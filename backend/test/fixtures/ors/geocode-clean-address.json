@@ -1,0 +1,104 @@
+{
+  "attribution": "© openrouteservice.org by HeiGIT | Geocoding results draw on OpenAddresses, OpenStreetMap and WhosOnFirst per source (see each feature's own `source` property); attribution terms: https://openrouteservice.org/terms-of-service/#attribution-geocode. Recorded from the live api.openrouteservice.org free tier for offline test use (§8.4, §17).",
+  "recordedAt": "2026-09-22T01:20:26Z",
+  "endpoint": "geocode/search",
+  "request": {
+    "text": "233 S Wacker Dr, Chicago, IL 60606",
+    "boundary.country": "US",
+    "size": 3
+  },
+  "responseStatus": 200,
+  "responseHeaders": {
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "99"
+  },
+  "responseBody": {
+    "geocoding": {
+      "version": "0.2",
+      "attribution": "https://openrouteservice.org/terms-of-service/#attribution-geocode",
+      "query": {
+        "text": "233 S Wacker Dr, Chicago, IL 60606",
+        "size": 3,
+        "private": false,
+        "boundary.country": [
+          "USA"
+        ],
+        "lang": {
+          "name": "English",
+          "iso6391": "en",
+          "iso6393": "eng",
+          "via": "default",
+          "defaulted": true
+        },
+        "querySize": 20,
+        "parser": "libpostal",
+        "parsed_text": {
+          "housenumber": "233",
+          "street": "s wacker dr",
+          "city": "chicago",
+          "state": "il",
+          "postalcode": "60606"
+        }
+      },
+      "engine": {
+        "name": "Pelias",
+        "author": "Mapzen",
+        "version": "1.0"
+      },
+      "timestamp": 1790040026716
+    },
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -87.635868,
+            41.878658
+          ]
+        },
+        "properties": {
+          "id": "us/il/cook-addresses-county:022d5c43ae4de352",
+          "gid": "openaddresses:address:us/il/cook-addresses-county:022d5c43ae4de352",
+          "layer": "address",
+          "source": "openaddresses",
+          "source_id": "us/il/cook-addresses-county:022d5c43ae4de352",
+          "name": "233 South Wacker Drive",
+          "housenumber": "233",
+          "street": "South Wacker Drive",
+          "postalcode": "60606",
+          "confidence": 1,
+          "match_type": "exact",
+          "accuracy": "point",
+          "country": "United States",
+          "country_gid": "whosonfirst:country:85633793",
+          "country_a": "USA",
+          "region": "Illinois",
+          "region_gid": "whosonfirst:region:85688697",
+          "region_a": "IL",
+          "county": "Cook County",
+          "county_gid": "whosonfirst:county:102084317",
+          "county_a": "CO",
+          "localadmin": "Chicago",
+          "localadmin_gid": "whosonfirst:localadmin:404496273",
+          "locality": "Chicago",
+          "locality_gid": "whosonfirst:locality:85940195",
+          "borough": "Central",
+          "borough_gid": "whosonfirst:borough:957999223",
+          "neighbourhood": "Loop",
+          "neighbourhood_gid": "whosonfirst:neighbourhood:85831409",
+          "continent": "North America",
+          "continent_gid": "whosonfirst:continent:102191575",
+          "label": "233 South Wacker Drive, Central, Chicago, IL, USA"
+        }
+      }
+    ],
+    "bbox": [
+      -87.635868,
+      41.878658,
+      -87.635868,
+      41.878658
+    ]
+  }
+}

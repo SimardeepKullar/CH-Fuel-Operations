@@ -1,0 +1,30 @@
+Fuel Card Transactions
+Transactions for Card # 3000001
+Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR
+B3000001A-TA,DRIVER SUB,201,2026-09-04 08:00:00,40277,LOVES #277,PRESCOTT,AR,TA,0.04,5.2000,5.0000,0.20,0,0,0,0,0,0,0.20,US,
+Transactions for Card # 3000002
+Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR
+B3000002A-TA,DRIVER MISMATCH,0,2026-09-04 09:00:00,40300,LOVES #300,AUSTIN,TX,TA,40.00,5.3000,5.1000,204.00,0,0,0,0,0,0,204.00,US,
+Transactions for Card # 3000003
+Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR
+B3000003A-TA,DRIVER CLOSE,210,2026-09-04 10:00:00,40275,LOVES #275,SPRINGFIELD,MO,TA,45.00,5.3000,5.1000,229.50,0,0,0,0,0,0,229.50,US,
+B3000003B-TA,DRIVER CLOSE,210,2026-09-04 11:18:00,40275,LOVES #275,SPRINGFIELD,MO,TA,42.00,5.3000,5.1000,214.20,0,0,0,0,0,0,214.20,US,
+Transactions for Card # 3000004
+Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR
+B3000004A-TA,DRIVER DEF,220,2026-09-04 12:00:00,40310,LOVES #310,TULSA,OK,TA,176.44,5.3000,5.1000,899.84,0,0,0,0,0,0,899.84,US,
+B3000004A-DF,DRIVER DEF,220,2026-09-04 12:00:00,40310,LOVES #310,TULSA,OK,DF,15.60,4.6000,4.6000,71.76,0,0,0,0,0,0,71.76,US,
+Transactions for Card # 3000005
+Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR
+B3000005A-S,DRIVER SCALE,230,2026-09-04 13:00:00,40400,LOVES #400,DALLAS,TX,S,0,0,0,15.25,0,0,0,0,0,0,15.25,US,
+Transactions for Card # 3000006
+Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR
+B3000006A-TA,DRIVER NORMAL,240,2026-09-04 14:00:00,40500,LOVES #500,HOUSTON,TX,TA,41.67,5.3000,5.1000,212.52,0,0,0,0,0,0,212.52,US,
+B3000006A-DF,DRIVER NORMAL,240,2026-09-04 14:00:00,40500,LOVES #500,HOUSTON,TX,DF,1.25,4.6000,4.6000,5.75,0,0,0,0,0,0,5.75,US,
+Express Codes
+DATE,EXPRESS CODE NUMBER, AUTH CODES, AMOUNT CASHED, FEE, TOTAL, CUR, PAYEE, NOTES
+Grand Totals
+PRODUCT, QTY, PRE TAX AMT, HST, GST, PST, QST, DISC RATE, DISC AMT, FINAL AMOUNT, CUR
+TA,345.15,0,0,0,0,0,0,0,1760.26,US,
+DF,16.85,0,0,0,0,0,0,0,77.51,US,
+S,,0,0,0,0,0,0,0,15.25,US,
+Grand Total,,0,0,0,0,0,0,0,1853.02,US,

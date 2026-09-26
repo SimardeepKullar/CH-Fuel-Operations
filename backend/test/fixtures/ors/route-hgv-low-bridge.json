@@ -1,0 +1,197 @@
+{
+  "attribution": "© openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors, ODbL 1.0 (https://www.openstreetmap.org/copyright). Recorded from the live api.openrouteservice.org free tier for offline test use (§8.4, §17).",
+  "recordedAt": "2026-09-14T23:00:00Z",
+  "endpoint": "driving-hgv",
+  "note": "Origin/destination straddle the Norfolk Southern-Gregson Street Overpass (the '11foot8' bridge), Durham NC, 35.999111,-78.910139, an 11'8\" (3.56m) clearance. Truck height spec 4.11m forces a detour; compare against route-car-low-bridge.json.",
+  "request": {
+    "coordinates": [
+      [
+        -78.9101,
+        35.9935
+      ],
+      [
+        -78.9101,
+        36.0045
+      ]
+    ],
+    "options": {
+      "profile_params": {
+        "restrictions": {
+          "length": 22.5,
+          "width": 2.6,
+          "height": 4.11,
+          "axleload": 9.0,
+          "weight": 36.287,
+          "hazmat": false
+        }
+      }
+    }
+  },
+  "responseStatus": 200,
+  "responseHeaders": {
+    "x-ratelimit-limit": "200",
+    "x-ratelimit-remaining": "193"
+  },
+  "responseBody": {
+    "bbox": [
+      -78.912089,
+      35.993562,
+      -78.90765,
+      36.004477
+    ],
+    "routes": [
+      {
+        "summary": {
+          "distance": 2061.5,
+          "duration": 301.7
+        },
+        "segments": [
+          {
+            "distance": 2061.5,
+            "duration": 301.7,
+            "steps": [
+              {
+                "distance": 470.2,
+                "duration": 33.6,
+                "type": 11,
+                "instruction": "Head west",
+                "name": "-",
+                "way_points": [
+                  0,
+                  11
+                ]
+              },
+              {
+                "distance": 209,
+                "duration": 21.5,
+                "type": 13,
+                "instruction": "Keep right",
+                "name": "-",
+                "way_points": [
+                  11,
+                  24
+                ]
+              },
+              {
+                "distance": 189.7,
+                "duration": 32,
+                "type": 0,
+                "instruction": "Turn left onto West Chapel Hill Street",
+                "name": "West Chapel Hill Street",
+                "way_points": [
+                  24,
+                  30
+                ]
+              },
+              {
+                "distance": 390.3,
+                "duration": 47.5,
+                "type": 0,
+                "instruction": "Turn left onto South Duke Street",
+                "name": "South Duke Street",
+                "way_points": [
+                  30,
+                  39
+                ]
+              },
+              {
+                "distance": 365,
+                "duration": 62.1,
+                "type": 0,
+                "instruction": "Turn left onto West Morgan Street, US 70 Business",
+                "name": "West Morgan Street, US 70 Business",
+                "way_points": [
+                  39,
+                  55
+                ]
+              },
+              {
+                "distance": 341.6,
+                "duration": 82,
+                "type": 3,
+                "instruction": "Turn sharp right onto Watts Street",
+                "name": "Watts Street",
+                "way_points": [
+                  55,
+                  64
+                ]
+              },
+              {
+                "distance": 95.6,
+                "duration": 23,
+                "type": 1,
+                "instruction": "Turn right onto Minerva Avenue",
+                "name": "Minerva Avenue",
+                "way_points": [
+                  64,
+                  65
+                ]
+              },
+              {
+                "distance": 0,
+                "duration": 0,
+                "type": 10,
+                "instruction": "Arrive at Minerva Avenue, on the left",
+                "name": "-",
+                "way_points": [
+                  65,
+                  65
+                ]
+              }
+            ]
+          }
+        ],
+        "bbox": [
+          -78.912089,
+          35.993562,
+          -78.90765,
+          36.004477
+        ],
+        "geometry": "w~tzE|bs`NI^[bAs@tAO`@gAbA{@f@g@RsA\\q@HuAFqEFUIc@Ic@QQYGQGg@B_@DOPWXOv@QREV??UAkB?_@?kA?_@?wCuB?i@?kA@I?u@McAe@o@]{@g@wDoB_@v@Wh@MTa@v@aAlBQ^QZMVO^K^Id@At@@h@Lz@DTJv@{@?Y?c@?S?]?uB?uBAeB?gBA@sE",
+        "way_points": [
+          0,
+          65
+        ]
+      }
+    ],
+    "metadata": {
+      "attribution": "openrouteservice.org | OpenStreetMap contributors",
+      "service": "routing",
+      "timestamp": 1789426835248,
+      "query": {
+        "coordinates": [
+          [
+            -78.9101,
+            35.9935
+          ],
+          [
+            -78.9101,
+            36.0045
+          ]
+        ],
+        "profile": "driving-hgv",
+        "profileName": "driving-hgv",
+        "format": "json",
+        "options": {
+          "profile_params": {
+            "restrictions": {
+              "length": 22.5,
+              "width": 2.6,
+              "height": 4.11,
+              "axleload": 9,
+              "weight": 36.287
+            },
+            "surface_quality_known": false,
+            "allow_unsuitable": false
+          }
+        }
+      },
+      "engine": {
+        "version": "9.10.0",
+        "build_date": "2026-08-13T11:53:14Z",
+        "graph_date": "2026-08-25T08:56:29Z",
+        "osm_date": "2026-08-17T00:00:02Z"
+      }
+    }
+  }
+}

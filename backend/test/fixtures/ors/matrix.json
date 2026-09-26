@@ -1,0 +1,117 @@
+{
+  "attribution": "© openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors, ODbL 1.0 (https://www.openstreetmap.org/copyright). Recorded from the live api.openrouteservice.org free tier for offline test use (§8.4, §17).",
+  "recordedAt": "2026-09-14T22:59:00Z",
+  "endpoint": "driving-hgv",
+  "request": {
+    "locations": [
+      [
+        -87.6298,
+        41.8781
+      ],
+      [
+        -90.1994,
+        38.627
+      ],
+      [
+        -96.797,
+        32.7767
+      ]
+    ],
+    "sources": [
+      0
+    ],
+    "destinations": [
+      1,
+      2
+    ],
+    "metrics": [
+      "distance",
+      "duration"
+    ]
+  },
+  "responseStatus": 200,
+  "responseHeaders": {
+    "x-ratelimit-limit": "50",
+    "x-ratelimit-remaining": "49"
+  },
+  "responseBody": {
+    "durations": [
+      [
+        25348.51,
+        77536.54
+      ]
+    ],
+    "distances": [
+      [
+        484905.5,
+        1558057.38
+      ]
+    ],
+    "destinations": [
+      {
+        "location": [
+          -90.19861,
+          38.626811
+        ],
+        "snapped_distance": 71.8
+      },
+      {
+        "location": [
+          -96.796753,
+          32.775944
+        ],
+        "snapped_distance": 87.18
+      }
+    ],
+    "sources": [
+      {
+        "location": [
+          -87.629771,
+          41.8781
+        ],
+        "snapped_distance": 2.38
+      }
+    ],
+    "metadata": {
+      "attribution": "openrouteservice.org | OpenStreetMap contributors",
+      "service": "matrix",
+      "timestamp": 1789426768829,
+      "query": {
+        "locations": [
+          [
+            -87.6298,
+            41.8781
+          ],
+          [
+            -90.1994,
+            38.627
+          ],
+          [
+            -96.797,
+            32.7767
+          ]
+        ],
+        "profile": "driving-hgv",
+        "profileName": "driving-hgv",
+        "responseType": "json",
+        "sources": [
+          "0"
+        ],
+        "destinations": [
+          "1",
+          "2"
+        ],
+        "metrics": [
+          "distance",
+          "duration"
+        ]
+      },
+      "engine": {
+        "version": "9.10.0",
+        "build_date": "2026-08-13T11:53:14Z",
+        "graph_date": "2026-08-25T08:56:29Z",
+        "osm_date": "2026-08-17T00:00:02Z"
+      }
+    }
+  }
+}

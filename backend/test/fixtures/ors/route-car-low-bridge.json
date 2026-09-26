@@ -1,0 +1,194 @@
+{
+  "attribution": "© openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors, ODbL 1.0 (https://www.openstreetmap.org/copyright). Recorded from the live api.openrouteservice.org free tier for offline test use (§8.4, §17).",
+  "recordedAt": "2026-09-14T23:00:05Z",
+  "endpoint": "driving-car",
+  "note": "Same coordinates as route-hgv-low-bridge.json, driving-car profile, for the T-10 DoD comparison.",
+  "request": {
+    "coordinates": [
+      [
+        -78.9101,
+        35.9935
+      ],
+      [
+        -78.9101,
+        36.0045
+      ]
+    ]
+  },
+  "responseStatus": 200,
+  "responseHeaders": {
+    "x-ratelimit-limit": "200",
+    "x-ratelimit-remaining": "192"
+  },
+  "responseBody": {
+    "bbox": [
+      -78.912626,
+      35.993562,
+      -78.908748,
+      36.004477
+    ],
+    "routes": [
+      {
+        "summary": {
+          "distance": 2076.9,
+          "duration": 217.8
+        },
+        "segments": [
+          {
+            "distance": 2076.9,
+            "duration": 217.8,
+            "steps": [
+              {
+                "distance": 470.2,
+                "duration": 29.6,
+                "type": 11,
+                "instruction": "Head west",
+                "name": "-",
+                "way_points": [
+                  0,
+                  11
+                ]
+              },
+              {
+                "distance": 209,
+                "duration": 25.1,
+                "type": 13,
+                "instruction": "Keep right",
+                "name": "-",
+                "way_points": [
+                  11,
+                  24
+                ]
+              },
+              {
+                "distance": 189.7,
+                "duration": 32,
+                "type": 0,
+                "instruction": "Turn left onto West Chapel Hill Street",
+                "name": "West Chapel Hill Street",
+                "way_points": [
+                  24,
+                  30
+                ]
+              },
+              {
+                "distance": 166.9,
+                "duration": 20,
+                "type": 0,
+                "instruction": "Turn left onto South Duke Street",
+                "name": "South Duke Street",
+                "way_points": [
+                  30,
+                  35
+                ]
+              },
+              {
+                "distance": 647,
+                "duration": 60.4,
+                "type": 0,
+                "instruction": "Turn left onto West Peabody Street",
+                "name": "West Peabody Street",
+                "way_points": [
+                  35,
+                  48
+                ]
+              },
+              {
+                "distance": 125,
+                "duration": 11.3,
+                "type": 5,
+                "instruction": "Turn slight right onto North Buchanan Boulevard",
+                "name": "North Buchanan Boulevard",
+                "way_points": [
+                  48,
+                  51
+                ]
+              },
+              {
+                "distance": 116.1,
+                "duration": 11.9,
+                "type": 1,
+                "instruction": "Turn right onto 16 Alley",
+                "name": "16 Alley",
+                "way_points": [
+                  51,
+                  55
+                ]
+              },
+              {
+                "distance": 57.3,
+                "duration": 10.3,
+                "type": 0,
+                "instruction": "Turn left onto Watts Street",
+                "name": "Watts Street",
+                "way_points": [
+                  55,
+                  56
+                ]
+              },
+              {
+                "distance": 95.6,
+                "duration": 17.2,
+                "type": 1,
+                "instruction": "Turn right onto Minerva Avenue",
+                "name": "Minerva Avenue",
+                "way_points": [
+                  56,
+                  57
+                ]
+              },
+              {
+                "distance": 0,
+                "duration": 0,
+                "type": 10,
+                "instruction": "Arrive at Minerva Avenue, on the left",
+                "name": "-",
+                "way_points": [
+                  57,
+                  57
+                ]
+              }
+            ]
+          }
+        ],
+        "bbox": [
+          -78.912626,
+          35.993562,
+          -78.908748,
+          36.004477
+        ],
+        "geometry": "w~tzE|bs`NI^[bAs@tAO`@gAbA{@f@g@RsA\\q@HuAFqEFUIc@Ic@QQYGQGg@B_@DOPWXOv@QREV??UAkB?_@?kA?_@?wCuB?i@?kA@I?u@MqCzFaAxBq@lAoBpCe@l@iAfAg@h@MJQDSAmCKqBGe@Fq@IgAEeBC?[?cAAS@mCgBA@sE",
+        "way_points": [
+          0,
+          57
+        ]
+      }
+    ],
+    "metadata": {
+      "attribution": "openrouteservice.org | OpenStreetMap contributors",
+      "service": "routing",
+      "timestamp": 1789426835800,
+      "query": {
+        "coordinates": [
+          [
+            -78.9101,
+            35.9935
+          ],
+          [
+            -78.9101,
+            36.0045
+          ]
+        ],
+        "profile": "driving-car",
+        "profileName": "driving-car",
+        "format": "json"
+      },
+      "engine": {
+        "version": "9.10.0",
+        "build_date": "2026-08-13T11:53:14Z",
+        "graph_date": "2026-09-12T17:48:32Z",
+        "osm_date": "2026-08-30T23:59:56Z"
+      }
+    }
+  }
+}

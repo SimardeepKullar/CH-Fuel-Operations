@@ -1,0 +1,177 @@
+{
+  "attribution": "© openrouteservice.org by HeiGIT | Geocoding results draw on OpenAddresses, OpenStreetMap and WhosOnFirst per source (see each feature's own `source` property); attribution terms: https://openrouteservice.org/terms-of-service/#attribution-geocode. Recorded from the live api.openrouteservice.org free tier for offline test use (§8.4, §17).",
+  "recordedAt": "2026-09-22T01:20:27Z",
+  "endpoint": "geocode/search",
+  "request": {
+    "text": "100 Main St",
+    "boundary.country": "US",
+    "size": 3
+  },
+  "responseStatus": 200,
+  "responseHeaders": {
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "98"
+  },
+  "responseBody": {
+    "geocoding": {
+      "version": "0.2",
+      "attribution": "https://openrouteservice.org/terms-of-service/#attribution-geocode",
+      "query": {
+        "text": "100 Main St",
+        "size": 3,
+        "private": false,
+        "boundary.country": [
+          "USA"
+        ],
+        "lang": {
+          "name": "English",
+          "iso6391": "en",
+          "iso6393": "eng",
+          "via": "default",
+          "defaulted": true
+        },
+        "querySize": 20,
+        "parser": "libpostal",
+        "parsed_text": {
+          "housenumber": "100",
+          "street": "main st"
+        }
+      },
+      "engine": {
+        "name": "Pelias",
+        "author": "Mapzen",
+        "version": "1.0"
+      },
+      "timestamp": 1790040027381
+    },
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -90.482483,
+            34.948201
+          ]
+        },
+        "properties": {
+          "id": "us/ar/statewide-addresses-state:6a8bb26a72c353e7",
+          "gid": "openaddresses:address:us/ar/statewide-addresses-state:6a8bb26a72c353e7",
+          "layer": "address",
+          "source": "openaddresses",
+          "source_id": "us/ar/statewide-addresses-state:6a8bb26a72c353e7",
+          "name": "100 Main Street",
+          "housenumber": "100",
+          "street": "Main Street",
+          "postalcode": "72348",
+          "confidence": 1,
+          "match_type": "exact",
+          "accuracy": "point",
+          "country": "United States",
+          "country_gid": "whosonfirst:country:85633793",
+          "country_a": "USA",
+          "region": "Arkansas",
+          "region_gid": "whosonfirst:region:85688549",
+          "region_a": "AR",
+          "county": "St. Francis County",
+          "county_gid": "whosonfirst:county:102082037",
+          "county_a": "SI",
+          "locality": "Hughes",
+          "locality_gid": "whosonfirst:locality:85919943",
+          "continent": "North America",
+          "continent_gid": "whosonfirst:continent:102191575",
+          "label": "100 Main Street, Hughes, AR, USA"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -116.758589,
+            36.909604
+          ]
+        },
+        "properties": {
+          "id": "node/2253450847",
+          "gid": "openstreetmap:address:node/2253450847",
+          "layer": "address",
+          "source": "openstreetmap",
+          "source_id": "node/2253450847",
+          "name": "100 Main Street",
+          "housenumber": "100",
+          "street": "Main Street",
+          "postalcode": "89003",
+          "confidence": 1,
+          "match_type": "exact",
+          "accuracy": "point",
+          "country": "United States",
+          "country_gid": "whosonfirst:country:85633793",
+          "country_a": "USA",
+          "region": "Nevada",
+          "region_gid": "whosonfirst:region:85688531",
+          "region_a": "NV",
+          "county": "Nye County",
+          "county_gid": "whosonfirst:county:102082609",
+          "county_a": "NY",
+          "locality": "Beatty",
+          "locality_gid": "whosonfirst:locality:85974979",
+          "continent": "North America",
+          "continent_gid": "whosonfirst:continent:102191575",
+          "label": "100 Main Street, Beatty, NV, USA",
+          "addendum": {
+            "osm": {
+              "phone": "+1 (775) 764-9848"
+            }
+          }
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -71.099936,
+            42.495218
+          ]
+        },
+        "properties": {
+          "id": "way/29801749",
+          "gid": "openstreetmap:address:way/29801749",
+          "layer": "address",
+          "source": "openstreetmap",
+          "source_id": "way/29801749",
+          "name": "100 Main Street",
+          "housenumber": "100",
+          "street": "Main Street",
+          "confidence": 1,
+          "match_type": "exact",
+          "accuracy": "point",
+          "country": "United States",
+          "country_gid": "whosonfirst:country:85633793",
+          "country_a": "USA",
+          "region": "Massachusetts",
+          "region_gid": "whosonfirst:region:85688645",
+          "region_a": "MA",
+          "county": "Middlesex County",
+          "county_gid": "whosonfirst:county:102084643",
+          "county_a": "MI",
+          "localadmin": "Stoneham",
+          "localadmin_gid": "whosonfirst:localadmin:404476015",
+          "locality": "Stoneham",
+          "locality_gid": "whosonfirst:locality:85950653",
+          "continent": "North America",
+          "continent_gid": "whosonfirst:continent:102191575",
+          "label": "100 Main Street, Stoneham, MA, USA"
+        }
+      }
+    ],
+    "bbox": [
+      -116.758589,
+      34.948201,
+      -71.099936,
+      42.495218
+    ]
+  }
+}

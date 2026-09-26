@@ -1,0 +1,47 @@
+{
+  "name": "ch-fuel-planner",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/SimardeepKullar/CH-Fuel-Planner#readme",
+  "bugs": {
+    "url": "https://github.com/SimardeepKullar/CH-Fuel-Planner/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SimardeepKullar/CH-Fuel-Planner.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "private": true,
+  "type": "commonjs",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "predev": "docker compose up -d && npm run build --workspace backend",
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run db:migrate --workspace backend",
+    "db:migrate:real": "npm run db:migrate:real --workspace backend",
+    "seed": "npm run seed --workspace backend",
+    "ingest": "tsx backend/src/cli/ingest.ts",
+    "backfill": "tsx backend/src/cli/backfill.ts",
+    "import-invoice": "tsx backend/src/cli/importInvoice.ts",
+    "backfill-invoices": "tsx backend/src/cli/backfillInvoices.ts",
+    "resolve": "tsx backend/src/cli/resolve.ts",
+    "reresolve": "tsx backend/src/cli/reresolve.ts",
+    "serve": "tsx backend/src/cli/serve.ts",
+    "db:reset": "docker compose down -v && docker compose up -d --wait && npm run db:migrate",
+    "db:logs": "docker compose logs -f db",
+    "pretypecheck": "npm run build --workspace backend",
+    "typecheck": "npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
+    "lint": "npm run lint --workspace frontend && npm run lint --workspace backend",
+    "test": "npm run test --workspace backend && npm run test --workspace frontend",
+    "test:unit": "npm run test:unit --workspace backend && npm run test --workspace frontend",
+    "verify": "npm run typecheck && npm run lint && npm test",
+    "prepare": "git config core.hooksPath .githooks"
+  }
+}

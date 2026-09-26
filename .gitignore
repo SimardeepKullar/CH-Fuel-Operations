@@ -1,0 +1,45 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+scripts/.cache/
+__pycache__/
+
+# graphify: regenerable output (run `graphify update .` to rebuild), also
+# embeds converted operator-export data that shouldn't be checked in
+graphify-out/
+
+# Claude Code: live session lock, not project config
+.claude/scheduled_tasks.lock
+
+# ─── Real BVD data — local only, never committed ──────────────────────────
+# Git history is permanent and repo visibility is one misclick, so neither of
+# these is ever committed, private repo or not. Each has small synthetic
+# stand-ins that ARE committed and are what CI runs; the real files are read
+# only by describe.skipIf blocks that skip automatically when they are absent
+# (see parseInvoiceCsv.test.ts and parseBvdCsv.test.ts).
+#
+# data/bvd-invoices/ — real per-driver, per-transaction financial data (who
+# bought how much fuel, where, when, for how much). Synthetic fixtures live in
+# backend/test/fixtures/invoices/.
+data/bvd-invoices/
+# data/bvd-prices/ — BVD's daily price sheets: contract pricing. Untracked in T-51;
+# earlier commits still contain them (see T-50 for the history decision).
+# Synthetic fixtures live in backend/test/fixtures/bvd-prices/.
+data/bvd-prices/
+
+# docs/design/*.dc.html — exported design mockups embed a real slice of the
+# 999210 invoice (real gallons/billed prices across 16+ rows) as inline JS
+# mock data, not just the handful of figures documented in PROJECT-SCOPE-v2.md
+# §A19. Untracked in T-58; earlier commits still contain it (see T-50/T-58 for
+# the history decision).
+docs/design/*.dc.html
+
+# migrations/real/ — the real fleet roster (real driver names, real BVD
+# fuel-card numbers), mirroring migrations/synthetic/ file for file (T-58).
+# migrations/synthetic/ is what a fresh clone, CI and `db:migrate` apply by
+# default; point runMigrations at migrations/real instead, locally, to test
+# against the real invoice. Never committed, same reasoning as the rows above.
+migrations/real/

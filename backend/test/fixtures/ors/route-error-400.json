@@ -1,0 +1,34 @@
+{
+  "attribution": "© openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors, ODbL 1.0 (https://www.openstreetmap.org/copyright). Recorded from the live api.openrouteservice.org free tier for offline test use (§8.4, §17).",
+  "recordedAt": "2026-09-14T22:59:28Z",
+  "endpoint": "driving-hgv",
+  "request": {
+    "coordinates": [
+      [
+        -87.6298,
+        41.8781
+      ]
+    ]
+  },
+  "responseStatus": 400,
+  "responseHeaders": {
+    "x-ratelimit-limit": "200",
+    "x-ratelimit-remaining": "196"
+  },
+  "responseBody": {
+    "error": {
+      "code": 2003,
+      "message": "Parameter 'coordinates' has incorrect value or format."
+    },
+    "info": {
+      "engine": {
+        "build_date": "2026-08-13T11:53:14Z",
+        "graph_version": "5",
+        "graph_date": "2026-08-25T08:56:29Z",
+        "osm_date": "2026-08-17T00:00:02Z",
+        "version": "9.10.0"
+      },
+      "timestamp": 1789426768206
+    }
+  }
+}

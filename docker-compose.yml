@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ch_fuel
+      POSTGRES_PASSWORD: ch_fuel
+      POSTGRES_DB: ch_fuel_planner
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # -h 127.0.0.1 forces a TCP check. Without it pg_isready uses the unix
+      # socket, which the entrypoint's temporary init server also answers — so
+      # on a fresh volume the container reports healthy, `up --wait` returns,
+      # and db:migrate connects just as that temp server shuts down. The temp
+      # server runs with listen_addresses='', so TCP is only accepted once the
+      # real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ch_fuel -d ch_fuel_planner"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:

@@ -1,0 +1,34 @@
+name: CI
+on:
+  pull_request:
+  push: { branches: [main] }
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ch_fuel
+          POSTGRES_PASSWORD: ch_fuel
+          POSTGRES_DB: ch_fuel_planner
+        ports: ['5433:5432']
+        # -h 127.0.0.1 forces a TCP check. The unix socket is also answered by
+        # the entrypoint's temporary init server, so a socket check reports
+        # healthy before the real server is up — and CI always starts from a
+        # fresh volume, so it takes that path every run.
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U ch_fuel -d ch_fuel_planner"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://ch_fuel:ch_fuel@localhost:5433/ch_fuel_planner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: '.nvmrc', cache: npm }
+      - run: npm ci
+      - run: npm run db:migrate
+      - run: npm run verify

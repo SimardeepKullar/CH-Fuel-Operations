@@ -1,0 +1,5 @@
+#!/bin/sh
+# Full gate, same as CI: typecheck && lint && test (needs a live database).
+set -e
+
+npm run verify
