@@ -32,7 +32,7 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
 
     // The fixture's six cards. Only 3000002 (the unitMismatch case) needs a
     // driver and a resolved truck assignment — every other card is left
-    // with no assignment on purpose, which the other five rules don't need.
+    // with no assignment on purpose, which the other four rules don't need.
     await scopedPool.query(
       `INSERT INTO fuel_cards (card_number) VALUES
          ('3000001'), ('3000002'), ('3000003'), ('3000004'), ('3000005'), ('3000006')`,
@@ -53,7 +53,7 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     // Card 3000003's pair (the tooClose case) only groups by station once
     // "LOVES #275" resolves to a real `stations` row — every other card's
     // station text is left unresolved on purpose (T-29: a station miss
-    // never quarantines, and the other five rules don't need one).
+    // never quarantines, and the other four rules don't need one).
     await scopedPool.query(
       `INSERT INTO stations (supplier, site_ref, name_raw, city_raw, city_normalized, state_usps)
        VALUES ('BVD', '40275', 'LOVES #275', 'SPRINGFIELD', 'SPRINGFIELD', 'MO')`,
@@ -75,18 +75,17 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     return result.invoiceId;
   }
 
-  it("produces the expected flag count on import: one anomaly per rule, five total, asserted as a number", async () => {
+  it("produces the expected flag count on import: one anomaly per rule, four total, asserted as a number", async () => {
     await importCases();
 
     const { rows } = await scopedPool.query<{ count: string }>("SELECT count(*) FROM anomalies");
-    expect(rows[0]?.count).toBe("5");
+    expect(rows[0]?.count).toBe("4");
 
     const { rows: byRule } = await scopedPool.query<{ rule: string; count: string }>(
       "SELECT rule, count(*) FROM anomalies GROUP BY rule ORDER BY rule",
     );
     expect(byRule).toEqual([
       { rule: "charges_no_fuel", count: "1" },
-      { rule: "def_ratio", count: "1" },
       { rule: "sub_gallon", count: "1" },
       { rule: "too_close", count: "1" },
       { rule: "unit_mismatch", count: "1" },
@@ -98,7 +97,7 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     await runAnomalies(scopedPool, invoiceId); // run it again directly
 
     const { rows } = await scopedPool.query<{ count: string }>("SELECT count(*) FROM anomalies");
-    expect(rows[0]?.count).toBe("5");
+    expect(rows[0]?.count).toBe("4");
   });
 
   it("a dismissed anomaly stays dismissed after a re-run", async () => {
@@ -112,28 +111,6 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.dismissed_at).not.toBeNull();
-  });
-
-  it("changing a threshold in the database changes the outcome with no code change", async () => {
-    const invoiceId = await importCases();
-    const before = await scopedPool.query<{ count: string }>("SELECT count(*) FROM anomalies");
-    expect(before.rows[0]?.count).toBe("5");
-
-    // Card 3000006 (the negative control) sits at a 3% DEF ratio — below the
-    // seeded 5% threshold, so it isn't flagged yet. Tightening the threshold
-    // below 3% must flag it on the very next run, with zero code changes.
-    await scopedPool.query(
-      "UPDATE anomaly_thresholds SET config = '{\"maxRatio\": 0.02, \"fuelProductCode\": \"TA\", \"defProductCode\": \"DF\"}' WHERE rule = 'def_ratio'",
-    );
-    await runAnomalies(scopedPool, invoiceId);
-
-    const after = await scopedPool.query<{ count: string }>("SELECT count(*) FROM anomalies");
-    expect(after.rows[0]?.count).toBe("6");
-
-    const { rows: defRatioRows } = await scopedPool.query<{ count: string }>(
-      "SELECT count(*) FROM anomalies WHERE rule = 'def_ratio'",
-    );
-    expect(defRatioRows[0]?.count).toBe("2");
   });
 
   it("a quarantined invoice produces zero anomalies", async () => {

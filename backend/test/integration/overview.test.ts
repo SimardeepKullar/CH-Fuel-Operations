@@ -111,10 +111,11 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
   it("receipt compliance and anomaly count reflect the database, not A5's pre-T-30/T-35 figures", async () => {
     const result = await getOverview(scopedPool, "2026-09-03");
     expect(result.kpis.receiptCompliance).toEqual({ confirmed: 0, total: 66 });
-    // 26, not 84 — 0005's driver/truck pairing now comes from the real
+    // 13, not 84 — 0005's driver/truck pairing now comes from the real
     // invoice instead of a guess, so the false-positive unit_mismatch
-    // findings the old pairing produced are gone (invoice999210.test.ts).
-    expect(result.kpis.anomaliesFlagged).toBe(26);
+    // findings the old pairing produced are gone (invoice999210.test.ts);
+    // and T-40A retired the def_ratio rule, dropping the count from 26 to 13.
+    expect(result.kpis.anomaliesFlagged).toBe(13);
   });
 
   it("a period with no matching invoice returns a well-formed empty payload over HTTP, not an error", async () => {

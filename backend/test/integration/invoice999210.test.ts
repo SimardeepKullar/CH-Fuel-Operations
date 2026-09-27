@@ -191,7 +191,9 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
   it("anomaly count matches T-30's engine against the real file (measured, not A5's stale figure)", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
-    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("26");
+    // 13, not 26 — T-40A retired the def_ratio rule, so its findings on this
+    // invoice no longer count.
+    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("13");
   });
 
   it("every stop and every express charge has a resolved truck or a named exclusion — none guessed", async () => {
