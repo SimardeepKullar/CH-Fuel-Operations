@@ -19,10 +19,6 @@ INSERT INTO anomaly_thresholds (rule, config) VALUES
   -- are implausible back-to-back purchases (§A10: 78 minutes at LOVES #275).
   ('too_close', '{"maxMinutesApart": 120}'),
 
-  -- DEF/diesel gallons ratio above this is well outside the ~3% norm
-  -- (§A10: 8.8% is the flagged case).
-  ('def_ratio', '{"maxRatio": 0.05, "fuelProductCode": "TA", "defProductCode": "DF"}'),
-
   -- A stop with charges but zero fuel gallons on TA/DF (§A10: a $15.25
   -- scale-only stop).
   ('charges_no_fuel', '{"fuelProductCodes": ["TA", "DF"]}'),

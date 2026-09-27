@@ -1,7 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "../invoice/productCode.js";
 import { chargesNoFuel, type ChargesNoFuelConfig, type ChargesNoFuelStop } from "./rules/chargesNoFuel.js";
-import { defRatio, type DefRatioConfig, type DefRatioStop } from "./rules/defRatio.js";
 import {
   priceAbovePublished,
   publishedPriceKey,
@@ -20,7 +19,6 @@ const RULE_NAMES = [
   "sub_gallon",
   "unit_mismatch",
   "too_close",
-  "def_ratio",
   "charges_no_fuel",
   "price_above_published",
 ] as const;
@@ -233,14 +231,6 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
   }));
   for (const finding of tooClose(tooCloseStops, thresholds.get("too_close") as TooCloseConfig)) {
     findings.push({ rule: "too_close", finding });
-  }
-
-  const defRatioStops: DefRatioStop[] = stops.map((s) => ({
-    id: s.id,
-    lines: (linesByStop.get(s.id) ?? []).map((l) => ({ productCode: l.product_code, gallons: l.gallons })),
-  }));
-  for (const finding of defRatio(defRatioStops, thresholds.get("def_ratio") as DefRatioConfig)) {
-    findings.push({ rule: "def_ratio", finding });
   }
 
   const chargesNoFuelStops: ChargesNoFuelStop[] = stops.map((s) => ({

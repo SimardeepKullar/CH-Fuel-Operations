@@ -1,13 +1,12 @@
 import type { AnomalyFlag as AnomalyFlagData } from "@ch/core/actuals/transactions";
 
-/** The six rules `runAnomalies.ts` currently writes (A10's table). A rule
+/** The five rules `runAnomalies.ts` currently writes (A10's table). A rule
  * added later without a label here still renders — humanized from its
  * slug — rather than disappearing or throwing. */
 const RULE_LABELS: Record<string, string> = {
   sub_gallon: "Sub-gal",
   unit_mismatch: "Unit mismatch",
   too_close: "Too close",
-  def_ratio: "DEF ratio",
   charges_no_fuel: "No fuel",
   price_above_published: "Price high",
 };

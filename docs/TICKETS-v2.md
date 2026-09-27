@@ -75,6 +75,12 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-38** | **Plan vs Actual matching and endpoints** | T-19, T-31 | **8** | **done — merged (`6737c0f`, PR #56)** |
 | **T-39** | **App shell — sidebar IA and invoice-period selector** | T-21 | **9** | **done — merged (`6bf9d8b`, PR #72)** |
 | **T-40** | **Transactions screen** | T-32, T-39 | **9** | **done — merged (`c04eb0b`, PR #75)** |
+| **T-40A** | **Remove the DEF ratio anomaly rule** | T-30, T-40 | **9** | **planned** |
+| **T-40B** | **Relabel the "No fuel" flag to "Scale"** | T-30, T-40 | **9** | **planned** |
+| **T-40C** | **Products-bought column on the transaction row** | T-32, T-40 | **9** | **planned** |
+| **T-40D** | **Filter bar spacing** | T-40 | **9** | **planned** |
+| **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
+| **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **new** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -439,6 +445,141 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 - [ ] The table scrolls horizontally as one unit — header, rows and totals footer stay aligned; the expansion never overlaps the panel beside it.
 - [ ] Keyboard: arrow-key row movement, `enter` to expand, `/` to focus search.
 - [ ] Anomaly flags render at two severities only.
+
+---
+
+## T-40A · Remove the DEF ratio anomaly rule
+
+**Priority 40A — polish pass on T-40's Transactions screen, from dispatcher review 2026-09-26.**
+
+**Goal.** `def_ratio` no longer runs as an anomaly rule. Stops with a high DEF-to-diesel ratio produce no finding, and the Flags column never shows a "DEF ratio" chip.
+
+**Why.** Not needed for how this fleet is dispatched — DEF top-offs vary enough in normal use that the rule mostly adds noise to the Flags column rather than directing attention anywhere useful, at only "amber" severity to begin with.
+
+**Fix.** Remove `"def_ratio"` from `RULE_NAMES` and its whole call path in `runAnomalies.ts`. Delete `backend/src/anomaly/rules/defRatio.ts` and `defRatio.test.ts`. Drop the `def_ratio` row from `anomaly_thresholds`'s seed — `migrations/synthetic/0004_actuals_config_seed.sql` and the mirrored `migrations/real/0004_actuals_config_seed.sql` (editing 0004 directly is fine pre-deploy, D21). Remove the `def_ratio` entry from `AnomalyFlag.tsx`'s `RULE_LABELS`. Clear any `def_ratio` rows a past run already wrote (`DELETE FROM anomalies WHERE rule = 'def_ratio'`, one-off, alongside the code change) so no orphaned flag with a since-removed rule lingers in the UI. Update `runAnomalies.test.ts` and any sibling test asserting a fixed per-rule or total finding count to drop the rule.
+
+**Files.** Modified: `backend/src/anomaly/runAnomalies.ts`, `migrations/synthetic/0004_actuals_config_seed.sql`, `migrations/real/0004_actuals_config_seed.sql`, `frontend/src/components/AnomalyFlag.tsx`, `backend/test/integration/runAnomalies.test.ts` (and sibling tests with a fixed finding count). Deleted: `backend/src/anomaly/rules/defRatio.ts`, `backend/src/anomaly/rules/defRatio.test.ts`.
+
+**Not in scope.** `backend/src/actuals/drivers.ts`'s own DEF-ratio figure — a separate, driver-level consumption statistic for the not-yet-built Drivers screen (T-45), computed directly from `fuel_stop_lines` rather than the anomaly engine. That stays; only the per-stop anomaly rule goes.
+
+**Dependencies.** T-30, T-40.
+
+**Definition of done.**
+- [ ] `runAnomalies` produces zero `def_ratio` findings on any invoice, existing or newly imported.
+- [ ] No orphaned `def_ratio` row remains in `anomalies`.
+- [ ] `npm run verify` green.
+
+---
+
+## T-40B · Relabel the "No fuel" flag to "Scale"
+
+**Priority 40B — polish pass on T-40, from dispatcher review 2026-09-26.**
+
+**Goal.** The `charges_no_fuel` anomaly flag reads **"Scale"** in the Flags column, not "No fuel".
+
+**Why.** Every real occurrence of this flag to date has been BVD's scale-weighing charge (§A10's own worked example — a card carrying only a $15.25 scale charge). "No fuel" reads like an error to a dispatcher scanning the column; "Scale" reads as the routine, expected thing it actually is.
+
+**Fix.** Display-only change: `RULE_LABELS.charges_no_fuel` in `frontend/src/components/AnomalyFlag.tsx` becomes `"Scale"`. The rule's slug (`charges_no_fuel`), its detection logic (a stop with a charge and zero fuel gallons), and every stored `anomalies.rule = 'charges_no_fuel'` row are untouched — only the label a dispatcher reads changes.
+
+**Files.** Modified: `frontend/src/components/AnomalyFlag.tsx`, `frontend/src/components/AnomalyFlag.test.tsx`.
+
+**Not in scope.** Renaming the backend rule slug itself (`charges_no_fuel`) — that touches existing `anomalies` rows, `anomaly_thresholds`, and every test keyed on the string, for no behavioral gain over a label change.
+
+**Dependencies.** T-30, T-40.
+
+**Definition of done.**
+- [ ] A `charges_no_fuel` finding renders as "Scale" in the Flags column.
+- [ ] `npm run verify` green.
+
+---
+
+## T-40C · Products-bought column on the transaction row
+
+**Priority 40C — polish pass on T-40, from dispatcher review 2026-09-26.**
+
+**Goal.** Each transaction row shows which products it carries (e.g. Diesel, DEF) as small badges, visible without expanding the row — the same way anomaly flags are already visible inline.
+
+**Why.** Today, seeing whether a stop bought DEF alongside diesel means expanding the row. The data is already on the wire: `frontend/src/app/(app)/transactions/page.tsx` already requests `includeLines: true` for the *whole* list (purely so `StopExpansion` can open instantly), so every row's `lines[]` is already sitting on the client, unused at the row level. This is a pure frontend read of existing data — no new backend request, no schema change.
+
+**Fix.** Add a `columnHelper.display({ id: "products", ... })` column to `TransactionsTable.tsx` (position TBD against the live layout — likely beside Flags) that reads `row.original.lines`, dedupes by `productCode`, and renders one small badge per distinct product via the existing `productLabel()` helper (`frontend/src/lib/transactionFilterConstants.ts`). Reuse the Flags column's visual language (small uppercase pill, `.anomaly-flag`'s sizing) but a neutral color — these are facts, not warnings. A row with `lines` undefined (shouldn't happen given `includeLines: true`, but the field is optional in the type) renders no badges rather than guessing from the diesel-only `gallons` summary.
+
+**Files.** Modified: `frontend/src/components/TransactionsTable.tsx`, `frontend/src/App.css` (new badge styling), `frontend/src/components/TransactionsTable.test.tsx`.
+
+**Not in scope.** Changing `StopExpansion`'s own product-line table (price, gallons, amount per line) — this column is a summary at a glance, not a replacement for the full detail.
+
+**Dependencies.** T-32, T-40.
+
+**Definition of done.**
+- [ ] A stop with both a TA and a DF line shows both a "Diesel" and a "DEF" badge collapsed.
+- [ ] A stop with one product shows only that badge.
+- [ ] `npm run verify` green.
+
+---
+
+## T-40D · Filter bar spacing
+
+**Priority 40D — polish pass on T-40, from dispatcher review 2026-09-26.**
+
+**Goal.** The filter bar's controls (search box, Driver/Truck/Card/State/Product/Receipt selects, the Flagged-only toggle, and the count + Clear group) read as one evenly spaced row — not the current uneven bunching — at both full desktop width and at the point the row wraps.
+
+**Why.** Reported live against the running Transactions screen. `.tx-toolbar-row` (`frontend/src/App.css`) mixes a flex-growing search input, several `flex: none` filter groups each with their own internal gap, and a `margin-left: auto` meta block on the end — a combination that can crowd or misalign once the row wraps at narrower widths.
+
+**Fix.** Needs a side-by-side look at the live screen before committing to specific values — this ticket starts with that review, not a blind CSS edit. Likely touches `.tx-toolbar-row`'s gap, `.tx-filter`'s internal spacing, and how `.tx-toolbar-meta` behaves once the row wraps.
+
+**Files.** Modified: `frontend/src/App.css` (`.tx-toolbar-row`, `.tx-filter`, `.tx-filter-label`, `.tx-filter-select`, `.tx-toolbar-meta` and neighbors).
+
+**Dependencies.** T-40.
+
+**Definition of done.**
+- [ ] Filter bar spacing confirmed even at desktop width and at the wrap breakpoint — the one visual check CLAUDE.md allows in place of an assertion (as T-04 step 4.2 does).
+- [ ] `npm run verify` green (no test-suite claim here beyond "nothing else broke" — this ticket is visual).
+
+---
+
+## T-40E · Unit column: invoice unit primary, assigned truck secondary
+
+**Priority 40E — polish pass on T-40, from dispatcher review 2026-09-26.**
+
+**Goal.** In the Unit column, the large/primary value becomes the unit number as entered on the invoice (`unit_raw` — what was actually pumped into that day); the driver's normally-assigned truck (resolved via the card→driver→assignment lookup) becomes the smaller secondary line. The `unit_mismatch` anomaly flag keeps firing exactly as it does today when the two disagree — this is a display-emphasis swap only, not a change to what counts as a mismatch.
+
+**Why.** The assigned truck is a schedule expectation; the invoice's raw unit is what actually happened that day, and a driver can legitimately run a different truck (a breakdown, a shop day) without that being wrong — just worth a glance via the existing flag. Today `RawResolved` (shared by the Driver and Unit columns; confirmed via `truckRawResolved()` in `backend/src/actuals/transactions.ts` and `resolveTruckForStop()` in `backend/src/resolve/resolveTruck.ts`) always renders `resolved` big and `raw` small — correct for Driver, backwards for Unit.
+
+**Fix.** Add a prop to `frontend/src/components/RawResolved.tsx` (e.g. `primary?: "resolved" | "raw"`, defaulting to `"resolved"` so every other caller, including the Driver column, is unaffected) and pass `primary="raw"` from the Unit column only, in `TransactionsTable.tsx`. Update the component's `resolved` and `disagreeing` states so each renders raw-big/resolved-small when `primary="raw"` — `unmatched` already shows raw alone and needs no change. No change to `agrees`, `truckRawResolved()`, or the `unit_mismatch` rule: they already compute exactly the right mismatch signal; only which already-computed value is styled as primary changes.
+
+**Files.** Modified: `frontend/src/components/RawResolved.tsx`, `frontend/src/components/TransactionsTable.tsx`, `frontend/src/App.css` (if the swapped state needs its own class), `frontend/src/components/RawResolved.test.tsx`.
+
+**Not in scope.** `backend/src/actuals/transactions.ts`'s `truckRawResolved()` and `backend/src/anomaly/rules/unitMismatch.ts` — both already correct; only frontend emphasis changes.
+
+**Dependencies.** T-40.
+
+**Definition of done.**
+- [ ] A stop where the invoice unit matches the assigned truck shows the invoice unit as the primary value.
+- [ ] A stop where they disagree still shows the `unit_mismatch` flag in the Flags column, with the invoice's (pumped) unit primary and the assigned truck as the smaller secondary value.
+- [ ] The Driver column's rendering is unchanged — still resolved-primary.
+- [ ] `npm run verify` green.
+
+---
+
+## T-40F · Sub-gallon flag: diesel only, not DEF
+
+**Priority 40F — polish pass on T-40, from dispatcher review 2026-09-26.**
+
+**Goal.** `sub_gallon` fires only on an implausibly small **diesel** (`TA`) line; a small DEF (`DF`) line no longer trips it.
+
+**Why.** DEF top-offs are routinely well under a gallon in normal use, unlike diesel. Flagging a tiny DEF line the same way an implausibly small diesel purchase is flagged produces a finding that's almost always noise for DEF specifically.
+
+**Fix.** Config-only — `subGallon.ts` already reads its eligible `productCodes` from `anomaly_thresholds` (D16: thresholds are data, not constants), currently seeded `["TA", "DF"]`. Change the `sub_gallon` row in `migrations/synthetic/0004_actuals_config_seed.sql` and the mirrored `migrations/real/0004_actuals_config_seed.sql` to `productCodes: ["TA"]`. No change to `subGallon.ts` itself.
+
+**Files.** Modified: `migrations/synthetic/0004_actuals_config_seed.sql`, `migrations/real/0004_actuals_config_seed.sql`, and any test fixture that currently relies on a sub-gallon DEF line being flagged (`backend/src/anomaly/rules/subGallon.test.ts`, `backend/test/integration/runAnomalies.test.ts`).
+
+**Not in scope.** A blanket "DEF is exempt from every rule" policy — `charges_no_fuel` still considers DEF where relevant; this change is specific to `sub_gallon`.
+
+**Dependencies.** T-30, T-40.
+
+**Definition of done.**
+- [ ] A DEF line under the configured minimum no longer produces a `sub_gallon` finding.
+- [ ] A diesel line under the minimum still does.
+- [ ] `npm run verify` green.
 
 ---
 
