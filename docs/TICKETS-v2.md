@@ -93,6 +93,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-56** | **Collapse `trucks` + `truck_profiles` into one table** | T-25, T-26 | **4** | **done — merged (`6f8d454`, PR #77)** |
 | **T-57** | **"Show all sheet stations" silently does nothing on a failed fetch** | T-23 | **5** | **done — merged (`3c8e56f`, PR #79)** |
 | **T-58** | **Real data out of the working tree — synthetic fleet roster, before the repo goes public** | T-25, T-51 | **10** | **in progress — history rewrite (T-50's original scope) still open** |
+| **T-59** | **"Show all sheet stations" dots vanish on a re-plan** | T-23 | **5** | **done — PR pending** |
 
 **Critical path:** T-25 → T-27 → T-28 → T-29 → T-31 → T-32 → T-40. Everything else in Phase 8/9 hangs off T-31 and can run in parallel once it lands. T-38/T-46 additionally need the v1 plan path (T-11…T-19) finished.
 
@@ -949,6 +950,29 @@ Matrix is the binding limit, and 25 plans a day is *exactly* ORS's daily matrix 
 **Files.** New: `migrations/synthetic/0001`–`0005` (moved from `migrations/`), `migrations/real/0001`–`0005` (gitignored). Modified: `backend/src/db/migrate.ts` (default dir, optional argv override), `backend/src/anomaly/rules/unitMismatch.ts`, `backend/src/actuals/otherCharges.ts`, `backend/src/invoice/parseInvoiceCsv.ts`, `backend/test/integration/support/actualsFixtures.ts` (`scopedSchema` takes an optional dir), roughly thirty backend test files (every one computing its own `migrationsDir`, plus `normalizeName`, `resolveDriver`, `resolveTruck`, `actualsSchema`, `actualsSeed`, `referenceLayer`, `reresolve`, `drivers`, `unitMismatch`, `transactions` for the roster names) and five frontend test files (`transactions/page`, `StopExpansion`, `TransactionsTable`, `useTransactionFilterOptions`, `useTransactionFilters`), `docs/PROJECT-SCOPE-v2.md` §A19, `docs/BUILD-PLAN-v2.md`, `docs/TICKETS-v2.md`, `CLAUDE.md`, `.gitignore`, `package.json` / `backend/package.json` (`db:migrate:real`).
 
 **Not in scope.** The git-history rewrite — T-50's original decision item (32 real BVD price-sheet CSVs committed in `4668db0`, still reachable from `main`) is still open, and this ticket's own edits need to survive that rewrite, not precede it into a squashed history that then gets rewritten again.
+
+---
+
+## T-59 · "Show all sheet stations" dots vanish on a re-plan
+
+**Priority 59 — a defect in T-23 step 23.2, distinct from T-57. Found 2026-09-26 reviewing a screenshot where the toggle read "Hide all sheet stations on map" but no green dots were drawn.**
+
+**Goal.** The sheet-stations layer survives computing a second plan while its toggle is already on, the same way the "Cheapest along route" hover highlight already does.
+
+**Why.** `RouteMap.tsx`'s "new plan" effect calls `buildMapSources(plan)` and writes every returned source to the map, including `SOURCE.sheet` — which `layers.ts` deliberately always returns empty for, since the sheet layer is meant to be drawn by its own dedicated effect instead. That dedicated effect only depended on `[sheetStations, ready]`. `useSheetStations` fetches once on mount and hands back a stable array reference, so on a second `POST /plans` the array never changes, the dedicated effect never re-fires, and the plan-effect's empty write is the last one to touch the source — the dots disappear even though the toggle stays on. The highlight layer's own effect already lists `plan` in its dependency array and was unaffected.
+
+**Fix.** Added `plan` to the sheet-stations data effect's dependency array (`RouteMap.tsx`), so it redraws immediately after the plan-effect's reset, in the same commit (React fires effects in declaration order). No backend change; `GET /stations` and the local database were already correct (verified 605/605 stations resolved).
+
+**Files.** Modified: `frontend/src/components/RouteMap.tsx`, `frontend/src/components/RouteMap.test.tsx`.
+
+**Not in scope.** T-57's failed-fetch handling (already merged, orthogonal — that ticket covers the fetch failing; this one covers a successful fetch's data being silently overwritten later).
+
+**Dependencies.** T-23.
+
+**Definition of done.**
+- [x] Toggling "Show all sheet stations on map" on, then computing a new plan, keeps the sheet dots drawn.
+- [x] Regression test added (`RouteMap.test.tsx`, "survives a re-plan"); confirmed it fails against the pre-fix code and passes against the fix.
+- [x] `npm run verify` green (other than one pre-existing, unrelated local-only failure in `backfillInvoicesCli.test.ts` gated on `data/bvd-invoices/`, not touched by this change).
 
 **Definition of done.**
 - [x] `git grep` across the tracked tree finds no real driver name, real card number, or the real A19 contract prices, outside the documented `hasRealFixture`-gated exceptions.

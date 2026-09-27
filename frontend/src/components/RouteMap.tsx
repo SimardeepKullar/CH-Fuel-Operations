@@ -206,12 +206,16 @@ export default function RouteMap({
   }, [showCandidates, ready]);
 
   // Sheet-stations data is fetched by PlanTab (useSheetStations), not here —
-  // just drawn whenever the prop changes.
+  // just drawn whenever the prop changes. Also redrawn on a new `plan`: the
+  // plan-effect above always resets every source via buildMapSources(), which
+  // deliberately leaves SOURCE.sheet empty (comment in layers.ts) since this
+  // effect is meant to own it — but that means a re-plan wipes it unless this
+  // effect also fires afterward to put the same data back.
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
     (map.getSource(SOURCE.sheet) as GeoJSONSource | undefined)?.setData(sheetStationsCollection(sheetStations));
-  }, [sheetStations, ready]);
+  }, [sheetStations, plan, ready]);
 
   // The sheet-stations toggle is a visibility flip, like the candidate toggle above.
   useEffect(() => {
