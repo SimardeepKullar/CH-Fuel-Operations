@@ -299,6 +299,29 @@ describe("RouteMap — all sheet stations layer (T-23 step 23.2)", () => {
     expect(features(map, SOURCE.sheet)).toHaveLength(1);
     expect(map.getSource(SOURCE.candidate)!.data).toBe(candidateData);
   });
+
+  it("survives a re-plan: sheet dots stay drawn when a new plan replaces the current one", async () => {
+    // Regression: buildMapSources() always resets SOURCE.sheet to empty as
+    // part of redrawing every source for a new plan (layers.ts leaves it
+    // empty on purpose, since this layer is meant to be owned by its own
+    // effect). useSheetStations fetches once and hands RouteMap a stable
+    // array, so without `plan` in this effect's own deps, a second plan
+    // would wipe the dots and nothing would ever redraw them.
+    // Same array reference across both renders, like the real
+    // useSheetStations hook hands RouteMap — a fresh `[SHEET_STATION]`
+    // literal on the rerender would make React see the prop as "changed"
+    // and mask the bug this test exists to catch.
+    const sheetStationsArr = [SHEET_STATION];
+    const { map, rerender } = await loadedMap(false, true, sheetStationsArr);
+    expect(features(map, SOURCE.sheet)).toHaveLength(1);
+
+    const secondPlan = { ...COMPLETED_PLAN, planId: "plan-map-2" };
+    rerender(
+      <RouteMap plan={secondPlan} showCandidates={false} showSheetStations={true} sheetStations={sheetStationsArr} />,
+    );
+    expect(features(map, SOURCE.sheet)).toHaveLength(1);
+    expect(features(map, SOURCE.sheet)[0]!.properties!.id).toBe("st-sheet-1");
+  });
 });
 
 describe("RouteMap — 'Cheapest along route' hover highlight (T-23 follow-up)", () => {
