@@ -7,7 +7,7 @@ const RULE_LABELS: Record<string, string> = {
   sub_gallon: "Sub-gal",
   unit_mismatch: "Unit mismatch",
   too_close: "Too close",
-  charges_no_fuel: "No fuel",
+  charges_no_fuel: "Scale",
   price_above_published: "Price high",
 };
 
