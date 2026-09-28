@@ -76,7 +76,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-39** | **App shell — sidebar IA and invoice-period selector** | T-21 | **9** | **done — merged (`6bf9d8b`, PR #72)** |
 | **T-40** | **Transactions screen** | T-32, T-39 | **9** | **done — merged (`c04eb0b`, PR #75)** |
 | **T-40A** | **Remove the DEF ratio anomaly rule** | T-30, T-40 | **9** | **done — merged (`69ca7f0`, PR #3)** |
-| **T-40B** | **Relabel the "No fuel" flag to "Scale"** | T-30, T-40 | **9** | **planned** |
+| **T-40B** | **Relabel the "No fuel" flag to "Scale"** | T-30, T-40 | **9** | **done — merged (`91086f4`, PR #4)** |
 | **T-40C** | **Products-bought column on the transaction row** | T-32, T-40 | **9** | **planned** |
 | **T-40D** | **Filter bar spacing** | T-40 | **9** | **planned** |
 | **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
@@ -488,8 +488,8 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Dependencies.** T-30, T-40.
 
 **Definition of done.**
-- [ ] A `charges_no_fuel` finding renders as "Scale" in the Flags column.
-- [ ] `npm run verify` green.
+- [x] A `charges_no_fuel` finding renders as "Scale" in the Flags column.
+- [x] `npm run verify` green.
 
 ---
 
