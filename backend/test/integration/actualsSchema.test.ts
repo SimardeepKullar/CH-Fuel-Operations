@@ -30,7 +30,7 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     await adminPool.end();
   });
 
-  it("applies all six migrations, and a second run is a no-op", async () => {
+  it("applies all five migrations, and a second run is a no-op", async () => {
     const first = await runMigrations(scopedPool, migrationsDir);
     expect(first.every((r) => !r.applied)).toBe(true);
     const { rows } = await scopedPool.query<{ filename: string }>(
@@ -42,7 +42,6 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
       "0003_actuals_schema.sql",
       "0004_actuals_config_seed.sql",
       "0005_fleet_roster_seed.sql",
-      "0006_remove_def_ratio_anomalies.sql",
     ]);
   });
 
