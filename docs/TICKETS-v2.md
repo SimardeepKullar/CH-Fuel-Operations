@@ -75,7 +75,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-38** | **Plan vs Actual matching and endpoints** | T-19, T-31 | **8** | **done — merged (`6737c0f`, PR #56)** |
 | **T-39** | **App shell — sidebar IA and invoice-period selector** | T-21 | **9** | **done — merged (`6bf9d8b`, PR #72)** |
 | **T-40** | **Transactions screen** | T-32, T-39 | **9** | **done — merged (`c04eb0b`, PR #75)** |
-| **T-40A** | **Remove the DEF ratio anomaly rule** | T-30, T-40 | **9** | **planned** |
+| **T-40A** | **Remove the DEF ratio anomaly rule** | T-30, T-40 | **9** | **done — merged (`69ca7f0`, PR #3)** |
 | **T-40B** | **Relabel the "No fuel" flag to "Scale"** | T-30, T-40 | **9** | **planned** |
 | **T-40C** | **Products-bought column on the transaction row** | T-32, T-40 | **9** | **planned** |
 | **T-40D** | **Filter bar spacing** | T-40 | **9** | **planned** |
