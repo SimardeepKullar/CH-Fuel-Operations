@@ -20,6 +20,13 @@ describe("AnomalyFlag", () => {
     expect(el.className).toContain("anomaly-flag-amber");
   });
 
+  it("renders charges_no_fuel as 'Scale', not 'No fuel'", () => {
+    render(<AnomalyFlag flag={{ rule: "charges_no_fuel", severity: "amber" }} />);
+    const el = screen.getByText("Scale");
+    expect(el.getAttribute("data-severity")).toBe("amber");
+    expect(el.className).toContain("anomaly-flag-amber");
+  });
+
   it("humanizes an unmapped rule slug rather than rendering nothing", () => {
     render(<AnomalyFlag flag={{ rule: "some_new_rule", severity: "amber" }} />);
     expect(screen.getByText("some new rule")).toBeTruthy();
