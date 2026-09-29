@@ -35,6 +35,7 @@
     "reresolve": "tsx backend/src/cli/reresolve.ts",
     "serve": "tsx backend/src/cli/serve.ts",
     "db:reset": "docker compose down -v && docker compose up -d --wait && npm run db:migrate",
+    "db:reset:real": "docker compose down -v && docker compose up -d --wait && npm run db:migrate:real && npm run seed && python scripts/load_gazetteer.py && npm run ingest -- data/bvd-prices/pcn-usd-9206810-981.csv && npm run backfill -- data/bvd-prices/2026-01/ && python scripts/resolve_from_operator.py && npm run resolve -- gazetteer && npm run import-invoice -- ./data/bvd-invoices/BVD_invoice_999210.pdf",
     "db:logs": "docker compose logs -f db",
     "pretypecheck": "npm run build --workspace backend",
     "typecheck": "npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
