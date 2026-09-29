@@ -58,10 +58,3 @@ export function productBadgeVariant(code: string): string {
   const type = DEFAULT_INVOICE_PRODUCT_CODES.get(code);
   return type ? PRODUCT_BADGE_VARIANTS[type] : "neutral";
 }
-
-/** True when the code is BVD's scale-weighing charge (`S`) — used to
- * suppress the redundant `charges_no_fuel`/"Scale" flag once the Products
- * column already states the same fact as a badge (T-40G). */
-export function isScaleProductCode(code: string): boolean {
-  return DEFAULT_INVOICE_PRODUCT_CODES.get(code) === "scale";
-}

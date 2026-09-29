@@ -14,7 +14,6 @@ import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../lib/form
 import {
   PRODUCT_OPTIONS,
   RECEIPT_STATUS_OPTIONS,
-  isScaleProductCode,
   productBadgeVariant,
   productLabel,
 } from "../lib/transactionFilterConstants";
@@ -164,15 +163,12 @@ const columns: ColumnDef<TransactionListItem, any>[] = [
   columnHelper.display({
     id: "flags",
     header: "Flags",
-    // A stop carrying a Scale line already says so via the Products badge
-    // (T-40G) — showing `charges_no_fuel`/"Scale" here too would say the
-    // same fact twice, once as a fact and once as a warning. Any other
-    // charges_no_fuel stop (no Scale line — e.g. cash-only) keeps the flag.
+    // A charge-with-no-fuel stop (scale, cash, or otherwise) is a routine
+    // fact visible in the row's own line items, not an anomaly — the
+    // charges_no_fuel/"Scale" flag never renders here (T-40H, extending
+    // T-40G's Scale-badge-specific suppression to every case).
     cell: ({ row }) => {
-      const hasScaleLine = (row.original.lines ?? []).some((line) => isScaleProductCode(line.productCode));
-      const flags = hasScaleLine
-        ? row.original.flags.filter((f) => f.rule !== "charges_no_fuel")
-        : row.original.flags;
+      const flags = row.original.flags.filter((f) => f.rule !== "charges_no_fuel");
       return (
         <span className="tx-flags">
           {flags.map((f) => (

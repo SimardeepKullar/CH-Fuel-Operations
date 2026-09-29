@@ -194,7 +194,7 @@ describe("TransactionsTable", () => {
     expect(products.querySelector(".product-badge-scale")!.textContent).toBe("Scale");
   });
 
-  it("a stop with a Scale product line drops the redundant Scale flag, keeping other flags", () => {
+  it("a stop with a Scale product line drops the Scale flag, keeping other flags", () => {
     const scaleCharge = stop({
       lines: [{ productCode: "S", gallons: 0, retailUsdPerGal: 0, billedUsdPerGal: 0, amountUsd: 15.25, currency: "USD" }],
       flags: [
@@ -208,13 +208,17 @@ describe("TransactionsTable", () => {
     expect(flags.textContent).toContain("Sub-gal");
   });
 
-  it("a charges_no_fuel flag still shows when the stop has no Scale line", () => {
+  it("a charges_no_fuel flag also drops when the stop has no Scale line (T-40H)", () => {
     const cashOnly = stop({
       lines: [{ productCode: "C", gallons: 0, retailUsdPerGal: 0, billedUsdPerGal: 0, amountUsd: 5, currency: "USD" }],
-      flags: [{ rule: "charges_no_fuel", severity: "amber" }],
+      flags: [
+        { rule: "charges_no_fuel", severity: "amber" },
+        { rule: "sub_gallon", severity: "red" },
+      ],
     });
     render(<TransactionsTable {...baseProps([cashOnly])} />);
     const flags = document.querySelector(".tx-flags")!;
-    expect(flags.textContent).toContain("Scale");
+    expect(flags.textContent).not.toContain("Scale");
+    expect(flags.textContent).toContain("Sub-gal");
   });
 });
