@@ -11,7 +11,13 @@ import {
 import type { ReceiptStatus } from "@ch/core/db/types";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../lib/formatMoney";
-import { PRODUCT_OPTIONS, RECEIPT_STATUS_OPTIONS, productLabel } from "../lib/transactionFilterConstants";
+import {
+  PRODUCT_OPTIONS,
+  RECEIPT_STATUS_OPTIONS,
+  isScaleProductCode,
+  productBadgeVariant,
+  productLabel,
+} from "../lib/transactionFilterConstants";
 import type { FilterOption } from "../hooks/useTransactionFilterOptions";
 import type { TransactionFiltersState } from "../hooks/useTransactionFilters";
 import AnomalyFlag from "./AnomalyFlag";
@@ -147,7 +153,7 @@ const columns: ColumnDef<TransactionListItem, any>[] = [
       return (
         <span className="tx-products">
           {distinct.map((line) => (
-            <span key={line.productCode} className="product-badge">
+            <span key={line.productCode} className={`product-badge product-badge-${productBadgeVariant(line.productCode)}`}>
               {productLabel(line.productCode)}
             </span>
           ))}
@@ -158,13 +164,23 @@ const columns: ColumnDef<TransactionListItem, any>[] = [
   columnHelper.display({
     id: "flags",
     header: "Flags",
-    cell: ({ row }) => (
-      <span className="tx-flags">
-        {row.original.flags.map((f) => (
-          <AnomalyFlag key={f.rule} flag={f} />
-        ))}
-      </span>
-    ),
+    // A stop carrying a Scale line already says so via the Products badge
+    // (T-40G) — showing `charges_no_fuel`/"Scale" here too would say the
+    // same fact twice, once as a fact and once as a warning. Any other
+    // charges_no_fuel stop (no Scale line — e.g. cash-only) keeps the flag.
+    cell: ({ row }) => {
+      const hasScaleLine = (row.original.lines ?? []).some((line) => isScaleProductCode(line.productCode));
+      const flags = hasScaleLine
+        ? row.original.flags.filter((f) => f.rule !== "charges_no_fuel")
+        : row.original.flags;
+      return (
+        <span className="tx-flags">
+          {flags.map((f) => (
+            <AnomalyFlag key={f.rule} flag={f} />
+          ))}
+        </span>
+      );
+    },
   }),
 ];
 

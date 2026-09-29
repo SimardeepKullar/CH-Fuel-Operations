@@ -81,6 +81,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40D** | **Filter bar spacing** | T-40 | **9** | **planned** |
 | **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
+| **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **planned** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **new** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -579,6 +580,33 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Definition of done.**
 - [ ] A DEF line under the configured minimum no longer produces a `sub_gallon` finding.
 - [ ] A diesel line under the minimum still does.
+- [ ] `npm run verify` green.
+
+---
+
+## T-40G · Colour-code product badges; drop the redundant Scale flag
+
+**Priority 40G — polish pass on T-40C, from dispatcher review.**
+
+**Goal.** The Products column's badges (T-40C) are colour-coded per product — the site's light blue for Diesel, navy for DEF, green for Scale — instead of one neutral grey for every product. Separately, when a stop carries a Scale line, the Flags column no longer also shows the `charges_no_fuel`/"Scale" flag (T-40B) for that stop — the Products badge already states the fact, so the Flags column stops repeating it.
+
+**Why.** T-40C shipped every product badge in the same neutral grey, which reads fine for an unfamiliar product but doesn't let a dispatcher tell Diesel from DEF at a glance the way colour would. Separately, once Products shows a "Scale" badge, a stop with only a scale charge now says the same thing twice — once as a fact (Products: Scale) and once as a warning (Flags: Scale) — which reads as more alarming than it is.
+
+**Fix.**
+- `frontend/src/lib/transactionFilterConstants.ts`: add a `productBadgeVariant(code): string` alongside `productLabel`, mapping `InvoiceProductType` → `"diesel" | "def" | "scale" | "neutral"` (same tripwire map, same unmapped-code fallback as `productLabel`).
+- `frontend/src/components/TransactionsTable.tsx`: the `products` column applies `product-badge product-badge-${productBadgeVariant(line.productCode)}` per badge. The `flags` column reads `row.original.lines`; when any line's product is `scale`, it filters `charges_no_fuel` out of the flags it renders for that row. Every other flag (including `charges_no_fuel` on a stop with *no* scale line — e.g. a trailer- or cash-only charge) is unaffected.
+- `frontend/src/App.css`: `.product-badge` keeps `.anomaly-flag`'s pill sizing; `.product-badge-diesel`/`-def`/`-scale` use the site's existing `--color-accent` (light blue), `--color-accent-800` (navy) and `--color-candidate` (green) as solid fills with white text; `.product-badge-neutral` keeps T-40C's grey for the remaining product types (Trailer, Additive, Oil, Lubricant, Cash).
+
+**Files.** Modified: `frontend/src/lib/transactionFilterConstants.ts`, `frontend/src/components/TransactionsTable.tsx`, `frontend/src/App.css`, `frontend/src/components/TransactionsTable.test.tsx`.
+
+**Not in scope.** The `charges_no_fuel` detection rule itself or its stored `anomalies` rows (backend, T-30) — this is a display-only suppression in the Flags column, same boundary T-40B drew.
+
+**Dependencies.** T-40B, T-40C.
+
+**Definition of done.**
+- [ ] A Diesel badge, a DEF badge and a Scale badge render in three visually distinct colours (light blue / navy / green).
+- [ ] A stop with a Scale product line and a `charges_no_fuel` finding shows the Scale product badge but not the Scale flag.
+- [ ] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) still shows the Scale flag.
 - [ ] `npm run verify` green.
 
 ---

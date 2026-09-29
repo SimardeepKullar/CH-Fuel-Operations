@@ -1120,8 +1120,9 @@ select.input { width: 100%; }
 .tx-receipt-mark.missing { border-color: var(--color-error-border); background: var(--color-error-bg); color: var(--color-error); }
 .tx-receipt-mark.pending { border-color: var(--color-border); background: var(--color-bg); color: var(--color-muted); }
 .tx-products { display: flex; flex-wrap: wrap; gap: 4px; }
-/* Same pill sizing as .anomaly-flag, but neutral — these are facts (what
-   was bought), not warnings. */
+/* Same pill sizing as .anomaly-flag; colour identifies the product itself
+   (T-40G), not a severity — light blue/navy/green are the site's own
+   accent/heading/candidate colours used elsewhere, not a bespoke palette. */
 .product-badge {
   display: inline-flex;
   align-items: center;
@@ -1130,10 +1131,12 @@ select.input { width: 100%; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-muted);
+  border: 1px solid;
 }
+.product-badge-diesel { border-color: var(--color-accent); background: var(--color-accent); color: #fff; }
+.product-badge-def { border-color: var(--color-accent-800); background: var(--color-accent-800); color: #fff; }
+.product-badge-scale { border-color: var(--color-candidate); background: var(--color-candidate); color: #fff; }
+.product-badge-neutral { border-color: var(--color-border); background: var(--color-bg); color: var(--color-muted); }
 .tx-flags { display: flex; flex-wrap: wrap; gap: 4px; }
 .tx-foot-row {
   align-items: center;

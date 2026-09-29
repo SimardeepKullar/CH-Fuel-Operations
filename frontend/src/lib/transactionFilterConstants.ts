@@ -12,6 +12,21 @@ const PRODUCT_LABELS: Record<InvoiceProductType, string> = {
   cash: "Cash",
 };
 
+/** T-40G: which colour a product's badge takes — the site's own light
+ * blue/navy/green (already used for the accent, headings, and map
+ * candidates elsewhere), not a bespoke palette. Every other product stays
+ * neutral, same as all of them were under T-40C. */
+const PRODUCT_BADGE_VARIANTS: Record<InvoiceProductType, string> = {
+  highway_diesel: "diesel",
+  def: "def",
+  scale: "scale",
+  trailer: "neutral",
+  additive: "neutral",
+  oil: "neutral",
+  lubricant: "neutral",
+  cash: "neutral",
+};
+
 /** The product filter's options — BVD's fixed, known invoice codes
  * (`productCode.ts`'s tripwire map), not derived from loaded rows: a
  * product with no stops this period should still be choosable, unlike
@@ -34,4 +49,19 @@ export const RECEIPT_STATUS_OPTIONS: FilterOption[] = [
 export function productLabel(code: string): string {
   const type = DEFAULT_INVOICE_PRODUCT_CODES.get(code);
   return type ? PRODUCT_LABELS[type] : code;
+}
+
+/** A product line's raw code -> its badge colour variant (T-40G). Falls
+ * back to "neutral" for anything outside the known tripwire map, mirroring
+ * `productLabel`'s own fallback. */
+export function productBadgeVariant(code: string): string {
+  const type = DEFAULT_INVOICE_PRODUCT_CODES.get(code);
+  return type ? PRODUCT_BADGE_VARIANTS[type] : "neutral";
+}
+
+/** True when the code is BVD's scale-weighing charge (`S`) — used to
+ * suppress the redundant `charges_no_fuel`/"Scale" flag once the Products
+ * column already states the same fact as a badge (T-40G). */
+export function isScaleProductCode(code: string): boolean {
+  return DEFAULT_INVOICE_PRODUCT_CODES.get(code) === "scale";
 }
