@@ -1070,10 +1070,10 @@ select.input { width: 100%; }
 
 .tx-panel { position: relative; background: var(--color-surface); border: 1px solid var(--color-border); }
 .tx-scroll { overflow-x: auto; }
-.tx-scroll-inner { min-width: 1166px; }
+.tx-scroll-inner { min-width: 1266px; }
 .tx-row-grid {
   display: grid;
-  grid-template-columns: 28px 100px 96px 150px 96px 170px 76px 96px 76px 96px 52px 130px;
+  grid-template-columns: 28px 100px 96px 150px 96px 170px 76px 96px 76px 96px 52px 100px 130px;
 }
 .tx-head-row {
   align-items: end;
@@ -1119,6 +1119,21 @@ select.input { width: 100%; }
 .tx-receipt-mark.confirmed { border-color: #7db98f; background: #eaf6ee; color: #2f7d4f; }
 .tx-receipt-mark.missing { border-color: var(--color-error-border); background: var(--color-error-bg); color: var(--color-error); }
 .tx-receipt-mark.pending { border-color: var(--color-border); background: var(--color-bg); color: var(--color-muted); }
+.tx-products { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Same pill sizing as .anomaly-flag, but neutral — these are facts (what
+   was bought), not warnings. */
+.product-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-muted);
+}
 .tx-flags { display: flex; flex-wrap: wrap; gap: 4px; }
 .tx-foot-row {
   align-items: center;

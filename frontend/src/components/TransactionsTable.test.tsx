@@ -141,4 +141,41 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable {...baseProps([flagged])} />);
     expect(screen.getByText("Sub-gal")).toBeTruthy();
   });
+
+  it("a stop with both a TA and a DF line shows both a Diesel and a DEF badge collapsed", () => {
+    render(<TransactionsTable {...baseProps([stop()])} />);
+    const products = document.querySelector(".tx-products")!;
+    expect(products.textContent).toContain("Diesel");
+    expect(products.textContent).toContain("DEF");
+    expect(products.querySelectorAll(".product-badge").length).toBe(2);
+  });
+
+  it("a stop with one product shows only that badge", () => {
+    const dieselOnly = stop({
+      lines: [{ productCode: "TA", gallons: 40.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 219.96, currency: "USD" }],
+    });
+    render(<TransactionsTable {...baseProps([dieselOnly])} />);
+    const products = document.querySelector(".tx-products")!;
+    expect(products.textContent).toBe("Diesel");
+    expect(products.querySelectorAll(".product-badge").length).toBe(1);
+  });
+
+  it("a stop with two lines of the same product shows one deduped badge", () => {
+    const duplicateProduct = stop({
+      lines: [
+        { productCode: "TA", gallons: 30.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 164.97, currency: "USD" },
+        { productCode: "TA", gallons: 10.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 54.99, currency: "USD" },
+      ],
+    });
+    render(<TransactionsTable {...baseProps([duplicateProduct])} />);
+    const products = document.querySelector(".tx-products")!;
+    expect(products.querySelectorAll(".product-badge").length).toBe(1);
+  });
+
+  it("a row with lines undefined renders no product badges", () => {
+    const noLines = stop({ lines: undefined });
+    render(<TransactionsTable {...baseProps([noLines])} />);
+    const products = document.querySelector(".tx-products")!;
+    expect(products.querySelectorAll(".product-badge").length).toBe(0);
+  });
 });
