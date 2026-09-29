@@ -82,7 +82,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
-| **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **planned** |
+| **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **new** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -629,10 +629,10 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Dependencies.** T-40G.
 
 **Definition of done.**
-- [ ] A stop with a `charges_no_fuel` finding and a Scale product line shows the Scale product badge but not the Scale flag (unchanged from T-40G).
-- [ ] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) also no longer shows the Scale flag.
-- [ ] Every other flag (`unit_mismatch`, `too_close`, `sub_gallon`, `price_above_published`) is unaffected.
-- [ ] `npm run verify` green.
+- [x] A stop with a `charges_no_fuel` finding and a Scale product line shows the Scale product badge but not the Scale flag (unchanged from T-40G).
+- [x] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) also no longer shows the Scale flag.
+- [x] Every other flag (`unit_mismatch`, `too_close`, `sub_gallon`, `price_above_published`) is unaffected.
+- [x] `npm run verify` green.
 
 ---
 
