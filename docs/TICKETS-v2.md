@@ -77,7 +77,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40** | **Transactions screen** | T-32, T-39 | **9** | **done — merged (`c04eb0b`, PR #75)** |
 | **T-40A** | **Remove the DEF ratio anomaly rule** | T-30, T-40 | **9** | **done — merged (`69ca7f0`, PR #3)** |
 | **T-40B** | **Relabel the "No fuel" flag to "Scale"** | T-30, T-40 | **9** | **done — merged (`91086f4`, PR #4)** |
-| **T-40C** | **Products-bought column on the transaction row** | T-32, T-40 | **9** | **planned** |
+| **T-40C** | **Products-bought column on the transaction row** | T-32, T-40 | **9** | **done — merged (`b44b66d`, PR #5)** |
 | **T-40D** | **Filter bar spacing** | T-40 | **9** | **planned** |
 | **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
@@ -510,9 +510,9 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Dependencies.** T-32, T-40.
 
 **Definition of done.**
-- [ ] A stop with both a TA and a DF line shows both a "Diesel" and a "DEF" badge collapsed.
-- [ ] A stop with one product shows only that badge.
-- [ ] `npm run verify` green.
+- [x] A stop with both a TA and a DF line shows both a "Diesel" and a "DEF" badge collapsed.
+- [x] A stop with one product shows only that badge.
+- [x] `npm run verify` green.
 
 ---
 
