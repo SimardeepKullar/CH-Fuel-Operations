@@ -82,6 +82,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
+| **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **planned** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **new** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -606,8 +607,32 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Definition of done.**
 - [x] A Diesel badge, a DEF badge and a Scale badge render in three visually distinct colours (light blue / navy / green).
 - [x] A stop with a Scale product line and a `charges_no_fuel` finding shows the Scale product badge but not the Scale flag.
-- [x] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) still shows the Scale flag.
+- [x] ~~A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) still shows the Scale flag.~~ Superseded by T-40H — the Scale flag is no longer shown in either case.
 - [x] `npm run verify` green.
+
+---
+
+## T-40H · Drop the Scale flag everywhere, not just alongside a Scale badge
+
+**Priority 40H — polish pass on T-40G, from dispatcher review 2026-09-29.**
+
+**Goal.** The Flags column never shows the `charges_no_fuel`/"Scale" flag, on any stop — not only the ones that also carry a Scale product line.
+
+**Why.** T-40G suppressed the flag only when the stop's own Products badges already stated the same fact ("Scale"), reasoning that repeating it as a warning overstated a routine charge. Dispatcher review found the same overstatement applies to every `charges_no_fuel` stop, not just scale ones — a cash-only or other no-fuel charge is a routine business fact visible in the row's line items, not something that needs flagging as an anomaly.
+
+**Fix.** `frontend/src/components/TransactionsTable.tsx`'s `flags` column: drop the `hasScaleLine` conditional and always filter `charges_no_fuel` out of the flags rendered for a row — the Scale-line branch T-40G added is no longer a special case, it's the only case. `isScaleProductCode` (`frontend/src/lib/transactionFilterConstants.ts`) becomes unused once that conditional is gone and is deleted along with its import.
+
+**Files.** Modified: `frontend/src/components/TransactionsTable.tsx`, `frontend/src/lib/transactionFilterConstants.ts`, `frontend/src/components/TransactionsTable.test.tsx`.
+
+**Not in scope.** The `charges_no_fuel` detection rule or its stored `anomalies` rows (backend, T-30), and any anomaly count that sums undismissed anomalies system-wide (T-39/T-41's `openAnomalyCount`) — this is a Transactions Flags-column display suppression only, the same boundary T-40B/T-40G drew. `AnomalyFlag.tsx`'s `charges_no_fuel` → "Scale" label mapping is untouched.
+
+**Dependencies.** T-40G.
+
+**Definition of done.**
+- [ ] A stop with a `charges_no_fuel` finding and a Scale product line shows the Scale product badge but not the Scale flag (unchanged from T-40G).
+- [ ] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) also no longer shows the Scale flag.
+- [ ] Every other flag (`unit_mismatch`, `too_close`, `sub_gallon`, `price_above_published`) is unaffected.
+- [ ] `npm run verify` green.
 
 ---
 
