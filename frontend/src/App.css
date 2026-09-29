@@ -1006,7 +1006,7 @@ select.input { width: 100%; }
   text-transform: uppercase;
   color: #a4abb9;
 }
-.tx-filter-select {
+select.tx-filter-select {
   width: auto;
   min-width: 96px;
   flex: none;
