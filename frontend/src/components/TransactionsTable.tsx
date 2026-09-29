@@ -11,7 +11,7 @@ import {
 import type { ReceiptStatus } from "@ch/core/db/types";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../lib/formatMoney";
-import { PRODUCT_OPTIONS, RECEIPT_STATUS_OPTIONS } from "../lib/transactionFilterConstants";
+import { PRODUCT_OPTIONS, RECEIPT_STATUS_OPTIONS, productLabel } from "../lib/transactionFilterConstants";
 import type { FilterOption } from "../hooks/useTransactionFilterOptions";
 import type { TransactionFiltersState } from "../hooks/useTransactionFilters";
 import AnomalyFlag from "./AnomalyFlag";
@@ -124,6 +124,33 @@ const columns: ColumnDef<TransactionListItem, any>[] = [
       return (
         <span className={`tx-receipt-mark ${status}`} title={RECEIPT_LABELS[status]}>
           {RECEIPT_MARKS[status]}
+        </span>
+      );
+    },
+  }),
+  columnHelper.display({
+    id: "products",
+    header: "Products",
+    // Facts, not warnings — a badge per distinct product the stop carries,
+    // in `.anomaly-flag`'s visual language but neutral color (T-40C).
+    // `lines` is optional on the type even though `includeLines: true` is
+    // always requested for this list; no lines means no badges rather than
+    // a guess off the diesel-only `gallons` summary.
+    cell: ({ row }) => {
+      const lines = row.original.lines ?? [];
+      const seen = new Set<string>();
+      const distinct = lines.filter((line) => {
+        if (seen.has(line.productCode)) return false;
+        seen.add(line.productCode);
+        return true;
+      });
+      return (
+        <span className="tx-products">
+          {distinct.map((line) => (
+            <span key={line.productCode} className="product-badge">
+              {productLabel(line.productCode)}
+            </span>
+          ))}
         </span>
       );
     },
@@ -469,6 +496,7 @@ export default function TransactionsTable({
                   {totals.avgRetail === null ? "—" : formatPricePerGal(totals.avgRetail)}
                 </span>
                 <span className="tx-foot-cell">{formatMoneyUsd(totals.totalUsd)}</span>
+                <span />
                 <span />
                 <span />
               </div>
