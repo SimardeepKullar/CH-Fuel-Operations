@@ -81,7 +81,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40D** | **Filter bar spacing** | T-40 | **9** | **planned** |
 | **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
-| **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **planned** |
+| **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **new** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -604,10 +604,10 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Dependencies.** T-40B, T-40C.
 
 **Definition of done.**
-- [ ] A Diesel badge, a DEF badge and a Scale badge render in three visually distinct colours (light blue / navy / green).
-- [ ] A stop with a Scale product line and a `charges_no_fuel` finding shows the Scale product badge but not the Scale flag.
-- [ ] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) still shows the Scale flag.
-- [ ] `npm run verify` green.
+- [x] A Diesel badge, a DEF badge and a Scale badge render in three visually distinct colours (light blue / navy / green).
+- [x] A stop with a Scale product line and a `charges_no_fuel` finding shows the Scale product badge but not the Scale flag.
+- [x] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) still shows the Scale flag.
+- [x] `npm run verify` green.
 
 ---
 
