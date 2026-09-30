@@ -79,7 +79,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40B** | **Relabel the "No fuel" flag to "Scale"** | T-30, T-40 | **9** | **done — merged (`91086f4`, PR #4)** |
 | **T-40C** | **Products-bought column on the transaction row** | T-32, T-40 | **9** | **done — merged (`b44b66d`, PR #5)** |
 | **T-40D** | **Filter bar spacing** | T-40 | **9** | **done — merged (`3d73602`, PR #7)** |
-| **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **planned** |
+| **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **done — merged (`3e02a8a`, PR #9)** |
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
 | **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
@@ -555,10 +555,10 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Dependencies.** T-40.
 
 **Definition of done.**
-- [ ] A stop where the invoice unit matches the assigned truck shows the invoice unit as the primary value.
-- [ ] A stop where they disagree still shows the `unit_mismatch` flag in the Flags column, with the invoice's (pumped) unit primary and the assigned truck as the smaller secondary value.
-- [ ] The Driver column's rendering is unchanged — still resolved-primary.
-- [ ] `npm run verify` green.
+- [x] A stop where the invoice unit matches the assigned truck shows the invoice unit as the primary value.
+- [x] A stop where they disagree still shows the `unit_mismatch` flag in the Flags column, with the invoice's (pumped) unit primary and the assigned truck as the smaller secondary value.
+- [x] The Driver column's rendering is unchanged — still resolved-primary.
+- [x] `npm run verify` green.
 
 ---
 
