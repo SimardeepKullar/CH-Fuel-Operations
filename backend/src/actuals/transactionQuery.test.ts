@@ -74,10 +74,10 @@ describe("buildTransactionFilterClause", () => {
     expect(clause.params).toEqual(["confirmed"]);
   });
 
-  it("anomalyOnly alone is an EXISTS against undismissed anomalies, never a post-filter", () => {
+  it("anomalyOnly alone is an EXISTS against undismissed anomalies, excluding charges_no_fuel, never a post-filter", () => {
     const clause = buildTransactionFilterClause({ anomalyOnly: true });
     expect(clause.whereSql).toBe(
-      "WHERE EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL)",
+      "WHERE EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL AND a.rule <> 'charges_no_fuel')",
     );
     expect(clause.params).toEqual([]);
   });
@@ -97,7 +97,7 @@ describe("buildTransactionFilterClause", () => {
     });
     expect(clause.whereSql).toBe(
       "WHERE fs.occurred_at >= $1 AND fs.driver_id = $2 AND " +
-        "EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL)",
+        "EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL AND a.rule <> 'charges_no_fuel')",
     );
     expect(clause.params).toEqual([dateFrom, "driver-1"]);
   });
