@@ -29,7 +29,14 @@ export interface TransactionFilters {
   /** A raw BVD product code (`TA`, `DF`, `S`, ...) — matches any line on the stop. */
   product?: string;
   receiptStatus?: ReceiptStatus;
-  /** Only stops carrying at least one undismissed anomaly. */
+  /**
+   * Only stops carrying at least one undismissed anomaly, excluding
+   * `charges_no_fuel` — that rule is never rendered as a flag anywhere on
+   * this screen (T-40H), so a stop whose only anomaly is `charges_no_fuel`
+   * must not satisfy a filter meant to mean "has a visible flag" (T-40I). A
+   * stop with `charges_no_fuel` plus another anomaly still matches on that
+   * other anomaly.
+   */
   anomalyOnly?: boolean;
 }
 
@@ -101,7 +108,7 @@ export function buildTransactionFilterClause(
   }
   if (filters.anomalyOnly) {
     conditions.push(
-      "EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL)",
+      "EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL AND a.rule <> 'charges_no_fuel')",
     );
   }
 

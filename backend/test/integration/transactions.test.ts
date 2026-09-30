@@ -174,7 +174,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
 
   it("anomalyOnly with a page size of 5 returns 5 flagged rows, not 5 rows of which some are flagged", async () => {
     const { rows: countRows } = await scopedPool.query<{ count: string }>(
-      "SELECT count(distinct subject_id) FROM anomalies WHERE subject_type = 'fuel_stop' AND dismissed_at IS NULL",
+      "SELECT count(distinct subject_id) FROM anomalies WHERE subject_type = 'fuel_stop' AND dismissed_at IS NULL AND rule <> 'charges_no_fuel'",
     );
     const flaggedCount = Number(countRows[0]!.count);
     expect(flaggedCount).toBeGreaterThanOrEqual(5); // the real 999210 fixture has plenty flagged
@@ -362,5 +362,95 @@ describe.skipIf(!hasDatabase)("fuel_stops default-sort query plan (integration)"
     const plan = rows.map((r) => r["QUERY PLAN"]).join("\n");
     expect(plan).not.toContain("Seq Scan");
     expect(plan).toMatch(/Index( Only)? Scan/);
+  });
+});
+
+/**
+ * T-40I: `anomalyOnly` must not match a stop whose only undismissed anomaly
+ * is `charges_no_fuel` — that rule is never rendered as a flag anywhere on
+ * this screen (T-40H), so it must not be able to satisfy a filter meant to
+ * mean "has a visible flag" either.
+ */
+describe.skipIf(!hasDatabase)("anomalyOnly excludes a charges_no_fuel-only stop (integration, T-40I)", () => {
+  let adminPool: Pool;
+  let scopedPool: Pool;
+  let schema: string;
+  let scaleOnlyId: string;
+  let scaleAndMismatchId: string;
+
+  beforeEach(async () => {
+    schema = `test_transactions_anomaly_only_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    adminPool = new Pool({ connectionString: process.env.DATABASE_URL });
+    await adminPool.query(`CREATE SCHEMA "${schema}"`);
+    scopedPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      options: `-c search_path=${schema},public`,
+    });
+    await runMigrations(scopedPool, migrationsDir);
+
+    await scopedPool.query(
+      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, grand_total_usd, status, file_sha256)
+       VALUES ('T-40I-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 0, 'imported', repeat('1', 64))`,
+    );
+    await scopedPool.query("INSERT INTO fuel_cards (card_number) VALUES ('9999901'), ('9999902')");
+
+    const { rows: scaleOnlyRows } = await scopedPool.query<{ id: string }>(
+      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total_usd)
+       VALUES ((SELECT id FROM invoices WHERE invoice_number = 'T-40I-TEST'), 'SCALE-ONLY',
+               TIMESTAMPTZ '2020-01-01', (SELECT id FROM fuel_cards WHERE card_number = '9999901'),
+               '900', 'SCALE ONLY DRIVER', 15.00)
+       RETURNING id`,
+    );
+    const scaleOnlyStopId = scaleOnlyRows[0]!.id;
+    const { rows: scaleAndMismatchRows } = await scopedPool.query<{ id: string }>(
+      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total_usd)
+       VALUES ((SELECT id FROM invoices WHERE invoice_number = 'T-40I-TEST'), 'SCALE-AND-MISMATCH',
+               TIMESTAMPTZ '2020-01-02', (SELECT id FROM fuel_cards WHERE card_number = '9999902'),
+               '901', 'SCALE AND MISMATCH DRIVER', 20.00)
+       RETURNING id`,
+    );
+    const scaleAndMismatchStopId = scaleAndMismatchRows[0]!.id;
+
+    await scopedPool.query(
+      `INSERT INTO anomalies (subject_type, subject_id, rule, severity) VALUES
+         ('fuel_stop', $1, 'charges_no_fuel', 'amber'),
+         ('fuel_stop', $2, 'charges_no_fuel', 'amber'),
+         ('fuel_stop', $2, 'unit_mismatch', 'red')`,
+      [scaleOnlyStopId, scaleAndMismatchStopId],
+    );
+
+    scaleOnlyId = scaleOnlyStopId;
+    scaleAndMismatchId = scaleAndMismatchStopId;
+  });
+
+  afterEach(async () => {
+    await scopedPool.end();
+    await adminPool.query(`DROP SCHEMA "${schema}" CASCADE`);
+    await adminPool.end();
+  });
+
+  it("a stop whose only undismissed anomaly is charges_no_fuel is absent from anomalyOnly", async () => {
+    const result = await listTransactions(
+      scopedPool,
+      { anomalyOnly: true },
+      { field: "occurred_at", direction: "desc" },
+      { page: 1, pageSize: 10 },
+    );
+    const ids = result.rows.map((r) => r.id);
+    expect(ids).not.toContain(scaleOnlyId);
+    expect(ids).toContain(scaleAndMismatchId);
+    expect(result.total).toBe(1);
+  });
+
+  it("a stop with charges_no_fuel plus another anomaly still shows that other flag", async () => {
+    const result = await listTransactions(
+      scopedPool,
+      { anomalyOnly: true },
+      { field: "occurred_at", direction: "desc" },
+      { page: 1, pageSize: 10 },
+    );
+    const row = result.rows.find((r) => r.id === scaleAndMismatchId);
+    expect(row).toBeDefined();
+    expect(row!.flags.some((f) => f.rule === "unit_mismatch")).toBe(true);
   });
 });
