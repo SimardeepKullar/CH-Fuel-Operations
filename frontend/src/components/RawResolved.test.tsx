@@ -39,4 +39,30 @@ describe("RawResolved", () => {
     const el = screen.getByText("072");
     expect(el.getAttribute("data-state")).toBe("unmatched");
   });
+
+  it('primary="raw", resolved state: shows the raw value as primary, resolved as the secondary line', () => {
+    render(<RawResolved value={{ resolved: "072", raw: "072R", agrees: true }} showRawWhenAgreeing primary="raw" />);
+    expect(document.querySelector(".rr-value")?.textContent).toBe("072R");
+    expect(document.querySelector(".rr-raw")?.textContent).toBe("072");
+  });
+
+  it('primary="raw", disagreeing state: shows the raw (pumped) value as primary and ≠assigned truck as secondary', () => {
+    render(<RawResolved value={{ resolved: "072", raw: "0", agrees: false }} primary="raw" />);
+    const wrapper = document.querySelector('[data-state="disagreeing"]');
+    expect(wrapper).not.toBeNull();
+    expect(document.querySelector(".rr-disagree-value")?.textContent).toBe("0");
+    expect(document.querySelector(".rr-disagree-raw")?.textContent).toBe("≠072");
+  });
+
+  it('primary="raw" does not change the unmatched state (raw alone either way)', () => {
+    render(<RawResolved value={{ resolved: null, raw: "J SMITH", agrees: null }} primary="raw" />);
+    const el = screen.getByText("J SMITH");
+    expect(el.getAttribute("data-state")).toBe("unmatched");
+  });
+
+  it("primary defaults to resolved, leaving the Driver column's rendering unchanged", () => {
+    render(<RawResolved value={{ resolved: "072", raw: "0", agrees: false }} />);
+    expect(document.querySelector(".rr-disagree-value")?.textContent).toBe("072");
+    expect(document.querySelector(".rr-disagree-raw")?.textContent).toBe("≠0");
+  });
 });

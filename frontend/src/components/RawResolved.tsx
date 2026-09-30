@@ -29,6 +29,13 @@ interface RawResolvedProps {
    * instead of a second hand-rolled monospace/dotted span appearing there.
    */
   rawOnly?: boolean;
+  /**
+   * Which value gets the large/primary treatment. Defaults to "resolved"
+   * (correct for Driver). The Unit column passes "raw": the invoice's
+   * pumped unit is what actually happened that day, while the assigned
+   * truck is a schedule expectation — T-40E.
+   */
+  primary?: "resolved" | "raw";
 }
 
 /**
@@ -43,7 +50,12 @@ interface RawResolvedProps {
  * own `"unmatched"` state below, rather than silently falling into either
  * of the other two.
  */
-export default function RawResolved({ value, showRawWhenAgreeing = false, rawOnly = false }: RawResolvedProps) {
+export default function RawResolved({
+  value,
+  showRawWhenAgreeing = false,
+  rawOnly = false,
+  primary = "resolved",
+}: RawResolvedProps) {
   const state = rawOnly ? "unmatched" : stateOf(value);
 
   if (state === "unmatched") {
@@ -55,18 +67,20 @@ export default function RawResolved({ value, showRawWhenAgreeing = false, rawOnl
   }
 
   if (state === "disagreeing") {
+    const [big, small] = primary === "raw" ? [value.raw, value.resolved] : [value.resolved, value.raw];
     return (
       <span className="rr rr-disagree" data-state="disagreeing">
-        <span className="rr-disagree-value">{value.resolved}</span>
-        <span className="rr-disagree-raw">&ne;{value.raw}</span>
+        <span className="rr-disagree-value">{big}</span>
+        <span className="rr-disagree-raw">&ne;{small}</span>
       </span>
     );
   }
 
+  const [big, small] = primary === "raw" ? [value.raw, value.resolved] : [value.resolved, value.raw];
   return (
     <span className="rr rr-resolved" data-state="resolved">
-      <span className="rr-value">{value.resolved}</span>
-      {showRawWhenAgreeing && <span className="rr-raw">{value.raw}</span>}
+      <span className="rr-value">{big}</span>
+      {showRawWhenAgreeing && <span className="rr-raw">{small}</span>}
     </span>
   );
 }
