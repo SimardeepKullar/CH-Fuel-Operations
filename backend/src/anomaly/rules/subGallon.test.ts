@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { subGallon, type SubGallonConfig, type SubGallonStop } from "./subGallon.js";
 
-const CONFIG: SubGallonConfig = { minGallons: "1.00", productCodes: ["TA", "DF"] };
+const CONFIG: SubGallonConfig = { minGallons: "1.00", productCodes: ["TA"] };
 
 describe("subGallon", () => {
   it("flags 0.04 gal / $0.20 at LOVES #277 (999210) as a billing error", () => {
@@ -43,6 +43,14 @@ describe("subGallon", () => {
   it("ignores a non-fuel product code even when its quantity is tiny", () => {
     const stops: SubGallonStop[] = [
       { id: "stop-oil", lines: [{ productCode: "O", gallons: "0.10", amountUsd: "5.00" }] },
+    ];
+
+    expect(subGallon(stops, CONFIG)).toEqual([]);
+  });
+
+  it("T-40F: a sub-gallon DEF line is not flagged — DEF top-offs routinely run well under a gallon", () => {
+    const stops: SubGallonStop[] = [
+      { id: "stop-def", lines: [{ productCode: "DF", gallons: "0.04", amountUsd: "0.20" }] },
     ];
 
     expect(subGallon(stops, CONFIG)).toEqual([]);

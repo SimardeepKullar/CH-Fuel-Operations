@@ -191,9 +191,11 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
   it("anomaly count matches T-30's engine against the real file (measured, not A5's stale figure)", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
-    // 13, not 26 — T-40A retired the def_ratio rule, so its findings on this
-    // invoice no longer count.
-    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("13");
+    // 12, not 26 — T-40A retired the def_ratio rule, so its findings on this
+    // invoice no longer count. T-40F then narrowed sub_gallon to diesel
+    // (TA) only, dropping this invoice's one sub-gallon DEF line
+    // (0.46 gal) from 13 to 12.
+    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("12");
   });
 
   it("every stop and every express charge has a resolved truck or a named exclusion — none guessed", async () => {
