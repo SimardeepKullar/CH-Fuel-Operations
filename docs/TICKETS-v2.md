@@ -80,7 +80,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40C** | **Products-bought column on the transaction row** | T-32, T-40 | **9** | **done — merged (`b44b66d`, PR #5)** |
 | **T-40D** | **Filter bar spacing** | T-40 | **9** | **done — merged (`3d73602`, PR #7)** |
 | **T-40E** | **Unit column: invoice unit primary, assigned truck secondary** | T-40 | **9** | **done — merged (`3e02a8a`, PR #9)** |
-| **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
+| **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **done — merged (`4aecaf3`, PR #11)** |
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
 | **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
 | **T-40I** | **"Flagged only" no longer matches a charges_no_fuel-only stop** | T-40H | **9** | **done — merged (`987cc02`, PR #10)** |
@@ -580,9 +580,9 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Dependencies.** T-30, T-40.
 
 **Definition of done.**
-- [ ] A DEF line under the configured minimum no longer produces a `sub_gallon` finding.
-- [ ] A diesel line under the minimum still does.
-- [ ] `npm run verify` green.
+- [x] A DEF line under the configured minimum no longer produces a `sub_gallon` finding.
+- [x] A diesel line under the minimum still does.
+- [x] `npm run verify` green.
 
 ---
 
