@@ -9,7 +9,9 @@
 INSERT INTO anomaly_thresholds (rule, config) VALUES
   -- Below this many gallons on a fuel line, a transaction is implausible
   -- rather than a genuinely tiny top-up (§A10: 0.04 gal at LOVES #277).
-  ('sub_gallon', '{"minGallons": "1.00", "productCodes": ["TA", "DF"]}'),
+  -- Diesel (TA) only — a small DEF (DF) top-off is routine, not implausible
+  -- (T-40F).
+  ('sub_gallon', '{"minGallons": "1.00", "productCodes": ["TA"]}'),
 
   -- No tunable knob yet — the entered unit either matches the resolved
   -- truck's unit_number or it doesn't (T-29's own agrees comparison).
