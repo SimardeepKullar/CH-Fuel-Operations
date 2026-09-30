@@ -1,5 +1,148 @@
-import ScreenStub from "../../../components/ScreenStub";
+"use client";
 
+import { useEffect, useState } from "react";
+import type { OverviewResult } from "@ch/core/actuals/overview";
+import { getOverview } from "../../../lib/api";
+import { useInvoicePeriod } from "../../../hooks/useInvoicePeriod";
+import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../../../lib/formatMoney";
+import KpiCard from "../../../components/KpiCard";
+import BilledPriceTrend from "../../../components/BilledPriceTrend";
+import TopSpendByDriver from "../../../components/TopSpendByDriver";
+import AnomalyDigest from "../../../components/AnomalyDigest";
+import EmptyState from "../../../components/EmptyState";
+import Corners from "../../../components/Corners";
+
+/**
+ * A8.1 (T-41) — the whole landing screen behind one call, `GET
+ * /overview?period=` (T-33). The effect depends on `period` alone, not
+ * `useInvoicePeriod`'s own `loading` flag: once `period` resolves to a real
+ * value it does not change again just because that hook's background
+ * `getHealth`/`listInvoices` calls finish later, so keying off it too would
+ * fire this screen's fetch a second time for the same period (DoD: exactly
+ * one API call).
+ */
 export default function OverviewPage() {
-  return <ScreenStub title="Overview" ticket="T-41" />;
+  const { period, loading: periodLoading } = useInvoicePeriod();
+  const [result, setResult] = useState<OverviewResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (period === null) {
+      setResult(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getOverview(period)
+      .then((r) => {
+        if (!cancelled) setResult(r);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err : new Error(String(err)));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [period]);
+
+  const showLoading = period === null ? periodLoading : loading;
+
+  if (showLoading) {
+    return (
+      <div className="overview-page">
+        <EmptyState title="Loading overview…" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="overview-page">
+        <EmptyState title="Couldn't load the overview" detail={error.message} />
+      </div>
+    );
+  }
+
+  if (result === null || result.kpis.invoiceId === null) {
+    return (
+      <div className="overview-page">
+        <EmptyState
+          title="No invoice imported yet"
+          detail="Import a BVD invoice to see spend, the billed-price trend and any anomalies for a period."
+        />
+      </div>
+    );
+  }
+
+  const { kpis, trend, topSpendByDriver, anomalyDigest } = result;
+  const receiptPct =
+    kpis.receiptCompliance.total > 0 ? Math.round((kpis.receiptCompliance.confirmed / kpis.receiptCompliance.total) * 100) : null;
+
+  return (
+    <div className="overview-page">
+      <div className="kpi-grid">
+        <KpiCard
+          label="Average billed price"
+          value={kpis.avgBilledUsdPerGal === null ? "—" : formatPricePerGal(kpis.avgBilledUsdPerGal)}
+          unit="USD/gal"
+          sub={`discount captured ${formatMoneyUsd(kpis.discount.totalUsd)}`}
+          dominant
+          testId="kpi-avg-billed"
+        />
+        <KpiCard label="Total spend" value={formatMoneyUsd(kpis.total.amountUsd)} unit="USD" testId="kpi-total" />
+        <KpiCard
+          label="Diesel"
+          value={formatMoneyUsd(kpis.diesel.amountUsd)}
+          unit="USD"
+          sub={`${formatGallons2dp(kpis.diesel.gallons)} gal`}
+          testId="kpi-diesel"
+        />
+        <KpiCard
+          label="DEF"
+          value={formatMoneyUsd(kpis.def.amountUsd)}
+          unit="USD"
+          sub={`${formatGallons2dp(kpis.def.gallons)} gal`}
+          testId="kpi-def"
+        />
+        <KpiCard label="Other charges" value={formatMoneyUsd(kpis.otherCharges.totalUsd)} unit="USD" testId="kpi-other" />
+        <KpiCard
+          label="Receipt compliance"
+          value={receiptPct === null ? "—" : `${receiptPct}%`}
+          sub={`${kpis.receiptCompliance.confirmed} of ${kpis.receiptCompliance.total} confirmed`}
+          testId="kpi-receipts"
+        />
+        <KpiCard label="Anomalies flagged" value={String(kpis.anomaliesFlagged)} testId="kpi-anomalies" />
+      </div>
+
+      <div className="overview-panels">
+        <div className="panel-card blueprint overview-trend-panel">
+          <Corners />
+          <div className="panel-card-header">
+            <span className="panel-card-title">Billed price trend</span>
+            <span className="panel-card-sub">trailing periods · $/gal</span>
+          </div>
+          <BilledPriceTrend points={trend} />
+        </div>
+
+        <div className="panel-card blueprint overview-topspend-panel">
+          <Corners />
+          <div className="panel-card-header">
+            <span className="panel-card-title">Top spend by driver</span>
+            <span className="panel-card-sub">this period</span>
+          </div>
+          <TopSpendByDriver drivers={topSpendByDriver} />
+        </div>
+      </div>
+
+      <div className="panel-card blueprint overview-anomaly-panel">
+        <Corners />
+        <AnomalyDigest items={anomalyDigest} period={period} />
+      </div>
+    </div>
+  );
 }
