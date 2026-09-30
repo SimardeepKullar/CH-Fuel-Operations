@@ -78,8 +78,10 @@ const columns: ColumnDef<TransactionListItem, any>[] = [
     header: "Unit",
     // The unit/truck field is operationally worth double-checking even when
     // it agrees with the card assignment (a pump mistype is common) — the
-    // design shows it always paired with its raw text, unlike driver.
-    cell: ({ row }) => <RawResolved value={row.original.truck} showRawWhenAgreeing />,
+    // design shows it always paired with its raw text, unlike driver. The
+    // invoice unit (what was actually pumped) is primary here, not the
+    // assigned truck (a schedule expectation) — T-40E.
+    cell: ({ row }) => <RawResolved value={row.original.truck} showRawWhenAgreeing primary="raw" />,
   }),
   columnHelper.display({
     id: "station",
