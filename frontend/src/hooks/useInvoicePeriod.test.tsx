@@ -20,11 +20,12 @@ vi.mock("../lib/api", () => ({
 const { useInvoicePeriod } = await import("./useInvoicePeriod");
 
 function Probe() {
-  const { period, setPeriod, periods, loading } = useInvoicePeriod();
+  const { period, setPeriod, periods, loading, invoiceNumber } = useInvoicePeriod();
   return (
     <div>
       <span data-testid="period">{period ?? "none"}</span>
       <span data-testid="loading">{String(loading)}</span>
+      <span data-testid="invoice-number">{invoiceNumber ?? "none"}</span>
       <ul>
         {periods.map((p) => (
           <li key={p.value}>{p.label}</li>
@@ -60,6 +61,7 @@ describe("useInvoicePeriod (T-39 step 39.2)", () => {
     await waitFor(() => expect(screen.getByTestId("period").textContent).toBe("2026-09-03"));
     expect(screen.getByText("999210 · Sep 3 – 9, 2026")).toBeTruthy();
     expect(screen.getByText("999104 · Aug 27 – Sep 2, 2026")).toBeTruthy();
+    expect(screen.getByTestId("invoice-number").textContent).toBe("999210");
   });
 
   it("excludes quarantined invoices from the picker list", async () => {

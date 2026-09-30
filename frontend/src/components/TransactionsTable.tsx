@@ -192,6 +192,10 @@ interface TransactionsTableProps {
   totalBeforeSearch: number;
   loading: boolean;
   error: Error | null;
+  /** The page's single scoping invoice (A7: `GET /transactions` is always
+   * filtered to one `period`/invoice) — `null` while loading. Passed through
+   * to `StopExpansion`'s "Source" row rather than re-derived per row. */
+  invoiceNumber: string | null;
   filters: TransactionFiltersState;
   setFilter: (key: keyof TransactionFiltersState, value: string | boolean) => void;
   clearFilters: () => void;
@@ -214,6 +218,7 @@ export default function TransactionsTable({
   totalBeforeSearch,
   loading,
   error,
+  invoiceNumber,
   filters,
   setFilter,
   clearFilters,
@@ -491,7 +496,7 @@ export default function TransactionsTable({
                         ),
                       )}
                     </div>
-                    {open && <StopExpansion stop={stop} />}
+                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumber} />}
                   </div>
                 );
               })}

@@ -27,6 +27,11 @@ interface StopExpansionProps {
    * it to overlap), is the equivalent, deterministic check.
    */
   stacked?: boolean;
+  /** The page's scoping invoice number (`useInvoicePeriod`'s own
+   * `invoiceNumber`, A7) — every row already belongs to the one invoice the
+   * top bar has selected, so this is passed down rather than re-derived per
+   * stop. `null` while loading. */
+  invoiceNumber?: string | null;
 }
 
 /**
@@ -37,12 +42,13 @@ interface StopExpansionProps {
  * always agree in real data (`transactions.test.ts`'s own $255.13 case).
  *
  * The design file's right-hand panel also shows an assignment "since" date
- * and a source/"Open detail" link; neither field exists on
- * `TransactionListItem`/`TransactionDetail` (no truck-assignment date is
- * returned here, and A8.4's own detail screen isn't part of this ticket's
- * file list) — omitted rather than faked.
+ * and an "Open detail"/"Find receipt" pair of links on the Source row;
+ * omitted here — no truck-assignment date is returned by any endpoint yet,
+ * and both links' destinations (A8.4's transaction-detail screen, T-43's
+ * Receipt Queue) don't exist yet either. Wiring a link to a screen that
+ * isn't built would be a dead click, not a feature.
  */
-export default function StopExpansion({ stop, stacked = false }: StopExpansionProps) {
+export default function StopExpansion({ stop, stacked = false, invoiceNumber = null }: StopExpansionProps) {
   const lines = stop.lines ?? [];
 
   return (
@@ -100,6 +106,12 @@ export default function StopExpansion({ stop, stacked = false }: StopExpansionPr
           </dd>
           <dt>Receipt</dt>
           <dd>{RECEIPT_LABELS[stop.receiptStatus] ?? stop.receiptStatus}</dd>
+          {invoiceNumber !== null && (
+            <>
+              <dt>Source</dt>
+              <dd>Invoice {invoiceNumber}</dd>
+            </>
+          )}
         </dl>
       </div>
     </div>

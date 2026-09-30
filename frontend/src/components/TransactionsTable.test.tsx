@@ -48,6 +48,7 @@ function baseProps(rows: TransactionListItem[]) {
     totalBeforeSearch: rows.length,
     loading: false,
     error: null,
+    invoiceNumber: "999210",
     filters: EMPTY_FILTERS,
     setFilter: vi.fn(),
     clearFilters: vi.fn(),

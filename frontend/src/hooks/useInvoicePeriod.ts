@@ -8,6 +8,7 @@ export interface InvoicePeriodOption {
    * the natural key `GET /overview?period=` etc. take (A13). */
   value: string;
   label: string;
+  invoiceNumber: string;
 }
 
 export interface UseInvoicePeriodResult {
@@ -16,6 +17,12 @@ export interface UseInvoicePeriodResult {
   setPeriod: (value: string) => void;
   periods: InvoicePeriodOption[];
   loading: boolean;
+  /** `periods` entry matching `period`'s own `invoiceNumber` — `null` while
+   * loading or if `period` names no imported invoice (a quarantined one, or
+   * an unknown `?period=`). A stop's own `invoiceId` isn't returned by `GET
+   * /transactions` (T-40, A7): the whole page is already scoped to one
+   * invoice via `period`, so this is that same invoice's human number. */
+  invoiceNumber: string | null;
 }
 
 function formatRange(periodStart: string, periodEnd: string): string {
@@ -31,7 +38,11 @@ function formatRange(periodStart: string, periodEnd: string): string {
 }
 
 function toOption(row: InvoiceListItem): InvoicePeriodOption {
-  return { value: row.periodStart, label: `${row.invoiceNumber} · ${formatRange(row.periodStart, row.periodEnd)}` };
+  return {
+    value: row.periodStart,
+    label: `${row.invoiceNumber} · ${formatRange(row.periodStart, row.periodEnd)}`,
+    invoiceNumber: row.invoiceNumber,
+  };
 }
 
 /**
@@ -93,5 +104,10 @@ export function useInvoicePeriod(): UseInvoicePeriodResult {
     [router, pathname, searchParams],
   );
 
-  return useMemo(() => ({ period, setPeriod, periods: options, loading }), [period, setPeriod, options, loading]);
+  const invoiceNumber = options.find((o) => o.value === period)?.invoiceNumber ?? null;
+
+  return useMemo(
+    () => ({ period, setPeriod, periods: options, loading, invoiceNumber }),
+    [period, setPeriod, options, loading, invoiceNumber],
+  );
 }

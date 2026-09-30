@@ -71,4 +71,15 @@ describe("StopExpansion", () => {
     render(<StopExpansion stop={A900000001} stacked />);
     expect(screen.getByTestId("stop-expansion").className).toContain("stop-expansion-stacked");
   });
+
+  it("shows the Source row with the page's invoice number when given", () => {
+    render(<StopExpansion stop={A900000001} invoiceNumber="999210" />);
+    expect(screen.getByText("Source")).toBeTruthy();
+    expect(screen.getByText("Invoice 999210")).toBeTruthy();
+  });
+
+  it("omits the Source row rather than a blank value while the invoice number hasn't loaded", () => {
+    render(<StopExpansion stop={A900000001} />);
+    expect(screen.queryByText("Source")).toBeNull();
+  });
 });

@@ -33,7 +33,7 @@ function matchesSearch(row: TransactionListItem, query: string): boolean {
 }
 
 export default function TransactionsPage() {
-  const { period, loading: periodLoading } = useInvoicePeriod();
+  const { period, loading: periodLoading, invoiceNumber } = useInvoicePeriod();
   const { filters, setFilter, clearFilters } = useTransactionFilters();
   const filterOptions = useTransactionFilterOptions(period);
 
@@ -97,6 +97,7 @@ export default function TransactionsPage() {
         totalBeforeSearch={rows.length}
         loading={loading}
         error={error}
+        invoiceNumber={invoiceNumber}
         filters={filters}
         setFilter={setFilter}
         clearFilters={clearFilters}
