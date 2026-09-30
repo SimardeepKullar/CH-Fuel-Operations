@@ -5,6 +5,25 @@ import { importInvoice, type ImportInvoiceMeta, type ImportInvoiceResult } from 
 import { parseInvoicePdf } from "../../invoice/parseInvoicePdf.js";
 import { problemResponse } from "../problem.js";
 
+/** `ImportInvoiceResult`'s own `report` type, read structurally off its
+ * "imported" variant rather than imported directly from `invoice/report.js`
+ * — this module is architecturally barred from importing parser/reconcile
+ * internals (`invoices.test.ts`'s own module-import test), and every
+ * non-error variant carries the same `report` shape. */
+type ImportedReport = Extract<ImportInvoiceResult, { status: "imported" }>["report"];
+
+/** `POST /invoices/import`'s 200 body — `ImportInvoiceResult`'s three
+ * non-error variants collapsed to one shape (the route maps `"conflict"` to
+ * a 409 problem+json instead, so it never reaches JSON as a body). The
+ * frontend's upload client (T-42) is typed against this rather than the
+ * broader `ImportInvoiceResult`, which still includes the case that never
+ * actually serialises. */
+export interface ImportInvoiceResponse {
+  status: "imported" | "quarantined" | "duplicate";
+  invoiceId: string;
+  report: ImportedReport;
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -158,6 +177,21 @@ interface InvoiceRejectionRow {
   auth_code: string | null;
   code: string;
   message: string;
+}
+
+export interface InvoiceRejectionItem {
+  lineNumber: number;
+  authCode: string | null;
+  code: string;
+  message: string;
+}
+
+/** `GET /invoices/{id}`'s body — an `InvoiceListItem` plus the rejections
+ * that quarantined it (empty for an `"imported"` invoice). Exported so T-42's
+ * "reopen a quarantined row from history" flow can type its fetch without
+ * re-declaring this shape client-side. */
+export interface InvoiceDetail extends InvoiceListItem {
+  rejections: InvoiceRejectionItem[];
 }
 
 /**

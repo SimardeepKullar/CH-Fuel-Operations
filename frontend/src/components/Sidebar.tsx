@@ -24,11 +24,12 @@ interface NavGroup {
  * including Settings living as the last item of the Analysis group rather
  * than a visually separate fourth block; the design renders every group
  * identically, so that's what "plus Settings" actually looks like once
- * built. Plan, Plans, Transactions and Overview have real content today
- * (T-21…T-23 and T-39's port, T-40's Transactions build, T-41's Overview
- * build); every other destination exists as a route so later tickets can
- * fill it in without moving anything (A18 Q4: a plain array a caller can
- * extend with a fourth group needs no layout change).
+ * built. Plan, Plans, Transactions, Overview and Import have real content
+ * today (T-21…T-23 and T-39's port, T-40's Transactions build, T-41's
+ * Overview build, T-42's Import build); every other destination exists as a
+ * route so later tickets can fill it in without moving anything (A18 Q4: a
+ * plain array a caller can extend with a fourth group needs no layout
+ * change).
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -45,7 +46,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Transactions", href: "/transactions", built: true },
       { label: "Receipt Queue", href: "/receipt-queue", built: false, badge: true },
       { label: "Other Charges", href: "/other-charges", built: false },
-      { label: "Import", href: "/import", built: false },
+      { label: "Import", href: "/import", built: true },
     ],
   },
   {
