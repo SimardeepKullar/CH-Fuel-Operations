@@ -83,6 +83,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
 | **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
+| **T-40I** | **"Flagged only" no longer matches a charges_no_fuel-only stop** | T-40H | **9** | **planned** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **new** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -633,6 +634,30 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 - [x] A stop with a `charges_no_fuel` finding and no Scale line (e.g. a cash-only charge) also no longer shows the Scale flag.
 - [x] Every other flag (`unit_mismatch`, `too_close`, `sub_gallon`, `price_above_published`) is unaffected.
 - [x] `npm run verify` green.
+
+---
+
+## T-40I · "Flagged only" no longer matches a charges_no_fuel-only stop
+
+**Priority 40I — polish pass on T-40H, from dispatcher review 2026-09-30.**
+
+**Goal.** The "Flagged only" checkbox on Transactions (`anomalyOnly`) never matches a stop whose *only* undismissed anomaly is `charges_no_fuel` — the same stop T-40H already made the Flags column render with zero flag pills.
+
+**Why.** T-40H stopped rendering the `charges_no_fuel`/"Scale" flag anywhere in the Flags column, but never touched `anomalyOnly`'s `EXISTS` clause, which still matches on any undismissed anomaly regardless of rule. The result: a cash- or scale-only stop with no other anomaly still passes "Flagged only" and appears in that filtered list, but its Flags cell renders empty — it looks flagged with nothing to show why. `charges_no_fuel` is no longer surfaced as a flag anywhere on this screen (T-40H's own framing: "the Scale flag is no longer shown in either case"), so it should not be able to satisfy a filter whose whole purpose is "show me the rows with a flag."
+
+**Fix.** `backend/src/actuals/transactionQuery.ts`'s `anomalyOnly` condition adds `AND a.rule <> 'charges_no_fuel'` to the existing `EXISTS` clause. No other filter changes; `state` and `product` stay `EXISTS`-based as before. A stop with `charges_no_fuel` *and* another undismissed anomaly is unaffected — the `EXISTS` still finds the other row.
+
+**Files.** Modified: `backend/src/actuals/transactionQuery.ts`, `backend/src/actuals/transactionQuery.test.ts`, `backend/test/integration/transactions.test.ts` (the real-fixture `anomalyOnly` count comparison excludes `charges_no_fuel` the same way, so it still cross-checks against `listTransactions`'s own count).
+
+**Not in scope.** `openAnomalyCount` (T-39/T-41, system-wide, regardless of invoice) and any driver/truck/station anomaly-count rollup — none of those render a Flags column or claim to mean "this row has a flag chip," so T-40H's own scope boundary (display-only suppression, backend `anomalies` rows untouched) still holds for them. The `charges_no_fuel` detection rule itself and `AnomalyFlag.tsx`'s label mapping are untouched.
+
+**Dependencies.** T-40H.
+
+**Definition of done.**
+- [ ] A stop whose only undismissed anomaly is `charges_no_fuel` is absent from the "Flagged only" result set.
+- [ ] A stop with `charges_no_fuel` plus another undismissed anomaly (e.g. `unit_mismatch`) still appears, with that other flag shown.
+- [ ] Every other filter (`state`, `product`, `receiptStatus`, date range, etc.) composes with `anomalyOnly` exactly as before.
+- [ ] `npm run verify` green.
 
 ---
 
