@@ -85,7 +85,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
 | **T-40I** | **"Flagged only" no longer matches a charges_no_fuel-only stop** | T-40H | **9** | **done — merged (`987cc02`, PR #10)** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **done — merged (`1b36ae7`, PR #12)** |
-| **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
+| **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **done — merged (`3ce1791`, PR #13)** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
 | **T-44** | **Other Charges screen** | T-36, T-39 | **9** | **new** |
 | **T-45** | **Drivers, Trucks, Stations screens** | T-37, T-22, T-39 | **9** | **new** |
