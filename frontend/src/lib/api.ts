@@ -15,7 +15,7 @@ import type { PriceSheetSummary } from "@ch/core/catalog/priceSheets";
 import type { BoundingBox, StationMapResolution, StationsPage } from "@ch/core/catalog/stations";
 import type { PlanListResult } from "@ch/core/planning/planPersistence";
 import type { HealthStatus } from "@ch/core/catalog/health";
-import type { InvoiceListResult } from "@ch/core/api/routes/invoices";
+import type { ImportInvoiceResponse, InvoiceDetail, InvoiceListResult } from "@ch/core/api/routes/invoices";
 import type { ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { DriversResult } from "@ch/core/actuals/drivers";
 import type { ListTransactionsResult, TransactionSortField } from "@ch/core/actuals/transactions";
@@ -42,23 +42,47 @@ export class ApiError extends Error {
   }
 }
 
+async function throwIfNotOk(response: Response): Promise<void> {
+  if (response.ok) return;
+  let problem: ProblemDetails;
+  try {
+    problem = (await response.json()) as ProblemDetails;
+  } catch {
+    problem = { title: response.statusText || "Request failed", status: response.status };
+  }
+  throw new ApiError(problem);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: { "content-type": "application/json", ...init?.headers },
   });
-
-  if (!response.ok) {
-    let problem: ProblemDetails;
-    try {
-      problem = (await response.json()) as ProblemDetails;
-    } catch {
-      problem = { title: response.statusText || "Request failed", status: response.status };
-    }
-    throw new ApiError(problem);
-  }
-
+  await throwIfNotOk(response);
   return (await response.json()) as T;
+}
+
+/**
+ * `POST /invoices/import` (T-42) — the one multipart caller in this file.
+ * Deliberately bypasses `request()`: that helper sets `content-type:
+ * application/json` unconditionally, which would ship a boundary-less
+ * multipart body the server can't parse. The browser sets the correct
+ * `multipart/form-data; boundary=...` header itself as long as nothing here
+ * sets `Content-Type` at all.
+ */
+export function uploadInvoice(file: File): Promise<ImportInvoiceResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return fetch(`${BASE_URL}/invoices/import`, { method: "POST", body: formData }).then(async (response) => {
+    await throwIfNotOk(response);
+    return (await response.json()) as ImportInvoiceResponse;
+  });
+}
+
+/** `GET /invoices/{id}` — reopens a history entry (T-42), including a
+ * quarantined one's rejections, without re-uploading the file. */
+export function getInvoice(id: string): Promise<InvoiceDetail> {
+  return request<InvoiceDetail>(`/invoices/${encodeURIComponent(id)}`);
 }
 
 export function createPlan(body: CreatePlanRequest): Promise<PlanResponse> {

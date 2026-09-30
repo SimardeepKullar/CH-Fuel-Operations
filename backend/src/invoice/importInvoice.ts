@@ -406,6 +406,7 @@ export async function importInvoice(
     periodStart: parsed.header.periodStart,
     periodEnd: parsed.header.periodEnd,
     grandTotalUsd: parsed.printedTotals.grandTotalUsd,
+    productTotals: parsed.printedTotals.products,
     parserRejections: parsed.rejections,
     reconcileResult,
     cardMisses,

@@ -1,4 +1,4 @@
-import type { InvoiceLineRejectionCode } from "./parseInvoiceCsv.js";
+import type { InvoiceLineRejectionCode, PrintedProductTotal } from "./parseInvoiceCsv.js";
 import type { CentsDelta, ReconcileResult } from "./reconcile.js";
 import type { FuelStopGroup } from "./groupByAuthCode.js";
 import type { ExpressRow } from "./parseExpressRows.js";
@@ -26,6 +26,14 @@ export interface ImportReport {
   periodStart: string;
   periodEnd: string;
   grandTotalUsd: string;
+  /** The invoice's own printed per-product-code rows (T-42's import preview:
+   * "TA + DF + S + Express = $50,929.71") — `parsed.printedTotals.products`
+   * verbatim, already computed wherever the report is built, before the
+   * promote/quarantine decision. Present whether the invoice balances or
+   * not; on the happy path `reconcile`'s imbalance lists are empty, so this
+   * is the only place the per-code figures a "reconciliation passed" screen
+   * needs to show are available at all. */
+  productTotals: PrintedProductTotal[];
   reconcile: ReconcileResult;
   parserRejectionCount: number;
   unknownCardNumbers: string[];
@@ -57,6 +65,7 @@ export interface BuildImportReportInput {
   periodStart: string;
   periodEnd: string;
   grandTotalUsd: string;
+  productTotals: readonly PrintedProductTotal[];
   parserRejections: ReadonlyArray<{
     lineNumber: number;
     authCode: string | null;
@@ -135,6 +144,7 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
     grandTotalUsd: input.grandTotalUsd,
+    productTotals: [...input.productTotals],
     reconcile: reconcileResult,
     parserRejectionCount: input.parserRejections.length,
     unknownCardNumbers: cardMisses.map((g) => g.cardNumber),
