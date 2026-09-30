@@ -19,6 +19,7 @@ import type { InvoiceListResult } from "@ch/core/api/routes/invoices";
 import type { ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { DriversResult } from "@ch/core/actuals/drivers";
 import type { ListTransactionsResult, TransactionSortField } from "@ch/core/actuals/transactions";
+import type { OverviewResult } from "@ch/core/actuals/overview";
 
 const BASE_URL = "/api/v1";
 
@@ -172,4 +173,9 @@ export function listTransactions(params: ListTransactionsParams = {}): Promise<L
  * rather than a second one. */
 export function listDrivers(period: string): Promise<DriversResult> {
   return request<DriversResult>(`/drivers?period=${encodeURIComponent(period)}`);
+}
+
+/** `GET /overview?period=` — A8.1's whole landing screen in one call (T-41). */
+export function getOverview(period: string): Promise<OverviewResult> {
+  return request<OverviewResult>(`/overview?period=${encodeURIComponent(period)}`);
 }
