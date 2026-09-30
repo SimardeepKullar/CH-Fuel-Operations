@@ -83,7 +83,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40F** | **Sub-gallon flag: diesel only, not DEF** | T-30, T-40 | **9** | **planned** |
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
 | **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
-| **T-40I** | **"Flagged only" no longer matches a charges_no_fuel-only stop** | T-40H | **9** | **planned** |
+| **T-40I** | **"Flagged only" no longer matches a charges_no_fuel-only stop** | T-40H | **9** | **done — merged (`987cc02`, PR #10)** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **new** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **new** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -654,10 +654,10 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 **Dependencies.** T-40H.
 
 **Definition of done.**
-- [ ] A stop whose only undismissed anomaly is `charges_no_fuel` is absent from the "Flagged only" result set.
-- [ ] A stop with `charges_no_fuel` plus another undismissed anomaly (e.g. `unit_mismatch`) still appears, with that other flag shown.
-- [ ] Every other filter (`state`, `product`, `receiptStatus`, date range, etc.) composes with `anomalyOnly` exactly as before.
-- [ ] `npm run verify` green.
+- [x] A stop whose only undismissed anomaly is `charges_no_fuel` is absent from the "Flagged only" result set.
+- [x] A stop with `charges_no_fuel` plus another undismissed anomaly (e.g. `unit_mismatch`) still appears, with that other flag shown.
+- [x] Every other filter (`state`, `product`, `receiptStatus`, date range, etc.) composes with `anomalyOnly` exactly as before.
+- [x] `npm run verify` green.
 
 ---
 
