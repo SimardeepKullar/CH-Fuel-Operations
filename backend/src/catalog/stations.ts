@@ -69,7 +69,10 @@ export async function listStations(pool: Pool, options: ListStationsOptions): Pr
     bbox.north,
     resolution ?? null,
   ];
-  const whereClause = `s.resolution <> 'unresolved'
+  // US only (T-60, D29): this is the planner's sheet layer, and CA directory
+  // stations are actuals-only. A fixed literal, never a parameter.
+  const whereClause = `s.country = 'US'
+       AND s.resolution <> 'unresolved'
        AND ($5::text IS NULL OR s.resolution = $5)
        AND ST_Intersects(s.geom::geometry, ST_MakeEnvelope($1, $2, $3, $4, 4326))`;
 

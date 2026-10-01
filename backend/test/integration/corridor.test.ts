@@ -23,6 +23,8 @@ interface StationSpec {
   resolution?: "exact" | "city" | "unresolved";
   uncertaintyMiles?: number | null;
   truckAccessible?: "operator_verified" | "unverified" | "excluded";
+  /** Defaults to 'US'. A 'CA' row stands in for a BVD-directory station (T-60). */
+  country?: "US" | "CA";
 }
 
 describe.skipIf(!hasDatabase)("corridor query (integration, T-11)", () => {
@@ -36,9 +38,9 @@ describe.skipIf(!hasDatabase)("corridor query (integration, T-11)", () => {
     const { rows } = await pool.query<{ id: string }>(
       `INSERT INTO stations
          (supplier, site_ref, name_raw, store_number, city_raw, city_normalized, state_usps,
-          geom, resolution, uncertainty_miles, truck_accessible)
+          geom, resolution, uncertainty_miles, truck_accessible, country)
        VALUES ('BVD', $1, $2, $3, 'Testville', 'TESTVILLE', 'TX',
-               ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography, $6, $7, $8)
+               ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography, $6, $7, $8, $9)
        RETURNING id`,
       [
         spec.ref,
@@ -49,6 +51,7 @@ describe.skipIf(!hasDatabase)("corridor query (integration, T-11)", () => {
         spec.resolution ?? "exact",
         spec.uncertaintyMiles ?? null,
         spec.truckAccessible ?? "operator_verified",
+        spec.country ?? "US",
       ],
     );
     return rows[0]!.id;
@@ -186,6 +189,29 @@ describe.skipIf(!hasDatabase)("corridor query (integration, T-11)", () => {
 
     expect(result.candidates.map((c) => c.id)).toEqual([near]);
     expect(result.exclusions).toEqual([]);
+  });
+
+  it("never returns a CA station — neither as a candidate nor as an exclusion (T-60)", async () => {
+    // ~1 mi off the line (0.0175° ≈ 1 mi), well inside the 12 mi radius. The
+    // unpriced CA station is the real case: directory stations carry no price,
+    // and the LEFT JOIN LATERAL would otherwise name it a "no price" exclusion.
+    const caUnpriced = await insertStation({ ref: "1", lat: 33, lngDelta: 0.0175, country: "CA", resolution: "exact", truckAccessible: "unverified" });
+    const caPriced = await insertStation({ ref: "2", lat: 34, lngDelta: 0.0175, country: "CA" });
+    const usUnpriced = await insertStation({ ref: "3", lat: 35, lngDelta: 0.0175 });
+    const usPriced = await insertStation({ ref: "4", lat: 36, lngDelta: 0.0175 });
+    await insertPrice(caPriced, { yourPrice: 2 });
+    await insertPrice(usPriced, { yourPrice: 4 });
+
+    const result = await corridor();
+
+    expect(result.candidates.map((c) => c.id)).toEqual([usPriced]);
+    expect(result.exclusions.map((e) => e.id)).toEqual([usUnpriced]);
+    const all = [...result.candidates.map((c) => c.id), ...result.exclusions.map((e) => e.id)];
+    expect(all).not.toContain(caUnpriced);
+    expect(all).not.toContain(caPriced);
+    // The US stations really are ~1 mi off — the CA ones are excluded by country, not distance.
+    expect(result.candidates[0]!.perpOffsetMiles).toBeGreaterThan(0.9);
+    expect(result.candidates[0]!.perpOffsetMiles).toBeLessThan(1.1);
   });
 
   it("never returns an unresolved station, priced or not", async () => {

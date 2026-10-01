@@ -1665,6 +1665,15 @@ It also carries operational facts no geocoder has — `StoreType`, `ParkingSpace
 
 **One thing the export must not be used for: prices.** The file contains a Love's retail price column and a notice that quotes may be delayed and all sales use the price posted at the time of fuelling. Those are street prices, not contract prices, and they are not what this app plans against. `stations.operator_attrs` stores location and amenity fields only. **Never prices.**
 
+**The closed `operator_attrs` set.** A row's `operator_attrs` carries exactly one of two fixed key sets, asserted in `operatorExport.test.ts` rather than eyeballed:
+
+| Source | Keys |
+|---|---|
+| Love's export (`resolution_source = 'operator_export'`) | `StoreType`, `ParkingSpaces`, `DEFLanes`, `Address`, `Zip`, `HighwayOrExit` |
+| BVD travel-centre directory (`resolution_source = 'bvd_directory'`, T-60, D29) | `Status`, `StoreId`, `Address`, `PostalCode`, `Highway`, `Exit`, `DEFAtPump`, `TruckParking`, `CatScale` |
+
+BVD's directory (`data/US-CA-GasStations/bvd-travel-centres-*.csv`) is admitted on the same ground as the Love's export: an operator saying where its own sites are. It carries no prices. Its fuel columns (`Diesel`, `Gasoline 87`, …) are availability flags, and they are not stored either. Unlike the Love's export it *creates* `stations` rows (`country = 'CA'`), and those rows are actuals-only: the planner never sees them.
+
 **OSM and the Census remain in place as tiers 2 and 3.** The export is a snapshot the operator can change or withdraw, it covers only this one supplier, and a second supplier in a later phase may publish nothing at all. The fallback chain is what keeps that from being a rebuild.
 
 ---

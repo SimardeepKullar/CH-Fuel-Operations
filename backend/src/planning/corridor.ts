@@ -86,6 +86,10 @@ export class CorridorError extends Error {
  * - `truck_accessible <> 'excluded'` — the scope leaves it out of the sketch, but
  *   a station marked excluded must not be planned against.
  * - `s.id` breaks position ties so the order is deterministic.
+ * - `s.country = 'US'` (T-60, D29): CA stations from BVD's directory are
+ *   actuals-only and carry no price, so without it a border station would
+ *   surface as a "no price" exclusion on a US route. A fixed literal, not a
+ *   parameter a caller could omit.
  *
  * Units: storage is miles, PostGIS geography is metres, and this statement is the
  * seam. The radius *parameter* is scaled up (`$2 * 1609.344`), never the column,
@@ -103,7 +107,8 @@ corridor AS (
          ST_Distance(s.geom, r.line) / 1609.344 AS perp_offset_miles,
          r.distance_miles
   FROM stations s CROSS JOIN route r
-  WHERE s.resolution <> 'unresolved'
+  WHERE s.country = 'US'
+    AND s.resolution <> 'unresolved'
     AND s.truck_accessible <> 'excluded'
     AND ST_DWithin(s.geom, r.line, $2::float8 * 1609.344)
 )
