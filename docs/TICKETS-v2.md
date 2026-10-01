@@ -584,6 +584,8 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 - [x] A diesel line under the minimum still does.
 - [x] `npm run verify` green.
 
+**Correction (2026-09-30, caught live post-merge).** The Fix above was incomplete for any database that had already seeded the `sub_gallon` row before this ticket merged: 0004's `INSERT ... ON CONFLICT (rule) DO NOTHING` only ever applies to a fresh database — by design, so it never clobbers a value someone's since edited in Settings — but that also means it silently skips a legitimate code change to an already-seeded row. `runAnomalies` compounds it: it only upserts findings a rule currently produces and never deletes one a rule no longer does, so a pre-existing DEF `sub_gallon` finding survives a re-run untouched. T-40A hit this same class of problem retiring `def_ratio` and called out the one-off cleanup in its own Fix; this ticket's Fix should have too. The missing step, run once per already-seeded environment: `UPDATE anomaly_thresholds SET config = '{"minGallons": "1.00", "productCodes": ["TA"]}'::jsonb WHERE rule = 'sub_gallon'` followed by `DELETE FROM anomalies WHERE rule = 'sub_gallon' AND detail->>'productCode' = 'DF'`. Applied to the local dev database (one stale finding, Lovepreet Singh's 0.46 gal DEF stop); needs the same pair run against any other already-seeded environment before the next deploy.
+
 ---
 
 ## T-40G · Colour-code product badges; drop the redundant Scale flag
