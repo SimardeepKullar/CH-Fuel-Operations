@@ -5,7 +5,7 @@ One-time, run by hand: `python scripts/resolve_from_operator.py`. Never
 imported by application code (§7.1) — like `load_gazetteer.py` (T-03), its
 whole job is producing rows in a table, not code other services depend on.
 
-`data/loves/LovesSearchResults.xlsx` holds 732 stores. Its real header is on
+`data/US-CA-GasStations/LovesSearchResults.xlsx` holds 732 stores. Its real header is on
 row 3 (`header=2` to pandas) — rows 1-2 are Love's branding and a price
 disclaimer — and any trailing row with no numeric StoreNumber is a footer,
 dropped defensively. Joining on the store number parsed out of BVD's `NAME`
@@ -47,10 +47,10 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
-DEFAULT_XLSX = Path(__file__).resolve().parent.parent / "data" / "loves" / "LovesSearchResults.xlsx"
+DEFAULT_XLSX = Path(__file__).resolve().parent.parent / "data" / "US-CA-GasStations" / "LovesSearchResults.xlsx"
 DEFAULT_FIXTURE_OUT = (
     Path(__file__).resolve().parent.parent
-    / "backend" / "test" / "fixtures" / "loves" / "operator_export.json"
+    / "backend" / "test" / "fixtures" / "US-CA-GasStations" / "operator_export.json"
 )
 
 # §11.4 step 1: inside CONUS (lat 25.95-48.57, lng -123.37 to -72.26).

@@ -13,7 +13,7 @@ import {
 } from "./gazetteer.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const fixturesDir = path.join(dirname, "../../test/fixtures/loves");
+const fixturesDir = path.join(dirname, "../../test/fixtures/US-CA-GasStations");
 
 const eloyAz: PlaceCentroid = {
   stateUsps: "AZ",

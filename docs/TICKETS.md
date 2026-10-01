@@ -103,7 +103,7 @@ Verified against the working tree on 5–6 September 2026, not taken from the do
 | `frontend/` | Vite 8 + React 19, plain JSX. Static mock reading `src/data/trips.js`. No API, no map. |
 | `data/bvd-prices/pcn-usd-9206810-981.csv` | 607 lines = metadata + header + **605 data rows**, effective `2026-08-22`. |
 | `data/bvd-prices/2026-01/` | 31 files, **30 distinct dates, 2026-01-11 missing**, `2026-01-26` twice with identical SHA-256 `84fc7c50…`, 594 data rows each. |
-| `data/loves/LovesSearchResults.xlsx` | Present. Header on row 3, footer row to drop. |
+| `data/US-CA-GasStations/LovesSearchResults.xlsx` | Present. Header on row 3, footer row to drop. |
 
 ### Doc-vs-code drift found during exploration
 

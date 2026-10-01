@@ -91,7 +91,7 @@ Verified by inspection of the repository on 4 September 2026. **This section is 
 | `frontend/` | Vite + React 19. `App.jsx` with Plan / Recent / Dev tabs, ~400 lines total | **Static mock** — reads `src/data/trips.js`, no API, no map |
 | `data/bvd-prices/pcn-usd-9206810-981.csv` | The 2026-08-22 sheet, 605 rows | Present |
 | `data/bvd-prices/2026-01/` | 31 files covering 30 days of January 2026 | Present |
-| `data/loves/LovesSearchResults.xlsx` | Love's operator export, 732 stores with coordinates | Present |
+| `data/US-CA-GasStations/LovesSearchResults.xlsx` | Love's operator export, 732 stores with coordinates | Present |
 | `package.json` | Workspace root, `db:*` scripts, frontend workspace | Works |
 
 ### What does not exist
@@ -668,7 +668,7 @@ The station is never silently planned against with a bad coordinate.
 
 **Step 1 — The operator's own export. Verified 4 September 2026.**
 
-`data/loves/LovesSearchResults.xlsx` holds **732 stores** with coordinates. Joining on store number — the number parsed out of `NAME`, never `SITE` — against the 605 BVD stations gives:
+`data/US-CA-GasStations/LovesSearchResults.xlsx` holds **732 stores** with coordinates. Joining on store number — the number parsed out of `NAME`, never `SITE` — against the 605 BVD stations gives:
 
 | Measure | Result |
 |---|---|
@@ -1858,4 +1858,4 @@ See §7.1 for the full reasoning. Short version: the ingest shares validation ru
 
 - `data/bvd-prices/pcn-usd-9206810-981.csv` — BVD price sheet, received 21 Aug 2026, effective 2026-08-22, 605 rows. Analysed 4 September 2026.
 - `data/bvd-prices/2026-01/` — 31 files, 30 distinct dates (2026-01-01 to 2026-01-31, missing 01-11), 594 rows each. Analysed 4 September 2026.
-- `data/loves/LovesSearchResults.xlsx` — Love's operator export, 732 stores, header on row 3. Joined to BVD at 604/605. Analysed 4 September 2026.
+- `data/US-CA-GasStations/LovesSearchResults.xlsx` — Love's operator export, 732 stores, header on row 3. Joined to BVD at 604/605. Analysed 4 September 2026.

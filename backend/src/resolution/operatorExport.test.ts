@@ -11,9 +11,9 @@ import {
 } from "./operatorExport.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const fixturesDir = path.join(dirname, "../../test/fixtures/loves");
+const fixturesDir = path.join(dirname, "../../test/fixtures/US-CA-GasStations");
 
-// A real matched row (LOVES #211, Oklahoma City) from data/loves/LovesSearchResults.xlsx.
+// A real matched row (LOVES #211, Oklahoma City) from data/US-CA-GasStations/LovesSearchResults.xlsx.
 const travelStopRow: OperatorExportRow = {
   storeNumber: 211,
   state: "OK",

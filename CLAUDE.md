@@ -177,7 +177,8 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
 | `data/bvd-prices/pcn-usd-9206810-981.csv` | August sheet | 605 data rows, effective 2026-08-22 |
 | `data/bvd-prices/2026-01/` | January corpus | 31 files, **30 distinct dates — 2026-01-11 missing**, 594 rows each |
 | `data/bvd-prices/2026-01/…-8097639-981 (1).csv` | Duplicate of its sibling | **Byte-identical**, SHA-256 `84fc7c50…` — the real idempotency test case |
-| `data/loves/LovesSearchResults.xlsx` | Operator export | 732 stores, header on row 3, footer row to drop, matches 604/605 — #306 is temporarily closed and absent, so it stays `unresolved` |
+| `data/US-CA-GasStations/LovesSearchResults.xlsx` | Operator export | 732 stores, header on row 3, footer row to drop, matches 604/605 — #306 is temporarily closed and absent, so it stays `unresolved` |
+| `data/US-CA-GasStations/bvd-travel-centres-2026-10-01.csv` | BVD's Canadian travel-centre directory (committed, D29) | 92 rows, 6 provinces, UTF-8 with BOM; 91 distinct `Site #` — one row (BVD Nisku) has none and is skipped. `Site #` is the invoice's `Site #` (58156 = BVD Comber) |
 | `migrations/real/` | Real fleet roster migration set (real driver names, real BVD fuel-card numbers) | Applied via `npm run db:migrate:real`; see T-58 |
 
 The missing January day and the duplicate file are **correct behaviour to report**, not bugs to suppress.
