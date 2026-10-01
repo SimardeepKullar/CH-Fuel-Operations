@@ -1,4 +1,4 @@
-# CH Fuel Planner
+# CH Fuel Operations
 
 An internal web app for **2043733 Ontario Inc., DBA CH Logistics**, a trucking company, that does two things:
 
