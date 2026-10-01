@@ -1,0 +1,1831 @@
+{
+  "stations": [
+    {
+      "siteRef": "53801",
+      "nameRaw": "BVD ACHESON",
+      "cityRaw": "ACHESON",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.56345,
+      "longitude": -113.76572,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1046",
+        "Address": "11429 266 ST",
+        "PostalCode": "T7X 6H2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 110,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53035",
+      "nameRaw": "BVD Calgary",
+      "cityRaw": "Calgary",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 51.00809,
+      "longitude": -114.00002,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1051",
+        "Address": "2515 50th Avenue SE",
+        "PostalCode": "T2B 3R8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "53804",
+      "nameRaw": "BVD CALGARY - 106 AVE",
+      "cityRaw": "CALGARY",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 50.95743,
+      "longitude": -113.95979,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1049",
+        "Address": "5225 106 AVE SE",
+        "PostalCode": "T2C 5E9",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 10,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53805",
+      "nameRaw": "BVD CALGARY - 32nd AVE",
+      "cityRaw": "CALGARY",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 51.08111,
+      "longitude": -114.0,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1050",
+        "Address": "2525 32 AVE NE",
+        "PostalCode": "T1Y 6B7",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 80,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "53807",
+      "nameRaw": "BVD Calgary - 52nd Street",
+      "cityRaw": "Calgary",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 50.99313,
+      "longitude": -113.95928,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2050",
+        "Address": "6811 52nd Street SE",
+        "PostalCode": "T2C 4J5",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53806",
+      "nameRaw": "BVD CALGARY - 7 AVE",
+      "cityRaw": "CALGARY",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 51.05889,
+      "longitude": -114.00056,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1052",
+        "Address": "2504 7 AVE NE",
+        "PostalCode": "T2A 2L7",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 10,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53822",
+      "nameRaw": "BVD CLAIRMONT",
+      "cityRaw": "CLAIRMONT",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 55.23317,
+      "longitude": -118.79259,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2037",
+        "Address": "7201 99 ST",
+        "PostalCode": "T0H 0W0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 45,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53808",
+      "nameRaw": "BVD DEAD MAN'S FLATS",
+      "cityRaw": "DEAD MAN'S FLATS",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 51.03954,
+      "longitude": -115.26338,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1054",
+        "Address": "200 1 AVE",
+        "PostalCode": "T1W 0K5",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53809",
+      "nameRaw": "BVD EDMONTON - 114 AVE",
+      "cityRaw": "EDMONTON",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.5637,
+      "longitude": -113.5975,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1045",
+        "Address": "16002 114 AVE NW",
+        "PostalCode": "T5M 2Z5",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53824",
+      "nameRaw": "BVD FORT MCMURRAY",
+      "cityRaw": "FORT MCMURRAY",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 56.66628,
+      "longitude": -111.32714,
+      "operatorAttrs": {
+        "Status": "Temporarily closed",
+        "StoreId": "2023",
+        "Address": "160 MACKAY CRESCENT",
+        "PostalCode": "T9H 4W8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53810",
+      "nameRaw": "BVD GRASSLAND",
+      "cityRaw": "GRASSLAND",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 54.82059,
+      "longitude": -112.6854,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1041",
+        "Address": "5004 50 ST",
+        "PostalCode": "T0A 1V0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 40,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53811",
+      "nameRaw": "BVD HINTON - GREGG AVE",
+      "cityRaw": "HINTON",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.39444,
+      "longitude": -117.60222,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1056",
+        "Address": "511 GREGG AVE",
+        "PostalCode": "T7V 1N1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 30,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53827",
+      "nameRaw": "BVD HINTON - SMITH ST",
+      "cityRaw": "HINTON",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.408272,
+      "longitude": -117.554113,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2035",
+        "Address": "438 SMITH ST",
+        "PostalCode": "T7V 2A1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 28,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53813",
+      "nameRaw": "BVD LETHBRIDGE",
+      "cityRaw": "LETHBRIDGE",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 49.70224,
+      "longitude": -112.78387,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1042",
+        "Address": "3951 2 Ave N",
+        "PostalCode": "T1H 0C8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53814",
+      "nameRaw": "BVD LLOYDMINSTER",
+      "cityRaw": "LLOYDMINSTER",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.27722,
+      "longitude": -110.02806,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1038",
+        "Address": "5721 44 ST",
+        "PostalCode": "T9V 0B3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 70,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53829",
+      "nameRaw": "BVD Lloydminster - 52nd Street",
+      "cityRaw": "Lloydminster",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.28635,
+      "longitude": -110.01221,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "2046",
+        "Address": "5310 52nd Street",
+        "PostalCode": "T9V 3B5",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53815",
+      "nameRaw": "BVD MEDICINE HAT",
+      "cityRaw": "MEDICINE HAT",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 50.02487,
+      "longitude": -110.69963,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1039",
+        "Address": "561 15 ST SW",
+        "PostalCode": "T1A 4W2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53831",
+      "nameRaw": "BVD OKOTOKS",
+      "cityRaw": "OKOTOKS",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 50.74479,
+      "longitude": -113.90743,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "2030",
+        "Address": "48223 338 AVE E",
+        "PostalCode": "T1S 1A8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53816",
+      "nameRaw": "BVD RED DEER",
+      "cityRaw": "Red Deer",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 52.31446,
+      "longitude": -113.87469,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "1047",
+        "Address": "Lot-6, 75th Avenue",
+        "PostalCode": "T4P 0R4",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53833",
+      "nameRaw": "BVD Red Deer - 8120 Edgar",
+      "cityRaw": "Red Deer",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 52.31666,
+      "longitude": -113.83837,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2051",
+        "Address": "8120 Edgar Industrial Drive",
+        "PostalCode": "T4P 3R2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53817",
+      "nameRaw": "BVD REDCLIFF",
+      "cityRaw": "Redcliff",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 50.06998,
+      "longitude": -110.75628,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "1040",
+        "Address": "1900 South Highway Dr SE #1",
+        "PostalCode": "T0J 2P0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53818",
+      "nameRaw": "BVD ROCKY RAPIDS",
+      "cityRaw": "ROCKY RAPIDS",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.22442,
+      "longitude": -114.99971,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1053",
+        "Address": "5201 62 ST",
+        "PostalCode": "T7A 1S1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53819",
+      "nameRaw": "BVD ROCKY VIEW COUNTY",
+      "cityRaw": "ROCKY VIEW COUNTY",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 50.98228,
+      "longitude": -113.9067,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1048",
+        "Address": "234040 WRANGLER RD",
+        "PostalCode": "T1X 0K2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53820",
+      "nameRaw": "BVD STRATHMORE",
+      "cityRaw": "STRATHMORE",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 51.0384,
+      "longitude": -113.3995,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1043",
+        "Address": "436 RIDGE RD",
+        "PostalCode": "T1P 1M6",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 15,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53836",
+      "nameRaw": "BVD Vermilion",
+      "cityRaw": "Vermilion",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.34712,
+      "longitude": -110.85931,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "2047",
+        "Address": "4403 52nd Street",
+        "PostalCode": "T9X 1J8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53838",
+      "nameRaw": "BVD VIKING",
+      "cityRaw": "VIKING",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 53.09534,
+      "longitude": -111.785622,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2024",
+        "Address": "5128 54 ST",
+        "PostalCode": "T0B 4N0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "53840",
+      "nameRaw": "BVD WHITECOURT",
+      "cityRaw": "WHITECOURT",
+      "provinceCode": "AB",
+      "country": "CA",
+      "latitude": 54.19166667,
+      "longitude": -115.79,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2033",
+        "Address": "CORNER OF HWY 43 & 32N",
+        "PostalCode": "T7S 1N3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 30,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54648",
+      "nameRaw": "BVD BLUE RIVER",
+      "cityRaw": "BLUE RIVER",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 52.10361,
+      "longitude": -119.31028,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1058",
+        "Address": "778 BC-5",
+        "PostalCode": "V0E 1J0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 25,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54649",
+      "nameRaw": "BVD CACHE CREEK",
+      "cityRaw": "CACHE CREEK",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 50.80583,
+      "longitude": -121.32472,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1062",
+        "Address": "959 S TRANS-CANADA HWY",
+        "PostalCode": "V0K 1H0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 35,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54650",
+      "nameRaw": "BVD CHILLIWACK",
+      "cityRaw": "CHILLIWACK",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 49.14082,
+      "longitude": -121.95884,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1064",
+        "Address": "7620A VEDDER RD",
+        "PostalCode": "V2R 4E8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 55,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54652",
+      "nameRaw": "BVD GOLDEN",
+      "cityRaw": "GOLDEN",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 51.31189,
+      "longitude": -116.97041,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1055",
+        "Address": "1050 TRANS-CANADA HWY",
+        "PostalCode": "V0A 1H1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 15,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54653",
+      "nameRaw": "BVD HOPE - FLOOD RD",
+      "cityRaw": "HOPE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 49.3652,
+      "longitude": -121.51701,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1063",
+        "Address": "61850 FLOOD-HOPE RD",
+        "PostalCode": "V0X 1L2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54659",
+      "nameRaw": "BVD HOPE - KLASSEN RD",
+      "cityRaw": "HOPE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 49.36367,
+      "longitude": -121.47914,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2040",
+        "Address": "19700 KLASSEN RD",
+        "PostalCode": "V0X 1L2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 62,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54055",
+      "nameRaw": "BVD Kamloops",
+      "cityRaw": "Kamloops",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 50.66125,
+      "longitude": -120.12112,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1059",
+        "Address": "175 Kokanee Way",
+        "PostalCode": "V2C 6Z2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "54661",
+      "nameRaw": "BVD KAMLOOPS - PAUL LAKE",
+      "cityRaw": "KAMLOOPS",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 50.7092,
+      "longitude": -120.328,
+      "operatorAttrs": {
+        "Status": "Temporarily closed",
+        "StoreId": "1061",
+        "Address": "401 PAUL LAKE RD",
+        "PostalCode": "V2H 1J8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 15,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54654",
+      "nameRaw": "BVD MCBRIDE",
+      "cityRaw": "MCBRIDE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 53.30417,
+      "longitude": -120.15917,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1060",
+        "Address": "1006 N E FRONTAGE RD",
+        "PostalCode": "V0J 2E0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54662",
+      "nameRaw": "BVD PRINCE GEORGE - FOREMAN RD",
+      "cityRaw": "PRINCE GEORGE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 53.921121,
+      "longitude": -122.648545,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2042",
+        "Address": "718 FOREMAN RD",
+        "PostalCode": "V2K 5C5",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 35,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54664",
+      "nameRaw": "BVD PRINCE GEORGE - HART HWY",
+      "cityRaw": "PRINCE GEORGE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 54.00481,
+      "longitude": -122.80207,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2045",
+        "Address": "8087 JOHN HART HWY",
+        "PostalCode": "V2K 3B8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54655",
+      "nameRaw": "BVD PRINCE GEORGE - NORANDA",
+      "cityRaw": "PRINCE GEORGE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 53.96584,
+      "longitude": -122.76568,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1066",
+        "Address": "2180 NORANDA RD E",
+        "PostalCode": "V2K 1R1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54656",
+      "nameRaw": "BVD PRINCE GEORGE - PACIFIC",
+      "cityRaw": "PRINCE GEORGE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 53.8722,
+      "longitude": -122.7365,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1065",
+        "Address": "1148 PACIFIC ST",
+        "PostalCode": "V2N 5S3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 30,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54657",
+      "nameRaw": "BVD SICAMOUS",
+      "cityRaw": "SICAMOUS",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 50.84594,
+      "longitude": -118.95529,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1057",
+        "Address": "1340 TRANS-CANADA HWY",
+        "PostalCode": "V0E 2V0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 60,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54658",
+      "nameRaw": "BVD TERRACE",
+      "cityRaw": "TERRACE",
+      "provinceCode": "BC",
+      "country": "CA",
+      "latitude": 54.51402,
+      "longitude": -128.54255,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1067",
+        "Address": "3097 Hwy 16 E",
+        "PostalCode": "V8G 3R2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "55322",
+      "nameRaw": "BVD BRANDON",
+      "cityRaw": "BRANDON",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.88639,
+      "longitude": -99.96333,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1032",
+        "Address": "1990 18TH ST N",
+        "PostalCode": "R7C 1A3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 52,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "55323",
+      "nameRaw": "BVD HEADINGLEY",
+      "cityRaw": "HEADINGLEY",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.8761,
+      "longitude": -97.391,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1031",
+        "Address": "5141 PORTAGE AVE",
+        "PostalCode": "R4H 1E1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 88,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "55326",
+      "nameRaw": "BVD MORRIS",
+      "cityRaw": "MORRIS",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.343,
+      "longitude": -97.3675,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2019",
+        "Address": "2 STAMPEDE DR",
+        "PostalCode": "R0G 1K0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 30,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "55327",
+      "nameRaw": "BVD OAK BLUFF",
+      "cityRaw": "OAK BLUFF",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.773989,
+      "longitude": -97.320674,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2018",
+        "Address": "34A PROVINCIAL TRUNK HWY 3 E",
+        "PostalCode": "R4G 0B2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 10,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "55012",
+      "nameRaw": "BVD Winnipeg",
+      "cityRaw": "Winnipeg",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.93783,
+      "longitude": -97.22395,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1029",
+        "Address": "425 Oak Point Hwy",
+        "PostalCode": "R2R 1T9",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "55329",
+      "nameRaw": "BVD Winnipeg - 110 Panet",
+      "cityRaw": "Winnipeg",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.88546,
+      "longitude": -97.07992,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "2049",
+        "Address": "110 Panet Road",
+        "PostalCode": "R2J 0G7",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "55324",
+      "nameRaw": "BVD WINNIPEG - BROOKSIDE",
+      "cityRaw": "WINNIPEG",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.95214,
+      "longitude": -97.22823,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1030",
+        "Address": "1991 BROOKSIDE BLVD",
+        "PostalCode": "R3C 2G1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "55325",
+      "nameRaw": "BVD WINNIPEG - LOWSON",
+      "cityRaw": "WINNIPEG",
+      "provinceCode": "MB",
+      "country": "CA",
+      "latitude": 49.84019,
+      "longitude": -97.20692,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1028",
+        "Address": "31 LOWSON CRES",
+        "PostalCode": "R3P 0T3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 12,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "61072",
+      "nameRaw": "BVD GRAND FALLS",
+      "cityRaw": "Grand falls",
+      "provinceCode": "NB",
+      "country": "CA",
+      "latitude": 47.03922,
+      "longitude": -67.76523,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "1002",
+        "Address": "Rue Belanger",
+        "PostalCode": "E3Z 0C2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "61062",
+      "nameRaw": "BVD Meductic",
+      "cityRaw": "Meductic",
+      "provinceCode": "NB",
+      "country": "CA",
+      "latitude": 45.97527,
+      "longitude": -67.4714,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1001",
+        "Address": "224 Rte 122 Johnson Settlement",
+        "PostalCode": "E6H 1B6",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58776",
+      "nameRaw": "BVD BOLTON",
+      "cityRaw": "Nashville",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.83633,
+      "longitude": -79.68805,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "1013",
+        "Address": "7491 Nashville Rd",
+        "PostalCode": "L0J 1C0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58777",
+      "nameRaw": "BVD BRADFORD",
+      "cityRaw": "BRADFORD",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 44.09861,
+      "longitude": -79.62722,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1010",
+        "Address": "3479 HWY 88 #1",
+        "PostalCode": "L3Z 2B2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 16,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58055",
+      "nameRaw": "BVD Brampton",
+      "cityRaw": "Brampton",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.74148538,
+      "longitude": -79.69017785,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1014",
+        "Address": "130 Delta Park Blvd",
+        "PostalCode": "L6T 5E7",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58796",
+      "nameRaw": "BVD CARDINAL",
+      "cityRaw": "CARDINAL",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 44.80947,
+      "longitude": -75.401474,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2003",
+        "Address": "2085 SHANLY RD",
+        "PostalCode": "K0E 1E0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 80,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58301",
+      "nameRaw": "BVD Cochrane",
+      "cityRaw": "Cochrane",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 49.05829,
+      "longitude": -81.03451,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1016",
+        "Address": "54 Highway 11 West - Mail Box 238",
+        "PostalCode": "P0L 1C0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58156",
+      "nameRaw": "BVD Comber",
+      "cityRaw": "Comber",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 42.23884,
+      "longitude": -82.54973,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1019",
+        "Address": "7018 Industrial Dr",
+        "PostalCode": "N0P 1J0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58037",
+      "nameRaw": "BVD Cornwall",
+      "cityRaw": "Cornwall",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 45.06076,
+      "longitude": -74.68609,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1003",
+        "Address": "6215 Boundary Road",
+        "PostalCode": "K6H 7P9",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58778",
+      "nameRaw": "BVD DRYDEN - 379 GOV",
+      "cityRaw": "DRYDEN",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 49.78694,
+      "longitude": -92.83278,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1027",
+        "Address": "379 GOVERNMENT ST",
+        "PostalCode": "P8N 2P4",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 55,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58779",
+      "nameRaw": "BVD GORMLEY",
+      "cityRaw": "GORMLEY",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.94216,
+      "longitude": -79.37972,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1007",
+        "Address": "2210 STOUFFVILLE RD",
+        "PostalCode": "L0H 1G0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58780",
+      "nameRaw": "BVD HEARST",
+      "cityRaw": "HEARST",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 49.69088,
+      "longitude": -83.68605,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1021",
+        "Address": "1565 ON-11 W",
+        "PostalCode": "P0L 1N0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 42,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58781",
+      "nameRaw": "BVD JOYCEVILLE",
+      "cityRaw": "JOYCEVILLE",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 44.3215,
+      "longitude": -76.33643,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1004",
+        "Address": "2054 JOYCEVILLE RD",
+        "PostalCode": "K7L 4V3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 50,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58782",
+      "nameRaw": "BVD LONDON",
+      "cityRaw": "LONDON",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 42.94526,
+      "longitude": -81.10779,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1017",
+        "Address": "3391 WESTCHESTER BOURNE",
+        "PostalCode": "N6M 1H6",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 120,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58088",
+      "nameRaw": "BVD Milton",
+      "cityRaw": "Milton",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.53421,
+      "longitude": -79.91462,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1015",
+        "Address": "3025  James Snow Parkway N",
+        "PostalCode": "L9T 2X7",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58062",
+      "nameRaw": "BVD Mississauga",
+      "cityRaw": "Mississauga",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.6566,
+      "longitude": -79.65074,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1011",
+        "Address": "Car entrance- 6070 Dixie Road",
+        "PostalCode": "L5T 1A6",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58802",
+      "nameRaw": "BVD MISSISSAUGA - KENNEDY",
+      "cityRaw": "MISSISSAUGA",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.6475,
+      "longitude": -79.68305556,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2006",
+        "Address": "6625 KENNEDY RD",
+        "PostalCode": "L5T 2W4",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 60,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58803",
+      "nameRaw": "BVD MISSISSAUGA - SHAWSON",
+      "cityRaw": "MISSISSAUGA",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.6539771,
+      "longitude": -79.6429823,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2005",
+        "Address": "1553 SHAWSON DR",
+        "PostalCode": "L4W 1T7",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 70,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58793",
+      "nameRaw": "BVD NEW LISKEARD",
+      "cityRaw": "NEW LISKEARD",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 47.53625,
+      "longitude": -79.67394,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1012",
+        "Address": "997491 ON-11",
+        "PostalCode": "P0J 1P0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 27,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58073",
+      "nameRaw": "BVD Niagara",
+      "cityRaw": "Niagara On The Lake",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.16043,
+      "longitude": -79.16489,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1006",
+        "Address": "495 York Road",
+        "PostalCode": "L0S 1J0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58784",
+      "nameRaw": "BVD NIAGARA - 615 YORK",
+      "cityRaw": "NIAGARA ON THE LAKE",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 43.15611,
+      "longitude": -79.15472,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1005",
+        "Address": "615 YORK RD",
+        "PostalCode": "L0S 1J0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 46,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58078",
+      "nameRaw": "BVD Nipigon",
+      "cityRaw": "Nipigon",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 49.02202,
+      "longitude": -88.28956,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1024",
+        "Address": "Highway 11&17",
+        "PostalCode": "P0T 2J0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58785",
+      "nameRaw": "BVD NIPIGON - TC1 453",
+      "cityRaw": "NIPIGON",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 49.01917,
+      "longitude": -88.30472,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1025",
+        "Address": "453 TRANS-CANADA HWY",
+        "PostalCode": "P0T 2J0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 15,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58011",
+      "nameRaw": "BVD NORTH BAY",
+      "cityRaw": "North Bay",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 46.25744,
+      "longitude": -79.38529,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1008",
+        "Address": "280 Pinewood Park Dr",
+        "PostalCode": "P1B 8Z4",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58790",
+      "nameRaw": "BVD NORTH BAY ON-11",
+      "cityRaw": "NORTH BAY",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 46.35727,
+      "longitude": -79.46752,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1009",
+        "Address": "3090 ON-11",
+        "PostalCode": "P1B 8G3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58804",
+      "nameRaw": "BVD ROSSLYN",
+      "cityRaw": "ROSSLYN",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 48.3805,
+      "longitude": -89.411,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2014",
+        "Address": "3131 WEST ARTHUR ST",
+        "PostalCode": "P7K 0P2",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 40,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58057",
+      "nameRaw": "BVD Sarnia",
+      "cityRaw": "Sarnia",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 42.99327,
+      "longitude": -82.31101,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1018",
+        "Address": "81 Ube Drive",
+        "PostalCode": "N7W 1B6",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "58237",
+      "nameRaw": "BVD Sault Ste Marie",
+      "cityRaw": "Sault Ste Marie",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 46.55451,
+      "longitude": -84.3208,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1023",
+        "Address": "937 Great Northern Road",
+        "PostalCode": "P6A 5K7",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58792",
+      "nameRaw": "BVD SSM - TRUNK RD",
+      "cityRaw": "SAULT STE MARIE",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 46.53111,
+      "longitude": -84.25139,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1022",
+        "Address": "1275 TRUNK RD",
+        "PostalCode": "P6A 6X8",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 35,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58794",
+      "nameRaw": "BVD THUNDER BAY",
+      "cityRaw": "THUNDER BAY",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 48.40909,
+      "longitude": -89.25736,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1026",
+        "Address": "1120 ALLOY DR",
+        "PostalCode": "P7B 5W3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 20,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58807",
+      "nameRaw": "BVD TIMMINS",
+      "cityRaw": "TIMMINS",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 48.47303,
+      "longitude": -81.401289,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2010",
+        "Address": "2154 RIVERSIDE DR",
+        "PostalCode": "P4N 7C3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 55,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58808",
+      "nameRaw": "BVD WAWA",
+      "cityRaw": "WAWA",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 47.964525,
+      "longitude": -84.792283,
+      "operatorAttrs": {
+        "Status": "Temporarily closed",
+        "StoreId": "2012",
+        "Address": "54 PINEWOOD DR",
+        "PostalCode": "P0S 1K0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 70,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58809",
+      "nameRaw": "BVD WHITE RIVER",
+      "cityRaw": "WHITE RIVER",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 48.593785,
+      "longitude": -85.277872,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "2013",
+        "Address": "217 ON-17",
+        "PostalCode": "P0M 3G0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "58783",
+      "nameRaw": "BVD WINDSOR",
+      "cityRaw": "WINDSOR",
+      "provinceCode": "ON",
+      "country": "CA",
+      "latitude": 42.245,
+      "longitude": -82.95167,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1020",
+        "Address": "4040 COUNTY RD 46",
+        "PostalCode": "N0R 1K0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 85,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "56412",
+      "nameRaw": "BVD ESTEVAN",
+      "cityRaw": "Estevan",
+      "provinceCode": "SK",
+      "country": "CA",
+      "latitude": 49.13284,
+      "longitude": -102.97367,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "1034",
+        "Address": "123 4 St",
+        "PostalCode": "S4A 0T3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "54054",
+      "nameRaw": "BVD Grenfell",
+      "cityRaw": "Grenfell",
+      "provinceCode": "SK",
+      "country": "CA",
+      "latitude": 50.40556,
+      "longitude": -102.93017,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1033",
+        "Address": "#1100 Hwy #1 & Desmond Street - P.O. Box 146",
+        "PostalCode": "S0G 2B0",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "56413",
+      "nameRaw": "BVD REGINA",
+      "cityRaw": "REGINA",
+      "provinceCode": "SK",
+      "country": "CA",
+      "latitude": 50.44944,
+      "longitude": -104.53167,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1035",
+        "Address": "1755 PRINCE OF WALES DR",
+        "PostalCode": "S4Z 1A5",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 60,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "56417",
+      "nameRaw": "BVD Regina - 210 McDonald",
+      "cityRaw": "Regina",
+      "provinceCode": "SK",
+      "country": "CA",
+      "latitude": 50.47859,
+      "longitude": -104.57581,
+      "operatorAttrs": {
+        "Status": "Coming soon",
+        "StoreId": "2048",
+        "Address": "210 McDonald Street North",
+        "PostalCode": "S4N 5W4",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": false,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "56414",
+      "nameRaw": "BVD SASKATOON",
+      "cityRaw": "SASKATOON",
+      "provinceCode": "SK",
+      "country": "CA",
+      "latitude": 52.19306,
+      "longitude": -106.68583,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1036",
+        "Address": "315 MARQUIS DR",
+        "PostalCode": "S7R 1B6",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 95,
+        "CatScale": true
+      }
+    },
+    {
+      "siteRef": "56418",
+      "nameRaw": "BVD SASKATOON - GRASSWOOD",
+      "cityRaw": "SASKATOON",
+      "provinceCode": "SK",
+      "country": "CA",
+      "latitude": 52.055972,
+      "longitude": -106.600546,
+      "operatorAttrs": {
+        "Status": "Temporarily closed",
+        "StoreId": "2021",
+        "Address": "HIGHWAY 11 SOUTH &, GRASWOOD RD",
+        "PostalCode": "S7K 4E3",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": false,
+        "TruckParking": 30,
+        "CatScale": false
+      }
+    },
+    {
+      "siteRef": "56415",
+      "nameRaw": "BVD SWIFT CURRENT",
+      "cityRaw": "SWIFT CURRENT",
+      "provinceCode": "SK",
+      "country": "CA",
+      "latitude": 50.2863,
+      "longitude": -107.8222,
+      "operatorAttrs": {
+        "Status": "Open",
+        "StoreId": "1037",
+        "Address": "1510 SOUTH SERVICE RD W",
+        "PostalCode": "S9H 3T1",
+        "Highway": null,
+        "Exit": null,
+        "DEFAtPump": true,
+        "TruckParking": 92,
+        "CatScale": false
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "lineNumber": 19,
+      "nameRaw": "BVD Nisku",
+      "reason": "NO_SITE_NUMBER"
+    }
+  ]
+}

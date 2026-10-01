@@ -4,8 +4,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseBvdCsv, type RawBvdRow } from "../ingest/parseBvdCsv.js";
 import {
+  BvdDirectoryError,
+  mapDirectoryRows,
   matchStationsToOperatorExport,
+  parseBvdDirectoryCsv,
   resolveFromOperatorRow,
+  stationFromDirectoryRow,
+  type BvdDirectoryRow,
   type OperatorExportRow,
   type StationForMatch,
 } from "./operatorExport.js";
@@ -200,3 +205,162 @@ describe.skipIf(!existsSync(REAL_AUGUST))(
     operatorExportResolves(() => parseBvdCsv(readFileSync(REAL_AUGUST)).rows, 604, "LOVES #306");
   },
 );
+
+// ─── BVD travel-centre directory (T-60 step 60.2) ───────────────────────────
+
+// Committed (D29), so these run in CI — unlike the gitignored price sheets.
+const DIRECTORY_CSV = new URL(
+  "../../../data/US-CA-GasStations/bvd-travel-centres-2026-10-01.csv",
+  import.meta.url,
+);
+
+const ALLOWED_DIRECTORY_ATTR_KEYS = [
+  "Status",
+  "StoreId",
+  "Address",
+  "PostalCode",
+  "Highway",
+  "Exit",
+  "DEFAtPump",
+  "TruckParking",
+  "CatScale",
+];
+
+function readDirectory(): BvdDirectoryRow[] {
+  return parseBvdDirectoryCsv(readFileSync(DIRECTORY_CSV));
+}
+
+function directoryRow(overrides: Partial<BvdDirectoryRow>): BvdDirectoryRow {
+  return {
+    lineNumber: 2,
+    siteName: "BVD Comber",
+    siteRef: "58156",
+    storeId: "1019",
+    status: "Open",
+    address: "7018 Industrial Dr",
+    city: "Comber",
+    province: "Ontario",
+    country: "Canada",
+    postalCode: "N0P 1J0",
+    highway: "",
+    exit: "",
+    defAtPump: "Yes",
+    truckParking: "",
+    catScale: "Yes",
+    latitude: "42.23884",
+    longitude: "-82.54973",
+    ...overrides,
+  };
+}
+
+describe("the BVD travel-centre directory (T-60)", () => {
+  it("maps Comber (58156) to ON with its coordinates as printed", () => {
+    const { stations } = mapDirectoryRows(readDirectory());
+    const comber = stations.find((s) => s.siteRef === "58156");
+    expect(comber).toEqual({
+      siteRef: "58156",
+      nameRaw: "BVD Comber",
+      cityRaw: "Comber",
+      provinceCode: "ON",
+      country: "CA",
+      latitude: 42.23884,
+      longitude: -82.54973,
+      operatorAttrs: {
+        Status: "Open",
+        StoreId: "1019",
+        Address: "7018 Industrial Dr",
+        PostalCode: "N0P 1J0",
+        Highway: null,
+        Exit: null,
+        DEFAtPump: true,
+        TruckParking: false,
+        CatScale: true,
+      },
+    });
+  });
+
+  it("maps 91 stations and reports the one row with no Site # by name, unmapped", () => {
+    const { stations, skipped } = mapDirectoryRows(readDirectory());
+    expect(stations).toHaveLength(91);
+    expect(skipped).toEqual([{ lineNumber: 19, nameRaw: "BVD Nisku", reason: "NO_SITE_NUMBER" }]);
+    expect(stations.map((s) => s.nameRaw)).not.toContain("BVD Nisku");
+  });
+
+  it("every row's operator_attrs keys are within the closed set, and none names a price (§17.1)", () => {
+    const priceWords = ["price", "cost", "diesel", "gasoline", "unleaded", "retail", "rate"];
+    for (const s of mapDirectoryRows(readDirectory()).stations) {
+      const keys = Object.keys(s.operatorAttrs);
+      for (const key of keys) {
+        expect(ALLOWED_DIRECTORY_ATTR_KEYS).toContain(key);
+        for (const word of priceWords) {
+          expect(key.toLowerCase()).not.toContain(word);
+        }
+      }
+    }
+  });
+
+  it("every station is CA with a two-letter province code", () => {
+    for (const s of mapDirectoryRows(readDirectory()).stations) {
+      expect(s.country).toBe("CA");
+      expect(s.provinceCode).toMatch(/^[A-Z]{2}$/);
+    }
+  });
+
+  it("loads Coming soon and Temporarily closed rows — an invoice can name them", () => {
+    const statuses = new Set(
+      mapDirectoryRows(readDirectory()).stations.map((s) => s.operatorAttrs.Status),
+    );
+    expect(statuses).toEqual(new Set(["Open", "Coming soon", "Temporarily closed"]));
+  });
+
+  it("agrees with the Python loader's mapping of the same file (bvd_directory.json)", () => {
+    const fromPython = JSON.parse(readFileSync(path.join(fixturesDir, "bvd_directory.json"), "utf8"));
+    expect(mapDirectoryRows(readDirectory())).toEqual(fromPython);
+  });
+
+  it("parses identically from CRLF and LF line endings", () => {
+    const text = readFileSync(DIRECTORY_CSV, "utf8").replace(/\r\n/g, "\n");
+    const lf = parseBvdDirectoryCsv(text);
+    const crlf = parseBvdDirectoryCsv(text.replace(/\n/g, "\r\n"));
+    expect(crlf).toEqual(lf);
+    expect(mapDirectoryRows(crlf)).toEqual(mapDirectoryRows(lf));
+    expect(lf).toHaveLength(92);
+  });
+
+  it("an unknown province throws, naming the row — never a guess", () => {
+    expect(() => stationFromDirectoryRow(directoryRow({ province: "Narnia", lineNumber: 7 }))).toThrow(
+      /line 7 \(BVD Comber, Site # 58156\): unknown province 'Narnia'/,
+    );
+  });
+
+  it("a country other than Canada throws, naming the row", () => {
+    expect(() => stationFromDirectoryRow(directoryRow({ country: "United States" }))).toThrow(
+      BvdDirectoryError,
+    );
+  });
+
+  it("a non-numeric coordinate throws rather than storing NaN", () => {
+    expect(() => stationFromDirectoryRow(directoryRow({ latitude: "" }))).toThrow(/Latitude/);
+  });
+
+  it("a duplicate Site # throws — it is the upsert key", () => {
+    expect(() => mapDirectoryRows([directoryRow({}), directoryRow({ lineNumber: 3 })])).toThrow(
+      /duplicate Site #: 58156/,
+    );
+  });
+
+  it("flags: Yes → true, blank → false, a parking count → number, anything else → null", () => {
+    const attrs = (o: Partial<BvdDirectoryRow>) => stationFromDirectoryRow(directoryRow(o)).operatorAttrs;
+    expect(attrs({ truckParking: "110" }).TruckParking).toBe(110);
+    expect(attrs({ truckParking: "Yes" }).TruckParking).toBe(true);
+    expect(attrs({ truckParking: "" }).TruckParking).toBe(false);
+    expect(attrs({ truckParking: "lots" }).TruckParking).toBeNull();
+    expect(attrs({ defAtPump: "" }).DEFAtPump).toBe(false);
+    expect(attrs({ catScale: "maybe" }).CatScale).toBeNull();
+  });
+
+  it("a header missing a column is an error, not a row of blanks", () => {
+    const text = readFileSync(DIRECTORY_CSV, "utf8").replace("Site #", "Site Number");
+    expect(() => parseBvdDirectoryCsv(text)).toThrow(/missing column\(s\): Site #/);
+  });
+});
