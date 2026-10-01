@@ -23,6 +23,11 @@ fields only), and `geom`. `store_number` / `brand_normalized` are backfilled
 for every BVD station, matched or not, since the join key that makes this
 script possible is exactly what T-08 step 8.1 (storeNumber.ts) computes.
 
+Also loads BVD's Canadian travel-centre directory
+(`data/US-CA-GasStations/bvd-travel-centres-*.csv`, T-60, D29), which —
+unlike the Love's export — *creates* `stations` rows, `country = 'CA'`,
+keyed on `Site #`. See `load_directory_stations`.
+
 **Never stores a price column from this export.** Its sheet also carries
 street prices (Unleaded, Midgrade, Premium, Diesel, Blend, Propane,
 BulkDEF) that are not the app's contract prices — CLAUDE.md, §17.1.
@@ -314,6 +319,83 @@ def write_directory_fixture(directory: dict, dest: Path) -> None:
     dest.write_text(json.dumps(directory, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def load_directory_stations(conn, directory: dict, supplier: str) -> dict:
+    """Upserts every directory station on `(supplier, site_ref)`.
+
+    Inserts an absent row with `country 'CA'`, `resolution 'exact'`,
+    `uncertainty_miles 0`, `resolution_source 'bvd_directory'` and
+    `truck_accessible 'unverified'` — the planner never uses these stations,
+    so there is nothing to verify them for. `state_usps` holds the province
+    code: the column name is a misnomer for these rows, kept rather than
+    renamed. `store_number` stays null — BVD names carry no `#`, and
+    `Store ID` is not a store number in the `LOVES #368` sense.
+
+    A row already present has its coordinates, `operator_attrs` and
+    `last_seen_at` refreshed; `name_raw` and `city_raw` are never
+    overwritten. The update is restricted to `country = 'CA'`, so a `Site #`
+    that ever collided with a US price-sheet `SITE` fails the load rather
+    than moving a US station to Canada.
+    """
+    inserted = 0
+    updated = 0
+    collisions: list[str] = []
+
+    with conn.cursor() as cur:
+        for st in directory["stations"]:
+            cur.execute(
+                """
+                INSERT INTO stations (
+                  supplier, site_ref, name_raw, city_raw, city_normalized, state_usps, country,
+                  geom, resolution, uncertainty_miles, resolution_source, resolved_at,
+                  truck_accessible, operator_attrs
+                )
+                VALUES (
+                  %s, %s, %s, %s, %s, %s, 'CA',
+                  ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
+                  'exact', 0, 'bvd_directory', now(), 'unverified', %s
+                )
+                ON CONFLICT (supplier, site_ref) DO UPDATE
+                  SET geom = EXCLUDED.geom,
+                      operator_attrs = EXCLUDED.operator_attrs,
+                      last_seen_at = now()
+                  WHERE stations.country = 'CA'
+                RETURNING (xmax = 0) AS inserted
+                """,
+                (
+                    supplier,
+                    st["siteRef"],
+                    st["nameRaw"],
+                    st["cityRaw"],
+                    city_normalized_for_directory(st["cityRaw"]),
+                    st["provinceCode"],
+                    st["longitude"],
+                    st["latitude"],
+                    Json(st["operatorAttrs"]),
+                ),
+            )
+            result = cur.fetchone()
+            if result is None:
+                collisions.append(f"{st['nameRaw']} (Site # {st['siteRef']})")
+            elif result[0]:
+                inserted += 1
+            else:
+                updated += 1
+
+    if collisions:
+        conn.rollback()
+        raise DirectoryError(
+            f"directory Site # collides with a non-CA station (left untouched): {collisions}"
+        )
+
+    conn.commit()
+    return {
+        "directory_stations": len(directory["stations"]),
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": [row["nameRaw"] for row in directory["skipped"]],
+    }
+
+
 def load_root_env() -> None:
     env_path = Path(__file__).resolve().parent.parent / ".env"
     if not env_path.exists():
@@ -331,7 +413,8 @@ def resolve(conn, operator_rows: list[OperatorRow], supplier: str) -> dict:
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
-            "SELECT id, name_raw, state_usps FROM stations WHERE supplier = %s",
+            # US only: the directory's CA rows are not Love's stores (T-60).
+            "SELECT id, name_raw, state_usps FROM stations WHERE supplier = %s AND country = 'US'",
             (supplier,),
         )
         stations = cur.fetchall()
@@ -440,13 +523,19 @@ def main() -> None:
     parser.add_argument(
         "--no-fixture", action="store_true", help="Skip writing the committed test fixtures."
     )
+    parser.add_argument(
+        "--directory-only",
+        action="store_true",
+        help="Load the BVD directory only; skip the Love's join.",
+    )
     args = parser.parse_args()
 
-    operator_rows = load_operator_rows(args.xlsx)
+    operator_rows = None if args.directory_only else load_operator_rows(args.xlsx)
     directory = load_directory(args.directory_csv)
 
     if not args.no_fixture:
-        write_fixture(operator_rows, args.fixture_out)
+        if operator_rows is not None:
+            write_fixture(operator_rows, args.fixture_out)
         write_directory_fixture(directory, args.directory_fixture_out)
 
     load_root_env()
@@ -457,7 +546,10 @@ def main() -> None:
 
     conn = psycopg2.connect(database_url)
     try:
-        report = resolve(conn, operator_rows, args.supplier)
+        report = {}
+        if operator_rows is not None:
+            report = resolve(conn, operator_rows, args.supplier)
+        report["bvd_directory"] = load_directory_stations(conn, directory, args.supplier)
     finally:
         conn.close()
 
