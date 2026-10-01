@@ -11,7 +11,7 @@
 
 Same contract as v1. Every ticket is decomposed into steps that can be implemented and tested one at a time, in dependency order. Each step gives a **goal**, the **files** it touches, the **logic** involved, and **tests** with specific cases. Work one step at a time. A step is finished when its tests pass, not when the code is written.
 
-**Conventions carried over.** Tests co-located as `*.test.ts`; anything needing a live database goes in `backend/test/integration/` and is skipped when `DATABASE_URL` is unset. Storage is miles and gallons; units convert only at the edges named in CLAUDE.md (T-52; T-22 added the map renderer). Money is USD everywhere. No pure function performs I/O. "Pass" means an assertion.
+**Conventions carried over.** Tests co-located as `*.test.ts`; anything needing a live database goes in `backend/test/integration/` and is skipped when `DATABASE_URL` is unset. Storage is miles and gallons; units convert only at the edges named in CLAUDE.md (T-52; T-22 added the map renderer). Money is in the invoice's own currency — USD, or CAD on a CA invoice (D24) — and invoice volumes are stored as printed, gallons or litres (D25, the one exception to miles-and-gallons storage); figures combine across currencies only at the API, at a stored rate (D27). No pure function performs I/O. "Pass" means an assertion.
 
 **One new convention.** Money and per-gallon prices are compared **exactly**, as integers of cents and ten-thousandths, never as floats with a tolerance. A cent of drift is the thing reconciliation exists to catch (T-28), so no test may hide one behind `toBeCloseTo`.
 
@@ -1096,3 +1096,261 @@ Two commits: the failing tests, then the fix. No live ORS call except the single
 
 **Tests.** The 55.1 tests. Then one real lane from the UI: it saves, reopens from Recent, and draws on the map.
 **Pass:** all of these; `npm run verify` green.
+
+---
+
+# Phase 11 · Canada invoices
+
+Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. All seven land before T-49, because T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place (D21). **No real driver name or card number goes into a step, a committed fixture or an always-run test** — real-data assertions sit in `skipIf(!hasRealFixture)` blocks that migrate from `migrations/real` (T-58).
+
+## T-60 · Canadian stations from BVD's travel-centre directory
+
+### Step 60.1 — Rename the folder
+
+**Goal.** `data/loves/` becomes `data/US-CA-GasStations/` with nothing else changing.
+
+**Files.** `git mv data/loves data/US-CA-GasStations`; `git mv backend/test/fixtures/loves backend/test/fixtures/US-CA-GasStations`. Modified: `scripts/resolve_from_operator.py` (`DEFAULT_XLSX`, fixture path), `package.json` (`db:reset:real`), every test reading the fixture path, `CLAUDE.md` Data on disk table.
+
+**Tests.** `git grep -n "data/loves\|fixtures/loves"` is empty. `npm run verify` green. `npm run db:reset:real` green; US resolution still 604/605, #306 `unresolved`.
+**Pass:** all of these, with `bvd-travel-centres-2026-10-01.csv` committed in the same commit.
+
+### Step 60.2 — Parse the directory (pure)
+
+**Goal.** A directory row maps to a station insert/update with no database.
+
+**Files.** Modified: `backend/src/resolution/operatorExport.ts` (+ test). New fixture: `backend/test/fixtures/US-CA-GasStations/bvd_directory.json`, written by the Python loader the same way `operator_export.json` is.
+
+**Logic.** `BvdDirectoryRow` → `{ siteRef, nameRaw, cityRaw, provinceCode, country: 'CA', latitude, longitude, operatorAttrs }`. A province-name → code map for the ten provinces and three territories; an unknown province is an error naming the row, never a guess. `operatorAttrs` is the closed set `Status, StoreId, Address, PostalCode, Highway, Exit, DEFAtPump, TruckParking, CatScale` — `Yes`/blank → `true`/`false`, a numeric parking count → number, otherwise `null`.
+
+**Tests.**
+- Comber (58156): `siteRef '58156'`, `provinceCode 'ON'`, coordinates as printed.
+- Every row of the committed file: keys of `operatorAttrs` ⊆ the closed set; no key contains a price word.
+- The one row with no `Site #` is reported, not mapped.
+- `Province 'Narnia'` throws, naming the row.
+- The file read with CRLF line endings (built in the test) maps identically.
+**Pass:** all.
+
+### Step 60.3 — Load into `stations`
+
+**Goal.** 91 CA stations exist, idempotently.
+
+**Files.** Modified: `scripts/resolve_from_operator.py`.
+
+**Logic.** Upsert on `(supplier, site_ref)` with parameterised SQL: insert when absent (`country 'CA'`, `resolution 'exact'`, `uncertainty_miles 0`, `resolution_source 'bvd_directory'`, `truck_accessible 'unverified'`, `geom`), update coordinates/attrs/`last_seen_at` when present. Print the counts and the skipped row's name.
+
+**Tests.** Integration (`DATABASE_URL`-gated): load twice — 91 rows after the first run, no change after the second; Love's rows untouched. `resolveStation(pool, '58156', 'BVD COMBER')` returns the Comber row.
+**Pass:** all; `db:reset:real` runs the loader.
+
+### Step 60.4 — Keep CA out of the planner
+
+**Goal.** No CA station in corridor candidates, exclusions or `GET /stations`.
+
+**Files.** Modified: `backend/src/planning/corridor.ts`, `backend/src/catalog/stations.ts` (+ tests).
+
+**Logic.** `AND s.country = 'US'` in the corridor's station scan and in the stations listing — a fixed literal, not a parameter that could be omitted.
+
+**Tests.** Insert a CA station 1 mile from a test route line: absent from candidates and from `exclusions`; absent from `GET /stations`. A US station at the same distance is unaffected.
+**Pass:** all; the T-11/T-13 corridor suites unchanged.
+
+---
+
+## T-62 · CA fleet roster additions
+
+### Step 62.1 — Real set
+
+**Goal.** `migrations/real/0005` carries the 21 cards and drivers, 20 trucks and 16 assignments.
+
+**Files.** Modified: `migrations/real/0005_fleet_roster_seed.sql` (gitignored).
+
+**Logic.** Cards and driver names transcribed from 999217's PDF, `Unit #` per stop tallied per driver: a driver with one unit across every stop gets that unit, from the first transaction date; the five with several units or a shared one get none (decided 2026-10-01). Trucks: the 20 listed in T-62.
+
+**Tests.** Gated: migrate a scoped schema from `migrations/real`, then every card number on 999217 resolves to a driver.
+**Pass:** that test, locally.
+
+### Step 62.2 — Synthetic mirror
+
+**Goal.** The same structure with invented identities.
+
+**Files.** Modified: `migrations/synthetic/0005_fleet_roster_seed.sql`, `backend/test/integration/actualsSeed.test.ts`, `referenceLayer.test.ts`.
+
+**Logic.** 21 invented names (mixed one-, two- and three-token), 21 cards continuing past the highest `90000xx` card, identical units and assignment pattern — including one driver with three units, one with two, and two shared units.
+
+**Tests.** Counts identical between the two sets (asserted by applying each into its own scoped schema). `git grep` for each real name and card from 62.1 is empty.
+**Pass:** all; `npm run verify` green.
+
+---
+
+## T-61 · Currency and native units at invoice import
+
+### Step 61.1 — Schema
+
+**Goal.** Invoice columns are currency- and unit-neutral, with tax columns.
+
+**Files.** Modified: `migrations/{synthetic,real}/0003_actuals_schema.sql`, `backend/src/db/types.ts`, `backend/src/db/schema.ts` (drift descriptor).
+
+**Logic.** As T-61's design. `currency text NOT NULL CHECK (currency IN ('USD','CAD'))`, `qty_unit text NOT NULL CHECK (qty_unit IN ('gal','L'))`; renames; `pre_tax_amount numeric(12,2)`, `hst`/`gst`/`pst`/`qst numeric(12,2) NOT NULL DEFAULT 0`. Column comments keep the "as printed" rule beside each.
+
+**Tests.** Drift test green. `actualsSchema.test.ts`: the CHECKs reject `'EUR'` and `'m3'`.
+**Pass:** all, with every query and test carried through the renames in the same commit — `npm run verify` stays green and US behaviour is unchanged.
+
+### Step 61.2 — Synthetic CA fixture
+
+**Goal.** A CA invoice PDF CI can import.
+
+**Files.** Modified: `backend/test/fixtures/invoices/generateSamplePdf.ts`. New: `sample-ca.pdf`.
+
+**Logic.** The generator gains a CA mode drawn from 999217's **layout**, not its data: `CN` on every row, litres, CAD/L to 4dp, HST at 13% with GST/PST/QST zero, a TA+DF pair sharing one base auth code, a Scale line (QTY 0, 23.01 + 2.99 = 26.00), a DEF line of 0.01 L, a diesel line under 3.785 L, one transaction dated just after the printed period end, and a printed period start weeks before the first transaction. Cards and names come from T-62's synthetic set.
+
+**Tests.** The generated file's own totals reconcile (asserted in the generator's test).
+**Pass:** regenerating is byte-stable.
+
+### Step 61.3 — Parsers accept `CN`
+
+**Goal.** Both parsers read a currency instead of assuming one.
+
+**Files.** Modified: `backend/src/invoice/parseInvoicePdf.ts`, `parseInvoiceCsv.ts` (+ tests).
+
+**Logic.** The PDF row readers anchor on `US|CN` (and the express reader likewise); the captured code is returned per row. Header gains `currency` mapped `US → USD`, `CN → CAD`; any other code is a row rejection `UNKNOWN_CURRENCY`; two codes in one file reject the invoice. The CSV parser returns `CA_CSV_UNVERIFIED` on a `CN` row (D30). Tax cells are now kept, thousands separators stripped at the existing boundary.
+
+**Tests.** `sample-ca.pdf` → every row `CAD`, tax cells present, 4dp per-litre prices intact. `sample-redacted.pdf` unchanged. A hand-built CSV with `CN` → `CA_CSV_UNVERIFIED`. A row ending `EU` → `UNKNOWN_CURRENCY`. Mixed `US`/`CN` → invoice rejected.
+**Pass:** all.
+
+### Step 61.4 — Import, reconcile, anomalies
+
+**Goal.** A CA invoice persists as printed and reconciles exactly.
+
+**Files.** Modified: `importInvoice.ts`, `reconcile.ts`, `backend/src/anomaly/rules/subGallon.ts`, `priceAbovePublished.ts`, `backend/src/actuals/*.ts` (renamed columns; a temporary `currency = 'USD'` filter on every period-scoped query).
+
+**Logic.** `qty_unit` from currency. Reconciliation per line and per grand total, integer arithmetic: `pre_tax + hst + gst + pst + qst = amount`; `round(qty × billed) = amount`; `round(qty × disc_rate) = discount`. Sub-gallon: `qty_unit = 'L'` → gallons at the rule's input via the existing `units.ts` constant. Price-above-published: no published row → `discrepancy: null`. `occurred_at`: pin the interpretation with a test on the after-period-end transaction.
+
+**Tests.** `sample-ca.pdf` imports with no quarantine; every check passes; the sub-diesel line is flagged and the DEF line not; the post-period-end transaction imports. `sample-redacted.pdf` results are byte-for-byte the same as before the ticket. `/overview?period=` and `/transactions?period=` for the CA fixture's printed start return nothing CA.
+**Pass:** all.
+
+### Step 61.5 — The real 999217
+
+**Goal.** The real CA invoice imports clean.
+
+**Files.** New: `backend/test/integration/invoice999217.test.ts` (`skipIf(!hasRealFixture)`, schema from `migrations/real`).
+
+**Tests.** 60 lines, 59 fuel stops, 34 cards, 9 stations resolved, 0 quarantined; grand total 46,837.33 CAD = 41,356.89 + 5,376.44; TA 21,318.77 L; DF 113.09 L; Scale 104.00. 999210's gated suite unchanged.
+**Pass:** all, locally; `npm run verify` green in both views; `CLAUDE.md` rules updated.
+
+---
+
+## T-63 · Billing weeks
+
+### Step 63.1 — Schema and import
+
+**Goal.** Every invoice has a billing week and an actual range.
+
+**Files.** Modified: `migrations/{synthetic,real}/0003_actuals_schema.sql`, `importInvoice.ts`, `db/types.ts`.
+
+**Logic.** `billing_week_end` ← printed `period_end`; `actual_start`/`actual_end` ← min/max transaction date (per 61.4's `occurred_at` rule); `UNIQUE (billing_week_end, currency)`.
+
+**Tests.** 999210 and 999217 (gated) share `2026-09-09`; the fixtures likewise. Importing a second USD invoice into an occupied week fails with a named reason.
+**Pass:** all.
+
+### Step 63.2 — `/periods` and the override
+
+**Goal.** Weeks, not invoices, are listed; an invoice can be moved.
+
+**Files.** Modified: `backend/src/api/routes/invoices.ts` (+ test), the periods route.
+
+**Logic.** As T-63's design. `datesDiffer = printed ≠ actual`. `PATCH` body `.strict()`: `{ billingWeekEnd }`; unique violation → 409 problem+json.
+
+**Tests.** Shape and ordering; `datesDiffer` on the CA fixture only; a move and a 409.
+**Pass:** all.
+
+### Step 63.3 — Period-scoped routes take `week` and `currency`
+
+**Goal.** Every Actuals endpoint serves one week, one side or both.
+
+**Files.** Modified: `backend/src/api/routes/{overview,transactions,drivers,trucks,stations,expressCharges,receipts}.ts`, `backend/src/actuals/*.ts`, `docs/UI-DATA-CONTRACT.md`, `PROJECT-SCOPE-v2.md` §A13.
+
+**Logic.** Zod `week` (date) and `currency` (`USD|CAD`); remove T-61's temporary filter; field renames off `Usd`; `?units=` converts `qty` and per-unit prices only. Plan vs Actual: `currency = 'USD'` fixed.
+
+**Tests.** Each route: missing/malformed `week` → 400; bad `currency` → 400; CAD returns only CA rows; `units=imperial` on CAD returns gallons with identical money; no field name ends in `Usd` (asserted by walking the response keys).
+**Pass:** all.
+
+### Step 63.4 — Gap report and frontend compile
+
+**Goal.** Coverage uses actual ranges; the frontend still works on US.
+
+**Files.** Modified: `invoiceGapReport.ts` (+ test), frontend API types and hooks.
+
+**Tests.** Aug 1 – Sep 2 is a gap for CAD despite 999217's printed start. Frontend suites green with a US default.
+**Pass:** all; `npm run verify` green.
+
+---
+
+## T-66 · Bank of Canada exchange rate
+
+### Step 66.1 — Adapter and `pickRate`
+
+**Goal.** A rate for a date, offline-testable.
+
+**Files.** New: `backend/src/fx/bankOfCanada.ts` (+ test), `backend/test/fixtures/boc/fxusdcad-2026-09.json` (recorded once from Valet; terms of use checked and noted beside it).
+
+**Tests.** Weekday → that day; Saturday → Friday; a window with no observation → `null`; a malformed response → a typed error, not a throw past the adapter.
+**Pass:** all, with no network.
+
+### Step 66.2 — Stored at import, re-fetchable
+
+**Goal.** CA invoices carry a rate as a record.
+
+**Files.** Modified: `0003_actuals_schema.sql` (both sets), `importInvoice.ts`, `backend/src/api/routes/invoices.ts`, the import CLI.
+
+**Tests.** Fake provider: CA import stores rate, date, source; USD import stores nulls; a failing provider still imports; `POST /invoices/{id}/fx-rate` fills a null and is a no-op on a stored rate.
+**Pass:** all.
+
+---
+
+## T-64 · Week selector, "Invoices in view", Transactions in native units
+
+### Step 64.1 — Week selector and context
+
+**Files.** New: `WeekSelector.tsx` (+ test). Modified: `TopBar.tsx`, the period context hook. Removed: `InvoicePeriodSelector.tsx`.
+
+**Tests.** Options read "Week ending Sep 9, 2026 · 🇺🇸 999210 · 🇨🇦 999217"; a one-sided week shows "🇨🇦 —"; ⚠ on `datesDiffer`; navigation does not refetch `/periods` (T-39's rule).
+**Pass:** all.
+
+### Step 64.2 — "Invoices in view" strip and the US | CA switch
+
+**Files.** New: `InvoicesInView.tsx`, `CurrencySideSwitch.tsx` (+ tests).
+
+**Tests.** Chip states (in view, not in view, not imported, ⚠ tooltip text); a chip links to that invoice in Import history; the switch defaults to US on every mount and disables a missing side.
+**Pass:** all.
+
+### Step 64.3 — Transactions in native units
+
+**Files.** Modified: `transactions/page.tsx`, `TransactionsTable.tsx`, `StopExpansion` (+ tests).
+
+**Tests.** CA: L and CAD/L by default, gallons and CAD/gal after the toggle, money identical; US: the reverse. Every money header carries its currency. A CA stop's detail shows Pre-tax, HST, GST, PST, QST and Final. The strip highlights only the invoice whose rows are shown — asserted against the request made.
+**Pass:** all.
+
+### Step 64.4 — Import screen: mismatch note and week override
+
+**Files.** Modified: the Import screens (T-42) (+ tests).
+
+**Tests.** The amber note text for a `datesDiffer` invoice; the override calls `PATCH` and the selector updates without a reload; a 409 shows its reason.
+**Pass:** all; `npm run verify` green.
+
+---
+
+## T-65 · Overview — US, CA and combined
+
+### Step 65.1 — `/overview?week=` returns three bodies
+
+**Files.** Modified: `backend/src/actuals/overview.ts`, `backend/src/api/routes/overview.ts` (+ tests).
+
+**Logic.** `us`, `ca` (existing body per invoice, or `null`), `combined` (`partial` flag, `beforeTax`/`tax`/`withTax`, rates in the requested unit, `currency`), `fx` (`rate`, `rateDate`, `source`, or `null` → combined money fields `null` with `ratePending: true`). One rounding point for conversion, in integer cents, documented in the function.
+
+**Tests.** For the fixtures' shared week: CA `withTax` = the CA grand total; `beforeTax + tax = withTax` exactly; combined USD = US + round(CA ÷ rate); US-only week → `ca: null`, `partial: true`; null rate → every converted field `null`, never computed.
+**Pass:** all.
+
+### Step 65.2 — Three panels
+
+**Files.** Modified: the Overview page and KPI components (+ tests).
+
+**Tests.** US top left, CA top right, combined below; the CA panel shows before tax / tax / with tax and both per-litre rates; "HST" vs "Sales tax" label rule; "Partial — CA invoice not imported"; "rate pending"; the rate and its date beside the combined figures; the actual-range footnote on `datesDiffer`; both chips highlighted.
+**Pass:** all; `npm run verify` green.
