@@ -1,6 +1,7 @@
 -- Fleet roster (T-25 step 25.4): this company's data, replaceable — unlike the
 -- required config in 0004. The 27 cards, 27 units and 27
--- drivers from PROJECT-SCOPE-v2.md §A19, each card given its one permanent
+-- drivers from PROJECT-SCOPE-v2.md §A19 (plus the CA invoice's additions,
+-- T-62, at the end of this file), each card given its one permanent
 -- driver and each driver one or more current truck_assignments rows.
 -- Idempotent — re-running this file must not duplicate rows or clobber a
 -- real reassignment.
@@ -159,6 +160,106 @@ FROM (VALUES
   ('AVERY',             '070',  '2026-01-01', NULL),
   ('DREW',              '044',  '2026-01-01', NULL),
   ('SAWYER',            '069',  '2026-01-01', NULL)
+) AS v(display_name, unit_number, effective_from, effective_to)
+JOIN drivers d ON d.display_name = v.display_name
+JOIN trucks t ON t.unit_number = v.unit_number
+ON CONFLICT DO NOTHING;
+
+-- ─── CA invoice additions (T-62) ──────────────────────────────────────────
+-- The CA invoice 999217 (week ending 2026-09-09) carries 34 cards: 13 are
+-- already above, under the same drivers as on the US invoice; the 21 below
+-- are new, each with exactly one raw driver name across its stops. Their
+-- stops entered 20 unit numbers not yet in the roster — added as trucks
+-- with the same flagged working default as the 27 above.
+--
+-- Assignments, decided 2026-10-01: the 16 new drivers whose CA stops all
+-- carry one unit, and a unit no other new driver entered, are assigned it
+-- from the invoice's first transaction date, 2026-09-03. The other 5 get no
+-- assignment until one is set in Settings (T-47): one entered 067, 1017 and
+-- 056; one entered 1002 and 062; one more entered 062; two entered 031.
+-- Their stops resolve a driver (by card) and no truck. One existing driver
+-- entered 074 on the CA invoice — 074 is added as a truck but that driver's
+-- assignment above is left as it is, so the unit-mismatch flag fires.
+
+INSERT INTO drivers (display_name)
+SELECT v.display_name FROM (VALUES
+  ('MILES HARTE'), ('JUNE ABBOTT'), ('COLE WINTER'), ('PIPER STONE'),
+  ('REMY'), ('ELLIOT'), ('HAZEL PRICE'), ('OWEN DALE'),
+  ('MARLO KEY'), ('SKYLER'), ('BEAU NASH'), ('PAXTON'),
+  ('EMERY'), ('JADE MERCER'), ('ROWAN'), ('ASH'),
+  ('KAI'), ('BRIAR'), ('SUTTON'), ('LENNOX'),
+  ('CLEO MARSH')
+) AS v(display_name)
+WHERE NOT EXISTS (SELECT 1 FROM drivers d WHERE d.display_name = v.display_name);
+
+INSERT INTO fuel_cards (card_number)
+VALUES
+  ('9000028'), ('9000029'), ('9000030'), ('9000031'), ('9000032'),
+  ('9000033'), ('9000034'), ('9000035'), ('9000036'), ('9000037'),
+  ('9000038'), ('9000039'), ('9000040'), ('9000041'), ('9000042'),
+  ('9000043'), ('9000044'), ('9000045'), ('9000046'), ('9000047'),
+  ('9000048')
+ON CONFLICT (card_number) DO NOTHING;
+
+INSERT INTO trucks
+  (unit_number, tank_gallons, avg_mpg, reserve_fraction, max_leg_miles,
+   min_leg_miles, cost_per_mile_usd, fixed_stop_minutes)
+SELECT v.unit_number, 200, 7.5, 0.150, 500, 300, 0.000, 20
+FROM (VALUES
+  ('005'), ('028'), ('029'), ('033'), ('034'), ('035'), ('037'), ('038'),
+  ('040'), ('049'), ('054'), ('056'), ('058'), ('059'), ('062'), ('067'),
+  ('074'), ('1002'), ('1004'), ('1010')
+) AS v(unit_number)
+ON CONFLICT (unit_number) DO NOTHING;
+
+UPDATE fuel_cards fc
+SET driver_id = d.id
+FROM (VALUES
+  ('9000028', 'MILES HARTE'),
+  ('9000029', 'JUNE ABBOTT'),
+  ('9000030', 'COLE WINTER'),
+  ('9000031', 'PIPER STONE'),
+  ('9000032', 'REMY'),
+  ('9000033', 'ELLIOT'),
+  ('9000034', 'HAZEL PRICE'),
+  ('9000035', 'OWEN DALE'),
+  ('9000036', 'MARLO KEY'),
+  ('9000037', 'SKYLER'),
+  ('9000038', 'BEAU NASH'),
+  ('9000039', 'PAXTON'),
+  ('9000040', 'EMERY'),
+  ('9000041', 'JADE MERCER'),
+  ('9000042', 'ROWAN'),
+  ('9000043', 'ASH'),
+  ('9000044', 'KAI'),
+  ('9000045', 'BRIAR'),
+  ('9000046', 'SUTTON'),
+  ('9000047', 'LENNOX'),
+  ('9000048', 'CLEO MARSH')
+) AS pairing(card_number, display_name)
+JOIN drivers d ON d.display_name = pairing.display_name
+WHERE fc.card_number = pairing.card_number
+  AND fc.driver_id IS NULL;
+
+INSERT INTO truck_assignments (driver_id, truck_id, effective_from, effective_to)
+SELECT d.id, t.id, v.effective_from::date, v.effective_to::date
+FROM (VALUES
+  ('MILES HARTE',      '038',  '2026-09-03', NULL),
+  ('JUNE ABBOTT',      '035',  '2026-09-03', NULL),
+  ('PIPER STONE',      '1004', '2026-09-03', NULL),
+  ('HAZEL PRICE',      '037',  '2026-09-03', NULL),
+  ('OWEN DALE',        '059',  '2026-09-03', NULL),
+  ('MARLO KEY',        '049',  '2026-09-03', NULL),
+  ('SKYLER',           '058',  '2026-09-03', NULL),
+  ('BEAU NASH',        '066',  '2026-09-03', NULL),
+  ('PAXTON',           '1010', '2026-09-03', NULL),
+  ('EMERY',            '029',  '2026-09-03', NULL),
+  ('JADE MERCER',      '033',  '2026-09-03', NULL),
+  ('ASH',              '005',  '2026-09-03', NULL),
+  ('KAI',              '034',  '2026-09-03', NULL),
+  ('BRIAR',            '054',  '2026-09-03', NULL),
+  ('SUTTON',           '040',  '2026-09-03', NULL),
+  ('CLEO MARSH',       '028',  '2026-09-03', NULL)
 ) AS v(display_name, unit_number, effective_from, effective_to)
 JOIN drivers d ON d.display_name = v.display_name
 JOIN trucks t ON t.unit_number = v.unit_number

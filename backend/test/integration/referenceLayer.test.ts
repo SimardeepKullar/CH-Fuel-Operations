@@ -133,6 +133,26 @@ describe.skipIf(!hasDatabase)("reference layer (integration, T-26)", () => {
     expect(byDisplayName).toEqual({ matched: true, driverId });
   });
 
+  it("resolves a single-unit CA driver's card to their truck from 2026-09-03, and not before (T-62)", async () => {
+    const card = await getCardByNumber(scopedPool, "9000028");
+    const onInvoice = await resolveAssignment(scopedPool, card!.id, new Date("2026-09-04T12:00:00Z"));
+    const truck = onInvoice.truckId ? await getTruckById(scopedPool, onInvoice.truckId) : null;
+    expect(truck?.unit_number).toBe("038");
+
+    const before = await resolveAssignment(scopedPool, card!.id, new Date("2026-09-02T12:00:00Z"));
+    expect(before.driverId).toBe(onInvoice.driverId);
+    expect(before.truckId).toBeNull();
+  });
+
+  it("resolves each of the five unassigned CA drivers' cards to a driver and no truck (T-62)", async () => {
+    for (const cardNumber of ["9000030", "9000032", "9000033", "9000042", "9000047"]) {
+      const card = await getCardByNumber(scopedPool, cardNumber);
+      const result = await resolveAssignment(scopedPool, card!.id, new Date("2026-09-08T12:00:00Z"));
+      expect(result.driverId).not.toBeNull();
+      expect(result.truckId).toBeNull();
+    }
+  });
+
   it("returns unmatched for a driver name with no alias and no display-name hit", async () => {
     const result = await resolveDriverByName(scopedPool, "NOBODY BY THIS NAME");
     expect(result).toEqual({ matched: false });

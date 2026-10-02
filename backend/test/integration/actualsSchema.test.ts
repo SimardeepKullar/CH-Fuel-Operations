@@ -261,7 +261,7 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
 
   it("cascades an invoice delete to fuel_stops, fuel_stop_lines and express_charges, but refuses to delete a referenced station", async () => {
     const cardId = await insertCard("C6");
-    const truckId = await insertTruck("074");
+    const truckId = await insertTruck("097");
     const { rows: stationRows } = await scopedPool.query<{ id: string }>(
       `INSERT INTO stations (supplier, site_ref, name_raw, city_raw, city_normalized, state_usps)
        VALUES ('BVD', 'SITE1', 'LOVES #1', 'DALLAS', 'dallas', 'TX')
