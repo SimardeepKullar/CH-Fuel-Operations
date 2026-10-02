@@ -103,7 +103,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-57** | **"Show all sheet stations" silently does nothing on a failed fetch** | T-23 | **5** | **done — merged (`3c8e56f`, PR #79)** |
 | **T-58** | **Real data out of the working tree — synthetic fleet roster, before the repo goes public** | T-25, T-51 | **10** | **in progress — history rewrite (T-50's original scope) still open** |
 | **T-59** | **"Show all sheet stations" dots vanish on a re-plan** | T-23 | **5** | **done — PR pending** |
-| **T-60** | **Canadian stations from BVD's travel-centre directory** | T-08 | **11** | **new** |
+| **T-60** | **Canadian stations from BVD's travel-centre directory** | T-08 | **11** | **done — merged (`13e7c88`, PR #14)** |
 | **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **new** |
 | **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **new** |
 | **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **new** |
@@ -1237,13 +1237,13 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Dependencies.** T-08.
 
 **Definition of done.**
-- [ ] `data/loves/` no longer exists; `git log --follow` traces `LovesSearchResults.xlsx` across the rename; `npm run db:reset:real` runs green on the new path.
-- [ ] The loader inserts 91 CA stations (`country = 'CA'`, province codes, coordinates) and names the one row it skipped; a second run changes nothing.
-- [ ] US resolution is unchanged: 604/605 from the Love's export, #306 still `unresolved`.
-- [ ] `matchStation` resolves all 9 site numbers on 999217 via `site_ref`. The directory is committed, so this runs in CI; the invoice-side assertion is `skipIf(!hasRealFixture)`.
-- [ ] A CA station placed 1 mile from a US route line appears in neither the corridor's candidates nor its `exclusions`, nor in `GET /stations`.
-- [ ] `operator_attrs` on every directory row holds only the closed key set — asserted, not eyeballed.
-- [ ] The committed CSV parses identically from a CRLF checkout (`core.autocrlf`; the case is built in the test, not committed).
+- [x] `data/loves/` no longer exists; `git log --follow` traces `LovesSearchResults.xlsx` across the rename; `npm run db:reset:real` runs green on the new path.
+- [x] The loader inserts 91 CA stations (`country = 'CA'`, province codes, coordinates) and names the one row it skipped; a second run changes nothing.
+- [x] US resolution is unchanged: 604/605 from the Love's export, #306 still `unresolved`.
+- [x] `matchStation` resolves all 9 site numbers on 999217 via `site_ref`. The directory is committed, so this runs in CI; the invoice-side assertion is `skipIf(!hasRealFixture)`.
+- [x] A CA station placed 1 mile from a US route line appears in neither the corridor's candidates nor its `exclusions`, nor in `GET /stations`.
+- [x] `operator_attrs` on every directory row holds only the closed key set — asserted, not eyeballed.
+- [x] The committed CSV parses identically from a CRLF checkout (`core.autocrlf`; the case is built in the test, not committed).
 
 ---
 
