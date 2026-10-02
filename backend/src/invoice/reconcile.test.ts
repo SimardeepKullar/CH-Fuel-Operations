@@ -8,7 +8,7 @@ import { reconcile } from "./reconcile.js";
 import type { ValidatedInvoiceLine } from "./parseInvoiceCsv.js";
 import type { FuelStopGroup } from "./groupByAuthCode.js";
 import type { ExpressRow } from "./parseExpressRows.js";
-import type { PrintedTotals } from "./parseInvoiceCsv.js";
+import type { PrintedProductTotal, PrintedTotals } from "./parseInvoiceCsv.js";
 
 function mkLine(overrides: Partial<ValidatedInvoiceLine>): ValidatedInvoiceLine {
   return {
@@ -25,10 +25,18 @@ function mkLine(overrides: Partial<ValidatedInvoiceLine>): ValidatedInvoiceLine 
     stationState: "TX",
     rawProductCode: "TA",
     productType: "highway_diesel",
-    gallons: "50.00",
-    retailUsdPerGal: "5.5000",
-    billedUsdPerGal: "5.1234",
-    amountUsd: "256.17",
+    currency: "USD",
+    qty: "50.00",
+    retailPerUnit: "5.5000",
+    billedPerUnit: "5.1234",
+    preTaxAmount: "256.17",
+    hst: "0.00",
+    gst: "0.00",
+    pst: "0.00",
+    qst: "0.00",
+    discRate: "0.3766",
+    discount: "18.83",
+    amount: "256.17",
     ...overrides,
   };
 }
@@ -45,8 +53,8 @@ function mkGroup(lines: ValidatedInvoiceLine[]): FuelStopGroup {
     stationState: first.stationState,
     siteNumber: first.siteNumber,
     occurredAt: first.occurredAt,
-    totalUsd: "0.00", // unused by reconcile()
-    totalGallons: "0.00", // unused by reconcile()
+    total: "0.00", // unused by reconcile()
+    totalQty: "0.00", // unused by reconcile()
     lines,
   };
 }
@@ -56,27 +64,36 @@ function mkGroup(lines: ValidatedInvoiceLine[]): FuelStopGroup {
 function baseGroups(): FuelStopGroup[] {
   return [
     mkGroup([
-      mkLine({ lineNumber: 1, rawProductCode: "TA", productType: "highway_diesel", gallons: "50.00", amountUsd: "256.17" }),
-      mkLine({ lineNumber: 2, rawProductCode: "DF", productType: "def", gallons: "5.00", amountUsd: "22.50" }),
+      mkLine({ lineNumber: 1, rawProductCode: "TA", productType: "highway_diesel", qty: "50.00", amount: "256.17" }),
+      mkLine({ lineNumber: 2, rawProductCode: "DF", productType: "def", qty: "5.00", amount: "22.50" }),
     ]),
   ];
 }
 
 interface PrintedRow {
-  gallons: string | null;
-  amountUsd: string;
+  qty: string | null;
+  amount: string;
 }
 
-function baseTotals(overrides: Record<string, PrintedRow> = {}, grandTotalUsd = "278.67"): PrintedTotals {
+/** A printed totals row with no tax — a US invoice's shape. */
+function printedRow(productCode: string, qty: string | null, amount: string): PrintedProductTotal {
+  return { productCode, qty, amount, discount: null, preTaxAmount: qty === null ? null : amount, hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00" };
+}
+
+function totalsOf(products: PrintedProductTotal[], grandTotal: string): PrintedTotals {
+  return { products, grandTotalRow: printedRow("Grand Total", null, grandTotal), grandTotal };
+}
+
+function baseTotals(overrides: Record<string, PrintedRow> = {}, grandTotal = "278.67"): PrintedTotals {
   const defaults: Record<string, PrintedRow> = {
-    TA: { gallons: "50.00", amountUsd: "256.17" },
-    DF: { gallons: "5.00", amountUsd: "22.50" },
+    TA: { qty: "50.00", amount: "256.17" },
+    DF: { qty: "5.00", amount: "22.50" },
   };
   const merged: Record<string, PrintedRow> = { ...defaults, ...overrides };
-  return {
-    products: Object.entries(merged).map(([productCode, row]) => ({ productCode, discountUsd: null, ...row })),
-    grandTotalUsd,
-  };
+  return totalsOf(
+    Object.entries(merged).map(([productCode, row]) => printedRow(productCode, row.qty, row.amount)),
+    grandTotal,
+  );
 }
 
 describe("reconcile — pure", () => {
@@ -89,7 +106,7 @@ describe("reconcile — pure", () => {
   });
 
   it("one cent short on DF fails only DF, with a delta of -0.01, while TA passes", () => {
-    const totals = baseTotals({ DF: { gallons: "5.00", amountUsd: "22.51" } }, "278.68");
+    const totals = baseTotals({ DF: { qty: "5.00", amount: "22.51" } }, "278.68");
     const result = reconcile(baseGroups(), [], totals);
     expect(result.balanced).toBe(false);
     expect(result.amountImbalances).toHaveLength(1);
@@ -104,8 +121,8 @@ describe("reconcile — pure", () => {
     // (219.39 + 59.28 = 278.67), which is exactly why a single grand-total
     // check would rubber-stamp this.
     const totals = baseTotals({
-      TA: { gallons: "50.00", amountUsd: "219.39" },
-      DF: { gallons: "5.00", amountUsd: "59.28" },
+      TA: { qty: "50.00", amount: "219.39" },
+      DF: { qty: "5.00", amount: "59.28" },
     });
     const result = reconcile(baseGroups(), [], totals);
     expect(result.balanced).toBe(false);
@@ -115,7 +132,7 @@ describe("reconcile — pure", () => {
   });
 
   it("reports a gallons imbalance independently of amount — amounts can match while gallons don't", () => {
-    const totals = baseTotals({ TA: { gallons: "51.00", amountUsd: "256.17" } });
+    const totals = baseTotals({ TA: { qty: "51.00", amount: "256.17" } });
     const result = reconcile(baseGroups(), [], totals);
     expect(result.balanced).toBe(false);
     expect(result.amountImbalances).toEqual([]);
@@ -126,14 +143,11 @@ describe("reconcile — pure", () => {
   it("never drifts through floating point: classic 0.1+0.2-style sums land on exact integer cents", () => {
     const groups = [
       mkGroup([
-        mkLine({ lineNumber: 1, rawProductCode: "TA", amountUsd: "0.10", gallons: "0.10" }),
-        mkLine({ lineNumber: 2, rawProductCode: "TA", amountUsd: "0.20", gallons: "0.20" }),
+        mkLine({ lineNumber: 1, rawProductCode: "TA", amount: "0.10", qty: "0.10" }),
+        mkLine({ lineNumber: 2, rawProductCode: "TA", amount: "0.20", qty: "0.20" }),
       ]),
     ];
-    const totals: PrintedTotals = {
-      products: [{ productCode: "TA", gallons: "0.30", amountUsd: "0.30", discountUsd: null }],
-      grandTotalUsd: "0.30",
-    };
+    const totals = totalsOf([printedRow("TA", "0.30", "0.30")], "0.30");
     const result = reconcile(groups, [], totals);
     expect(result.balanced).toBe(true);
     expect(result.grandTotal.deltaCents).toBe(0);
@@ -152,15 +166,16 @@ describe("reconcile — pure", () => {
         driverNameRaw: "DRIVER",
         cdlRaw: null,
         tripNumberRaw: null,
-        amountUsd: "50.00",
-        feeUsd: "3.00",
-        totalUsd: "53.00",
+        amount: "50.00",
+        fee: "3.00",
+        total: "53.00",
+        currency: "USD",
         payee: "lumper",
         note: null,
         category: null,
       },
     ];
-    const totals = baseTotals({ "Express Codes": { gallons: null, amountUsd: "53.00" } }, "331.67");
+    const totals = baseTotals({ "Express Codes": { qty: null, amount: "53.00" } }, "331.67");
     const result = reconcile(baseGroups(), expressRows, totals);
     expect(result.balanced).toBe(true);
   });

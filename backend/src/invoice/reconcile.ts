@@ -38,15 +38,15 @@ export interface ReconcileResult {
 
 function printedAmountCents(printedTotals: PrintedTotals, label: string): number {
   const row = printedTotals.products.find((p) => p.productCode === label);
-  return row ? toCents(row.amountUsd) : 0;
+  return row ? toCents(row.amount) : 0;
 }
 
 function printedGallonsCents(printedTotals: PrintedTotals, label: string): number | null {
   const row = printedTotals.products.find((p) => p.productCode === label);
-  if (!row || row.gallons === null) {
+  if (!row || row.qty === null) {
     return null;
   }
-  return toCents(row.gallons);
+  return toCents(row.qty);
 }
 
 /**
@@ -85,7 +85,7 @@ export function reconcile(
     const label = PRINTED_ROW_LABEL[code] ?? code;
     const lineNumbers = codeLines.map((l) => l.lineNumber);
 
-    const parsedAmountCents = codeLines.reduce((sum, l) => sum + toCents(l.amountUsd), 0);
+    const parsedAmountCents = codeLines.reduce((sum, l) => sum + toCents(l.amount), 0);
     const expectedAmountCents = printedAmountCents(printedTotals, label);
     if (parsedAmountCents !== expectedAmountCents) {
       amountImbalances.push({
@@ -99,7 +99,7 @@ export function reconcile(
 
     const expectedGallonsCents = printedGallonsCents(printedTotals, label);
     if (expectedGallonsCents !== null) {
-      const parsedGallonsCents = codeLines.reduce((sum, l) => sum + toCents(l.gallons), 0);
+      const parsedGallonsCents = codeLines.reduce((sum, l) => sum + toCents(l.qty), 0);
       if (parsedGallonsCents !== expectedGallonsCents) {
         gallonImbalances.push({
           productCode: code,
@@ -112,7 +112,7 @@ export function reconcile(
     }
   }
 
-  const parsedExpressCents = expressRows.reduce((sum, r) => sum + toCents(r.totalUsd), 0);
+  const parsedExpressCents = expressRows.reduce((sum, r) => sum + toCents(r.total), 0);
   const expectedExpressCents = printedAmountCents(printedTotals, EXPRESS_PRINTED_LABEL);
   if (parsedExpressCents !== expectedExpressCents) {
     amountImbalances.push({
@@ -125,8 +125,8 @@ export function reconcile(
   }
 
   const parsedGrandTotalCents =
-    lines.reduce((sum, l) => sum + toCents(l.amountUsd), 0) + parsedExpressCents;
-  const expectedGrandTotalCents = toCents(printedTotals.grandTotalUsd);
+    lines.reduce((sum, l) => sum + toCents(l.amount), 0) + parsedExpressCents;
+  const expectedGrandTotalCents = toCents(printedTotals.grandTotal);
   const grandTotal = {
     expectedCents: expectedGrandTotalCents,
     parsedCents: parsedGrandTotalCents,

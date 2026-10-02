@@ -27,6 +27,7 @@ function report(overrides: Partial<ImportReport> = {}): ImportReport {
     fileSha256: "abc123",
     periodStart: "2026-08-01",
     periodEnd: "2026-08-31",
+    currency: "USD",
     grandTotalUsd: "50929.71",
     productTotals: [
       { productCode: "TA", gallons: "9000.00", amountUsd: "47000.00", discountUsd: "500.00" },

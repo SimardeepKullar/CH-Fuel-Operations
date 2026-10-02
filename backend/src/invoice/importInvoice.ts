@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
 import { runAnomalies } from "../anomaly/runAnomalies.js";
 import { getCardByNumber } from "../catalog/cards.js";
 import { getTruckByUnitNumber } from "../catalog/trucks.js";
@@ -194,6 +195,12 @@ async function resolveExpressChargeDrivers(
   return resolutions;
 }
 
+/** Quantity unit follows currency (D25): BVD bills Canadian fuel in litres
+ * and US fuel in gallons — measured on 999217 and 999210, one each. */
+export function qtyUnitFor(currency: InvoiceCurrency): InvoiceQtyUnit {
+  return currency === "CAD" ? "L" : "gal";
+}
+
 async function insertInvoiceRow(
   client: PoolClient,
   parsed: ParsedInvoice,
@@ -204,7 +211,7 @@ async function insertInvoiceRow(
     `INSERT INTO invoices
        (invoice_number, period_start, period_end, invoice_date, due_date,
         currency, qty_unit, grand_total, status, file_sha256)
-     VALUES ($1, $2, $3, $4, $5, 'USD', 'gal', $6, $7, $8)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
       parsed.header.invoiceNumber,
@@ -212,7 +219,9 @@ async function insertInvoiceRow(
       parsed.header.periodEnd,
       parsed.header.invoiceDate,
       parsed.header.dueDate,
-      parsed.printedTotals.grandTotalUsd,
+      parsed.header.currency,
+      qtyUnitFor(parsed.header.currency),
+      parsed.printedTotals.grandTotal,
       status,
       fileSha256,
     ],
@@ -242,7 +251,7 @@ async function insertInvoiceTotals(
     await client.query(
       `INSERT INTO invoice_totals (invoice_id, product_code, qty, amount, discount)
        VALUES ($1, $2, $3, $4, $5)`,
-      [invoiceId, rawCode, printedRow.gallons ?? "0.00", printedRow.amountUsd, printedRow.discountUsd],
+      [invoiceId, rawCode, printedRow.qty ?? "0.00", printedRow.amount, printedRow.discount],
     );
   }
 }
@@ -270,7 +279,7 @@ async function insertFuelStop(
       group.unitRaw,
       group.driverNameRaw,
       resolution.stationId,
-      group.totalUsd,
+      group.total,
     ],
   );
   const fuelStopId = rows[0]?.id;
@@ -282,7 +291,7 @@ async function insertFuelStop(
       `INSERT INTO fuel_stop_lines
          (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [fuelStopId, line.rawProductCode, line.gallons, line.retailUsdPerGal, line.billedUsdPerGal, line.amountUsd],
+      [fuelStopId, line.rawProductCode, line.qty, line.retailPerUnit, line.billedPerUnit, line.amount],
     );
   }
 }
@@ -308,9 +317,9 @@ async function insertExpressCharge(
       row.unitRaw,
       driverResolution.driverId,
       row.driverNameRaw,
-      row.amountUsd,
-      row.feeUsd,
-      row.totalUsd,
+      row.amount,
+      row.fee,
+      row.total,
       row.payee,
       row.note,
       row.category,
@@ -405,7 +414,8 @@ export async function importInvoice(
     fileSha256,
     periodStart: parsed.header.periodStart,
     periodEnd: parsed.header.periodEnd,
-    grandTotalUsd: parsed.printedTotals.grandTotalUsd,
+    currency: parsed.header.currency,
+    grandTotalUsd: parsed.printedTotals.grandTotal,
     productTotals: parsed.printedTotals.products,
     parserRejections: parsed.rejections,
     reconcileResult,

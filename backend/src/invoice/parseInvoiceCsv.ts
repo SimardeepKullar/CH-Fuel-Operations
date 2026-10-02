@@ -2,6 +2,8 @@ import { parse } from "csv-parse/sync";
 import { normaliseHeaderCell } from "../ingest/parseBvdCsv.js";
 import { DecimalFormatError, toDecimalString } from "./decimal.js";
 import type { InvoiceProductType } from "./productCode.js";
+import type { InvoiceCurrency } from "../db/types.js";
+import { currencyFromCode } from "./currency.js";
 import {
   parseExpressRows,
   type ExpressLayout,
@@ -10,12 +12,24 @@ import {
 } from "./parseExpressRows.js";
 import { addIsoDays } from "../ingest/gapReport.js";
 
+/** Why a whole invoice was refused, where the reason is a named rule rather
+ * than a malformed shape (T-61). */
+export type InvoiceFormatErrorCode =
+  /** Two currencies among one invoice's rows — rejected, never split (D24). */
+  | "MIXED_CURRENCY"
+  /** A CAD invoice arrived as the portal CSV, a shape not yet verified
+   * against a real CA export (D30). Import the PDF instead. */
+  | "CA_CSV_UNVERIFIED";
+
 export class InvoiceFormatError extends Error {
-  constructor(message: string) {
-    super(message);
+  readonly code: InvoiceFormatErrorCode | null;
+  constructor(message: string, code: InvoiceFormatErrorCode | null = null) {
+    super(code ? `${code}: ${message}` : message);
     this.name = "InvoiceFormatError";
+    this.code = code;
   }
 }
+
 
 /** Invoice-level metadata. The emailed PDF prints all of it in a header
  * table; the portal CSV carries none of it and opens straight into
@@ -28,6 +42,8 @@ export interface InvoiceHeader {
   periodEnd: string;
   invoiceDate: string;
   dueDate: string;
+  /** From the rows' `CUR`: one currency per invoice (D24). */
+  currency: InvoiceCurrency;
   supplierName: string;
   supplierAddress: string;
   billToName: string;
@@ -40,28 +56,43 @@ export interface PrintedProductTotal {
   /** The label as printed: a product code ("TA"), or a section label
    * ("Manual Transactions", "Express Codes"). */
   productCode: string;
-  /** Null when the printed row has no gallons figure (e.g. "S", "Express Codes"). */
-  gallons: string | null;
-  amountUsd: string;
+  /** In the invoice's unit. Null when the printed row has no quantity
+   * figure (e.g. "S", "Express Codes"). */
+  qty: string | null;
+  /** FINAL AMOUNT, tax included, in the invoice's currency. */
+  amount: string;
   /** BVD's own printed "Disc AMT" for this product code — trusted as given,
    * never recomputed from retail/billed (their internal rounding doesn't
    * reproduce from the 4dp prices this schema stores). Null when the printed
-   * row has no Disc Amt figure (e.g. "S", which has no per-gallon price to
+   * row has no Disc Amt figure (e.g. "S", which has no per-unit price to
    * discount off of). */
-  discountUsd: string | null;
+  discount: string | null;
+  /** PRE TAX AMT; null on a row printing only a final amount ("S"). */
+  preTaxAmount: string | null;
+  /** The tax columns as printed — "0.00" on a row that prints none. */
+  hst: string;
+  gst: string;
+  pst: string;
+  qst: string;
 }
 
 export interface PrintedTotals {
   products: PrintedProductTotal[];
-  /** The invoice's own printed "Grand Total" row — the sum BVD printed, not
-   * one this parser computed. */
-  grandTotalUsd: string;
+  /** The invoice's own printed "Grand Total" row — the sums BVD printed, not
+   * ones this parser computed. Its pre-tax and tax columns cover the priced
+   * products only; Scale, Manual and Express print a final amount alone
+   * (T-61). */
+  grandTotalRow: PrintedProductTotal;
+  /** `grandTotalRow.amount`, the figure the invoice is reconciled to. */
+  grandTotal: string;
 }
 
 export type InvoiceLineRejectionCode =
   | "SCHEMA_ERROR"
   | "NUMERIC_PARSE_ERROR"
-  | "UNMAPPED_PRODUCT";
+  | "UNMAPPED_PRODUCT"
+  /** `CUR` is neither `US` nor `CN` (D24) — never defaulted. */
+  | "UNKNOWN_CURRENCY";
 
 export interface InvoiceLineRejection {
   lineNumber: number;
@@ -76,7 +107,8 @@ export interface InvoiceLineRejection {
 
 /** One product line, straight off the sheet and past validation. Numeric
  * fields are decimal-safe strings (never `number`) at their column's exact
- * precision — 2dp for gallons and dollars, 4dp for per-gallon prices. */
+ * precision — 2dp for quantities and money, 4dp for per-unit prices — in the
+ * line's own currency and unit, as printed (D25). */
 export interface ValidatedInvoiceLine {
   lineNumber: number;
   /** The full auth code as printed, e.g. "A900000001-TA". */
@@ -95,10 +127,21 @@ export interface ValidatedInvoiceLine {
   stationState: string;
   rawProductCode: string;
   productType: InvoiceProductType;
-  gallons: string;
-  retailUsdPerGal: string;
-  billedUsdPerGal: string;
-  amountUsd: string;
+  currency: InvoiceCurrency;
+  /** Litres on a CAD invoice, gallons on a USD one. */
+  qty: string;
+  retailPerUnit: string;
+  /** Tax-inclusive: QTY × Billed ≈ Final AMT (T-61). */
+  billedPerUnit: string;
+  preTaxAmount: string;
+  hst: string;
+  gst: string;
+  pst: string;
+  qst: string;
+  discRate: string;
+  discount: string;
+  /** Final AMT, tax included. */
+  amount: string;
 }
 
 export type InvoiceLineResult =
@@ -172,7 +215,7 @@ function assertIsoDate(value: string, label: string): string {
   return value;
 }
 
-function parseHeader(metaRow: string[]): InvoiceHeader {
+function parseHeader(metaRow: string[]): Omit<InvoiceHeader, "currency"> {
   return {
     invoiceNumber: findLabelledValue(metaRow, "Invoice Number"),
     periodStart: assertIsoDate(findLabelledValue(metaRow, "Period Start"), "Period Start"),
@@ -261,15 +304,39 @@ export function validateProductLine(
     };
   }
 
-  let gallons: string;
-  let retailUsdPerGal: string;
-  let billedUsdPerGal: string;
-  let amountUsd: string;
+  const rawCurrency = (record[20] ?? "").trim();
+  const currency = currencyFromCode(rawCurrency);
+  if (!currency) {
+    return {
+      ok: false,
+      rejection: {
+        lineNumber,
+        authCode,
+        code: "UNKNOWN_CURRENCY",
+        message: `unknown currency code: "${rawCurrency}"`,
+        rawProduct: rawProductCode,
+      },
+    };
+  }
+
+  let numerics: Pick<
+    ValidatedInvoiceLine,
+    "qty" | "retailPerUnit" | "billedPerUnit" | "preTaxAmount" | "hst" | "gst" | "pst" | "qst" | "discRate" | "discount" | "amount"
+  >;
   try {
-    gallons = toDecimalString(record[9] ?? "", 2);
-    retailUsdPerGal = toDecimalString(record[10] ?? "", 4);
-    billedUsdPerGal = toDecimalString(record[11] ?? "", 4);
-    amountUsd = toDecimalString(record[19] ?? "", 2);
+    numerics = {
+      qty: toDecimalString(record[9] ?? "", 2),
+      retailPerUnit: toDecimalString(record[10] ?? "", 4),
+      billedPerUnit: toDecimalString(record[11] ?? "", 4),
+      preTaxAmount: toDecimalString(record[12] ?? "", 2),
+      hst: toDecimalString(record[13] ?? "", 2),
+      gst: toDecimalString(record[14] ?? "", 2),
+      pst: toDecimalString(record[15] ?? "", 2),
+      qst: toDecimalString(record[16] ?? "", 2),
+      discRate: toDecimalString(record[17] ?? "", 4),
+      discount: toDecimalString(record[18] ?? "", 2),
+      amount: toDecimalString(record[19] ?? "", 2),
+    };
   } catch (err) {
     const message = err instanceof DecimalFormatError ? err.message : String(err);
     return {
@@ -294,53 +361,90 @@ export function validateProductLine(
       stationState: (record[7] ?? "").trim(),
       rawProductCode,
       productType: productCodes.get(rawProductCode)!,
-      gallons,
-      retailUsdPerGal,
-      billedUsdPerGal,
-      amountUsd,
+      currency,
+      ...numerics,
     },
   };
 }
 
-function buildPrintedTotals(rows: string[][], lineNumbers: number[]): PrintedTotals {
+function buildPrintedTotals(
+  rows: string[][],
+  lineNumbers: number[],
+): { printedTotals: PrintedTotals; currencies: InvoiceCurrency[] } {
   const products: PrintedProductTotal[] = [];
-  let grandTotalUsd: string | null = null;
+  let grandTotalRow: PrintedProductTotal | null = null;
+  const currencies: InvoiceCurrency[] = [];
 
   rows.forEach((record, idx) => {
     const lineNumber = lineNumbers[idx]!;
     const label = (record[0] ?? "").trim();
-    const qtyRaw = (record[1] ?? "").trim();
-    const discAmtRaw = (record[8] ?? "").trim();
-    const finalAmountRaw = (record[9] ?? "").trim();
+    const cell = (i: number) => (record[i] ?? "").trim();
+    const finalAmountRaw = cell(9);
 
     if (finalAmountRaw === "") {
       throw new InvoiceFormatError(`line ${lineNumber}: totals row "${label}" has no final amount`);
     }
+    if (cell(10) !== "") {
+      const currency = currencyFromCode(cell(10));
+      if (!currency) {
+        throw new InvoiceFormatError(`line ${lineNumber}: totals row "${label}": unknown currency code "${cell(10)}"`);
+      }
+      currencies.push(currency);
+    }
 
-    let amountUsd: string;
-    let gallons: string | null;
-    let discountUsd: string | null;
+    const optional = (i: number) => (cell(i) === "" ? null : toDecimalString(cell(i), 2));
+    let row: PrintedProductTotal;
     try {
-      amountUsd = toDecimalString(finalAmountRaw, 2);
-      gallons = qtyRaw === "" ? null : toDecimalString(qtyRaw, 2);
-      discountUsd = discAmtRaw === "" ? null : toDecimalString(discAmtRaw, 2);
+      row = {
+        productCode: label,
+        qty: optional(1),
+        amount: toDecimalString(finalAmountRaw, 2),
+        discount: optional(8),
+        preTaxAmount: optional(2),
+        hst: optional(3) ?? "0.00",
+        gst: optional(4) ?? "0.00",
+        pst: optional(5) ?? "0.00",
+        qst: optional(6) ?? "0.00",
+      };
     } catch (err) {
       const message = err instanceof DecimalFormatError ? err.message : String(err);
       throw new InvoiceFormatError(`line ${lineNumber}: totals row "${label}": ${message}`);
     }
 
     if (label === "Grand Total") {
-      grandTotalUsd = amountUsd;
+      grandTotalRow = row;
       return;
     }
-    products.push({ productCode: label, gallons, amountUsd, discountUsd });
+    products.push(row);
   });
 
-  if (grandTotalUsd === null) {
+  if (grandTotalRow === null) {
     throw new InvoiceFormatError('missing "Grand Total" row in the Grand Totals section');
   }
+  const grand: PrintedProductTotal = grandTotalRow;
 
-  return { products, grandTotalUsd };
+  return { printedTotals: { products, grandTotalRow: grand, grandTotal: grand.amount }, currencies };
+}
+
+/**
+ * The invoice's one currency, from every `CUR` it printed (D24): accepted
+ * lines, express rows and totals rows. Lines rejected for an unknown code
+ * are already quarantined and do not vote. Two known currencies reject the
+ * invoice whole — never split.
+ */
+function invoiceCurrency(printed: readonly InvoiceCurrency[]): InvoiceCurrency {
+  const currencies = new Set(printed);
+  if (currencies.size > 1) {
+    throw new InvoiceFormatError(
+      `rows print more than one currency (${[...currencies].sort().join(", ")}); an invoice is single-currency`,
+      "MIXED_CURRENCY",
+    );
+  }
+  const [only] = currencies;
+  if (!only) {
+    throw new InvoiceFormatError("no row prints a recognised currency code (US or CN)");
+  }
+  return only;
 }
 
 /**
@@ -363,7 +467,7 @@ export function parseInvoiceRecords(
   if (!metaRow) {
     throw new InvoiceFormatError("file is empty");
   }
-  const header = parseHeader(metaRow);
+  const headerFields = parseHeader(metaRow);
 
   // Explicit "awaiting header" states, so a header-shape mismatch is caught
   // exactly where a header is expected and throws (rejected, not coerced) —
@@ -501,7 +605,13 @@ export function parseInvoiceRecords(
   }
 
   const expressRows = parseExpressRows(rawExpressRows, expressLayout);
-  const printedTotals = buildPrintedTotals(totalsRows, totalsLineNumbers);
+  const { printedTotals, currencies } = buildPrintedTotals(totalsRows, totalsLineNumbers);
+  const currency = invoiceCurrency([
+    ...lines.map((l) => l.currency),
+    ...expressRows.map((r) => r.currency),
+    ...currencies,
+  ]);
+  const header: InvoiceHeader = { ...headerFields, currency };
 
   return { header, printedTotals, lines, rejections, expressRows };
 }
@@ -603,5 +713,12 @@ export function parseInvoiceCsv(
     skip_empty_lines: true,
   });
   const metaRow = synthesizeMetaRow(sourceFilename, records);
-  return parseInvoiceRecords([metaRow, ...records], productCodes);
+  const parsed = parseInvoiceRecords([metaRow, ...records], productCodes);
+  if (parsed.header.currency !== "USD") {
+    throw new InvoiceFormatError(
+      "a CAD invoice imports from the emailed PDF only, until a real CA portal CSV has been seen",
+      "CA_CSV_UNVERIFIED",
+    );
+  }
+  return parsed;
 }

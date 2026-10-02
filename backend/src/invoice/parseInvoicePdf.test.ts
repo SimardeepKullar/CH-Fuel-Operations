@@ -49,6 +49,7 @@ describe("parseInvoicePdf — structural (synthetic fixture)", () => {
       periodEnd: "2026-01-07",
       invoiceDate: "2026-01-08",
       dueDate: "2026-01-09",
+      currency: "USD",
     });
   });
 
@@ -56,7 +57,7 @@ describe("parseInvoicePdf — structural (synthetic fixture)", () => {
     const result = await parseInvoicePdf(redacted(), DEFAULT_INVOICE_PRODUCT_CODES);
     expect(result.rejections).toEqual([]);
     expect(result.lines).toHaveLength(4);
-    expect(result.printedTotals.grandTotalUsd).toBe("840.67");
+    expect(result.printedTotals.grandTotal).toBe("840.67");
   });
 
   it("carries express tractor and driver, which the CSV export cannot", async () => {
@@ -89,8 +90,8 @@ describe("parseInvoicePdf — structural (synthetic fixture)", () => {
 
     expect(fromPdf.header).toEqual(fromCsv.header);
     expect(fromPdf.printedTotals).toEqual(fromCsv.printedTotals);
-    expect(fromPdf.lines.map((l) => [l.authCode, l.gallons, l.amountUsd])).toEqual(
-      fromCsv.lines.map((l) => [l.authCode, l.gallons, l.amountUsd]),
+    expect(fromPdf.lines.map((l) => [l.authCode, l.qty, l.amount])).toEqual(
+      fromCsv.lines.map((l) => [l.authCode, l.qty, l.amount]),
     );
     // ...and differ only where the CSV has no columns at all.
     expect(fromCsv.expressRows.every((r) => r.unitRaw === null)).toBe(true);
@@ -114,6 +115,7 @@ describe.skipIf(!hasRealFixture)("parseInvoicePdf — real invoice 999210 (local
       periodEnd: "2026-09-09",
       invoiceDate: "2026-09-10",
       dueDate: "2026-09-11",
+      currency: "USD",
       supplierName: "BVD Petroleum",
       supplierAddress: "130 Delta Park Blvd, Brampton, ON L6T 5E7",
       billToName: "2043733 ONTARIO INC.",
@@ -140,14 +142,16 @@ describe.skipIf(!hasRealFixture)("parseInvoicePdf — real invoice 999210 (local
     const result = await parseInvoicePdf(readFileSync(REAL_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
     const byCode = Object.fromEntries(result.printedTotals.products.map((p) => [p.productCode, p]));
     expect(byCode.TA).toEqual({
-      productCode: "TA", gallons: "8733.11", amountUsd: "48450.68", discountUsd: "5088.61",
+      productCode: "TA", qty: "8733.11", amount: "48450.68", discount: "5088.61",
+      preTaxAmount: "48450.68", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00",
     });
     expect(byCode.DF).toEqual({
-      productCode: "DF", gallons: "174.43", amountUsd: "845.40", discountUsd: "0.00",
+      productCode: "DF", qty: "174.43", amount: "845.40", discount: "0.00",
+      preTaxAmount: "845.40", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00",
     });
     // Printed as a bare final amount with no other columns.
-    expect(byCode.S).toEqual({ productCode: "S", gallons: null, amountUsd: "90.50", discountUsd: null });
-    expect(result.printedTotals.grandTotalUsd).toBe("50929.71");
+    expect(byCode.S).toEqual({ productCode: "S", qty: null, amount: "90.50", discount: null, preTaxAmount: null, hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00"});
+    expect(result.printedTotals.grandTotal).toBe("50929.71");
   });
 
   it("reconciles: the whole invoice balances to its own printed figures", async () => {
@@ -162,14 +166,14 @@ describe.skipIf(!hasRealFixture)("parseInvoicePdf — real invoice 999210 (local
   it("parses all 6 real express rows with their tractor and driver, flat $3.00 fee intact", async () => {
     const result = await parseInvoicePdf(readFileSync(REAL_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
     expect(result.expressRows).toHaveLength(6);
-    expect(result.expressRows.every((r) => r.feeUsd === "3.00")).toBe(true);
+    expect(result.expressRows.every((r) => r.fee === "3.00")).toBe(true);
 
     // Every real express row carries a tractor; only the driver is ever blank.
     expect(result.expressRows.every((r) => r.unitRaw !== null)).toBe(true);
     const byCode = Object.fromEntries(result.expressRows.map((r) => [r.expressCode, r]));
-    expect(byCode["6552061"]).toMatchObject({ unitRaw: "1019", driverNameRaw: "Gurjit", totalUsd: "243.35" });
-    expect(byCode["6570949"]).toMatchObject({ unitRaw: "064", driverNameRaw: "Jugraj", totalUsd: "460.60" });
-    expect(byCode["6571780"]).toMatchObject({ unitRaw: "073", driverNameRaw: null, totalUsd: "203.00" });
+    expect(byCode["6552061"]).toMatchObject({ unitRaw: "1019", driverNameRaw: "Gurjit", total: "243.35" });
+    expect(byCode["6570949"]).toMatchObject({ unitRaw: "064", driverNameRaw: "Jugraj", total: "460.60" });
+    expect(byCode["6571780"]).toMatchObject({ unitRaw: "073", driverNameRaw: null, total: "203.00" });
     expect(byCode["6551741"]).toMatchObject({ unitRaw: "066", driverNameRaw: "Gurshiv", payee: "lumper fees" });
   });
 });
@@ -191,8 +195,8 @@ describe.skipIf(!hasRealPair)("parseInvoicePdf vs parseInvoiceCsv — the same r
     expect(csvLines.size).toBe(pdfLines.size);
     for (const [auth, csvLine] of csvLines) {
       const pdfLine = pdfLines.get(auth)!;
-      expect([csvLine.gallons, csvLine.billedUsdPerGal, csvLine.amountUsd, csvLine.unitRaw, csvLine.driverNameRaw])
-        .toEqual([pdfLine.gallons, pdfLine.billedUsdPerGal, pdfLine.amountUsd, pdfLine.unitRaw, pdfLine.driverNameRaw]);
+      expect([csvLine.qty, csvLine.billedPerUnit, csvLine.amount, csvLine.unitRaw, csvLine.driverNameRaw])
+        .toEqual([pdfLine.qty, pdfLine.billedPerUnit, pdfLine.amount, pdfLine.unitRaw, pdfLine.driverNameRaw]);
     }
   });
 
@@ -203,11 +207,129 @@ describe.skipIf(!hasRealPair)("parseInvoicePdf vs parseInvoiceCsv — the same r
     const csvByCode = Object.fromEntries(fromCsv.expressRows.map((r) => [r.expressCode, r]));
     for (const pdfRow of fromPdf.expressRows) {
       const csvRow = csvByCode[pdfRow.expressCode]!;
-      expect(csvRow.totalUsd).toBe(pdfRow.totalUsd);
+      expect(csvRow.total).toBe(pdfRow.total);
       expect(csvRow.payee).toBe(pdfRow.payee);
       expect(csvRow.unitRaw).toBeNull();
       expect(csvRow.driverNameRaw).toBeNull();
     }
     expect(fromPdf.expressRows.every((r) => r.unitRaw !== null)).toBe(true);
+  });
+});
+
+// T-61: a CA invoice. sample-ca.pdf is synthetic, written in the CA layout
+// (see generateSamplePdf.ts); variants are rendered from its spec in the
+// test, never committed.
+const CA_PDF = fileURLToPath(new URL("../../test/fixtures/invoices/sample-ca.pdf", import.meta.url));
+const REAL_CA_PDF = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_999217.pdf", import.meta.url));
+
+/** The CA fixture with one fuel row's CUR replaced. */
+async function caPdfWithCur(authCode: string, code: string): Promise<Buffer> {
+  const { CA_INVOICE, renderInvoicePdf } = await import("../../test/fixtures/invoices/generateSamplePdf.js");
+  const spec = structuredClone(CA_INVOICE);
+  const row = spec.cards.flatMap((c) => c.rows).find((r) => r[0] === authCode)!;
+  row[row.length - 1] = code;
+  return renderInvoicePdf(spec);
+}
+
+describe("parseInvoicePdf — CA invoice (synthetic fixture, T-61)", () => {
+  it("reads every row as CAD: header, lines, express and totals", async () => {
+    const result = await parseInvoicePdf(readFileSync(CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.currency).toBe("CAD");
+    expect(result.lines).toHaveLength(9);
+    expect(result.rejections).toEqual([]);
+    expect(result.lines.every((l) => l.currency === "CAD")).toBe(true);
+    expect(result.expressRows.map((r) => r.currency)).toEqual(["CAD"]);
+  });
+
+  it("keeps the printed period, even though it starts weeks before the first transaction", async () => {
+    const { header } = await parseInvoicePdf(readFileSync(CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(header).toMatchObject({ periodStart: "2026-08-01", periodEnd: "2026-09-09", invoiceDate: "2026-09-10", dueDate: "2026-09-11" });
+  });
+
+  it("keeps litres, CAD per litre at 4dp, and every tax cell as printed", async () => {
+    const result = await parseInvoicePdf(readFileSync(CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    const first = result.lines.find((l) => l.authCode === "A700000101-TA")!;
+    expect(first).toMatchObject({
+      qty: "300.00", retailPerUnit: "2.4990", billedPerUnit: "2.2427",
+      preTaxAmount: "595.40", hst: "77.40", gst: "0.00", pst: "0.00", qst: "0.00",
+      discRate: "0.2563", discount: "76.89", amount: "672.80",
+    });
+    // Thousands separators stripped at the boundary, as on the US invoice.
+    expect(result.lines.find((l) => l.authCode === "A700000105-TA")).toMatchObject({ preTaxAmount: "1165.00", amount: "1316.45" });
+    const scale = result.lines.find((l) => l.rawProductCode === "S")!;
+    expect(scale).toMatchObject({ qty: "0.00", preTaxAmount: "23.01", hst: "2.99", amount: "26.00" });
+  });
+
+  it("splits a site name with no '#' from its city at the layout's tab", async () => {
+    const result = await parseInvoicePdf(readFileSync(CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    const sites = new Map(result.lines.map((l) => [l.siteNumber, [l.stationNameRaw, l.stationCity, l.stationState]]));
+    expect(sites.get("58803")).toEqual(["BVD MISSISSAUGA - SHAWSON", "MISSISSAUGA", "ON"]);
+    expect(sites.get("58073")).toEqual(["BVD NIAGARA", "Niagara on the Lake", "ON"]);
+    expect(sites.get("58156")).toEqual(["BVD COMBER", "Comber", "ON"]);
+  });
+
+  it("reads the transaction after the printed period end, and the driver's name and unit, unchanged", async () => {
+    const result = await parseInvoicePdf(readFileSync(CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.lines.find((l) => l.authCode === "A700000108-TA")).toMatchObject({
+      occurredAt: "2026-09-10T00:45:19", driverNameRaw: "LENNOX", unitRaw: "031", cardNumber: "9000047",
+    });
+  });
+
+  it("reads the grand total row's pre-tax and tax columns, which cover TA/TF/DF only", async () => {
+    const { printedTotals } = await parseInvoicePdf(readFileSync(CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(printedTotals.grandTotal).toBe("3839.54");
+    expect(printedTotals.grandTotalRow).toMatchObject({ qty: "1725.66", preTaxAmount: "3336.77", hst: "433.77" });
+    expect(printedTotals.products.find((p) => p.productCode === "S")).toMatchObject({ amount: "26.00", preTaxAmount: null, hst: "0.00" });
+  });
+
+  it("quarantines a row ending in an unknown CUR as UNKNOWN_CURRENCY", async () => {
+    const result = await parseInvoicePdf(await caPdfWithCur("A700000107-TA", "EU"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([expect.objectContaining({ authCode: "A700000107-TA", code: "UNKNOWN_CURRENCY" })]);
+    expect(result.lines).toHaveLength(8);
+    expect(result.header.currency).toBe("CAD");
+  });
+
+  it("rejects an invoice mixing US and CN rows whole, with MIXED_CURRENCY", async () => {
+    await expect(
+      parseInvoicePdf(await caPdfWithCur("A700000107-TA", "US"), DEFAULT_INVOICE_PRODUCT_CODES),
+    ).rejects.toMatchObject({ name: "InvoiceFormatError", code: "MIXED_CURRENCY" });
+  });
+
+  it("still reads the US fixture as USD on every line", async () => {
+    const result = await parseInvoicePdf(redacted(), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.currency).toBe("USD");
+    expect(result.lines.every((l) => l.currency === "USD")).toBe(true);
+  });
+});
+
+// The real CA invoice, gitignored. Asserts counts and totals only — no card
+// number or driver name appears in this file (T-58).
+describe.skipIf(!existsSync(REAL_CA_PDF))("parseInvoicePdf — real CA invoice 999217 (local fixture only)", () => {
+  it("parses 60 CAD lines on 34 cards at 9 sites, with nothing rejected", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.currency).toBe("CAD");
+    expect(result.rejections).toHaveLength(0);
+    expect(result.lines).toHaveLength(60);
+    expect(result.lines.every((l) => l.currency === "CAD")).toBe(true);
+    expect(new Set(result.lines.map((l) => l.cardNumber)).size).toBe(34);
+    expect(new Set(result.lines.map((l) => l.siteNumber)).size).toBe(9);
+    expect(result.expressRows).toHaveLength(0);
+  });
+
+  it("reads the printed totals: grand 46,837.33 = pre-tax 41,356.89 + HST 5,376.44 + Scale 104.00", async () => {
+    const { printedTotals } = await parseInvoicePdf(readFileSync(REAL_CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(printedTotals.grandTotal).toBe("46837.33");
+    expect(printedTotals.grandTotalRow).toMatchObject({ preTaxAmount: "41356.89", hst: "5376.44" });
+    const byCode = Object.fromEntries(printedTotals.products.map((p) => [p.productCode, p]));
+    expect(byCode.TA).toMatchObject({ qty: "21318.77" });
+    expect(byCode.DF).toMatchObject({ qty: "113.09" });
+    expect(byCode.S).toMatchObject({ amount: "104.00" });
+  });
+
+  it("splits every site name from its city: 9 distinct (site, name, city) triples", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_CA_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    const triples = new Set(result.lines.map((l) => `${l.siteNumber}|${l.stationNameRaw}|${l.stationCity}`));
+    expect(triples.size).toBe(9);
+    expect(result.lines.every((l) => l.stationNameRaw.startsWith("BVD ") && l.stationCity !== "")).toBe(true);
   });
 });

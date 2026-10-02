@@ -39,10 +39,18 @@ function line(overrides: Partial<ValidatedInvoiceLine>): ValidatedInvoiceLine {
     stationState: "TX",
     rawProductCode: "TA",
     productType: "highway_diesel",
-    gallons: "100.00",
-    retailUsdPerGal: "5.9990",
-    billedUsdPerGal: "5.5000",
-    amountUsd: "550.00",
+    currency: "USD",
+    qty: "100.00",
+    retailPerUnit: "5.9990",
+    billedPerUnit: "5.5000",
+    preTaxAmount: "550.00",
+    hst: "0.00",
+    gst: "0.00",
+    pst: "0.00",
+    qst: "0.00",
+    discRate: "0.4990",
+    discount: "49.90",
+    amount: "550.00",
     ...overrides,
   };
 }
@@ -53,7 +61,7 @@ describe("groupByAuthCode — structural (synthetic fixture)", () => {
     const stop = groups.find((g) => g.baseAuthCode === "B100001")!;
     expect(stop.lines).toHaveLength(2);
     expect(stop.lines.map((l) => l.rawProductCode).sort()).toEqual(["DF", "TA"]);
-    expect(stop.totalUsd).toBe("278.67");
+    expect(stop.total).toBe("278.67");
   });
 
   it("produces one group per base auth code", () => {
@@ -65,15 +73,15 @@ describe("groupByAuthCode — structural (synthetic fixture)", () => {
     const groups = groupByAuthCode(redactedLines());
     const single = groups.find((g) => g.baseAuthCode === "B100002")!;
     expect(single.lines).toHaveLength(1);
-    expect(single.totalUsd).toBe(single.lines[0]!.amountUsd);
+    expect(single.total).toBe(single.lines[0]!.amount);
   });
 
   it("gives a scale-only stop zero gallons and a non-zero total", () => {
     const groups = groupByAuthCode(redactedLines());
     const scaleOnly = groups.find((g) => g.baseAuthCode === "B100003")!;
     expect(scaleOnly.lines.every((l) => l.rawProductCode === "S")).toBe(true);
-    expect(scaleOnly.totalGallons).toBe("0.00");
-    expect(Number(scaleOnly.totalUsd)).toBeGreaterThan(0);
+    expect(scaleOnly.totalQty).toBe("0.00");
+    expect(Number(scaleOnly.total)).toBeGreaterThan(0);
   });
 
   it("rejects a group whose lines disagree on card or station", () => {
@@ -91,7 +99,7 @@ describe.skipIf(!hasRealFixture)("groupByAuthCode — real invoice 999210 (local
     const stop = groups.find((g) => g.baseAuthCode === "A252014353")!;
     expect(stop.lines).toHaveLength(2);
     expect(stop.lines.map((l) => l.rawProductCode).sort()).toEqual(["DF", "TA"]);
-    expect(stop.totalUsd).toBe("255.13");
+    expect(stop.total).toBe("255.13");
   });
 
   it("produces ~60 stops (66) from the full line set", () => {

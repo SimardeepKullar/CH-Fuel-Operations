@@ -21,11 +21,12 @@ export interface FuelStopGroup {
   occurredAt: string;
   /** Sum of ALL line amounts in the group — never just the diesel line. This
    * is the whole reason this module exists: the legacy sheet recorded only
-   * the diesel line per stop and silently dropped DEF (§A5). */
-  totalUsd: string;
-  /** Sum of gallons across all lines; a scale-only stop is legitimately
-   * zero here despite a non-zero totalUsd. */
-  totalGallons: string;
+   * the diesel line per stop and silently dropped DEF (§A5). In the
+   * invoice's currency, tax included. */
+  total: string;
+  /** Sum of quantity across all lines, in the invoice's unit; a scale-only
+   * stop is legitimately zero here despite a non-zero total. */
+  totalQty: string;
   lines: ValidatedInvoiceLine[];
 }
 
@@ -80,8 +81,8 @@ export function groupByAuthCode(lines: readonly ValidatedInvoiceLine[]): FuelSto
       stationState: first.stationState,
       siteNumber: first.siteNumber,
       occurredAt: first.occurredAt,
-      totalUsd: sumDecimal2dp(groupLines.map((l) => l.amountUsd)),
-      totalGallons: sumDecimal2dp(groupLines.map((l) => l.gallons)),
+      total: sumDecimal2dp(groupLines.map((l) => l.amount)),
+      totalQty: sumDecimal2dp(groupLines.map((l) => l.qty)),
       lines: groupLines,
     });
   }

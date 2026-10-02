@@ -35,6 +35,7 @@ describe("parseInvoiceCsv — structural (synthetic fixture)", () => {
       periodEnd: "2026-01-07",
       invoiceDate: "2026-01-08",
       dueDate: "2026-01-09",
+      currency: "USD",
       supplierName: "BVD Petroleum",
       supplierAddress: "130 Delta Park Blvd, Brampton, ON L6T 5E7",
       billToName: "2043733 ONTARIO INC.",
@@ -62,16 +63,21 @@ describe("parseInvoiceCsv — structural (synthetic fixture)", () => {
     const byCode = Object.fromEntries(
       result.printedTotals.products.map((p) => [p.productCode, p]),
     );
-    expect(byCode.TA).toEqual({ productCode: "TA", gallons: "130.00", amountUsd: "672.17", discountUsd: "50.83" });
-    expect(byCode.DF).toEqual({ productCode: "DF", gallons: "5.00", amountUsd: "22.50", discountUsd: "0.00" });
-    expect(byCode.S).toEqual({ productCode: "S", gallons: null, amountUsd: "15.00", discountUsd: null });
+    expect(byCode.TA).toEqual({ productCode: "TA", qty: "130.00", amount: "672.17", discount: "50.83", preTaxAmount: "672.17", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00"});
+    expect(byCode.DF).toEqual({ productCode: "DF", qty: "5.00", amount: "22.50", discount: "0.00", preTaxAmount: "22.50", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00"});
+    expect(byCode.S).toEqual({ productCode: "S", qty: null, amount: "15.00", discount: null, preTaxAmount: null, hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00"});
     expect(byCode["Express Codes"]).toEqual({
       productCode: "Express Codes",
-      gallons: null,
-      amountUsd: "131.00",
-      discountUsd: null,
+      qty: null,
+      amount: "131.00",
+      discount: null,
+      preTaxAmount: null,
+      hst: "0.00",
+      gst: "0.00",
+      pst: "0.00",
+      qst: "0.00",
     });
-    expect(result.printedTotals.grandTotalUsd).toBe("840.67");
+    expect(result.printedTotals.grandTotal).toBe("840.67");
   });
 
   it("parses every product line with no rejections", () => {
@@ -83,8 +89,8 @@ describe("parseInvoiceCsv — structural (synthetic fixture)", () => {
   it("parses 4dp prices exactly, as decimal-safe strings", () => {
     const result = parseInvoiceCsv(redacted(), DEFAULT_INVOICE_PRODUCT_CODES, "invoice_100001.csv");
     const ta = result.lines.find((l) => l.baseAuthCode === "B100001" && l.rawProductCode === "TA")!;
-    expect(ta.billedUsdPerGal).toBe("5.1234");
-    expect(ta.retailUsdPerGal).toBe("5.5000");
+    expect(ta.billedPerUnit).toBe("5.1234");
+    expect(ta.retailPerUnit).toBe("5.5000");
   });
 
   it("performs no I/O and prints nothing", () => {
@@ -132,7 +138,7 @@ describe("parseInvoiceCsv — structural (synthetic fixture)", () => {
     const result = parseInvoiceCsv(csv, DEFAULT_INVOICE_PRODUCT_CODES, "invoice_100005.csv");
     expect(result.rejections).toEqual([]);
     expect(result.expressRows).toEqual([]);
-    expect(result.printedTotals.grandTotalUsd).toBe("256.17");
+    expect(result.printedTotals.grandTotal).toBe("256.17");
   });
 });
 
@@ -148,6 +154,7 @@ describe.skipIf(!hasRealFixture)("parseInvoiceCsv — real invoice 999210 (local
       periodEnd: "2026-09-09",
       invoiceDate: "2026-09-10",
       dueDate: "2026-09-11",
+      currency: "USD",
       supplierName: "BVD Petroleum",
       supplierAddress: "130 Delta Park Blvd, Brampton, ON L6T 5E7",
       billToName: "2043733 ONTARIO INC.",
@@ -162,19 +169,29 @@ describe.skipIf(!hasRealFixture)("parseInvoiceCsv — real invoice 999210 (local
     );
     expect(byCode.TA).toEqual({
       productCode: "TA",
-      gallons: "8733.11",
-      amountUsd: "48450.68",
-      discountUsd: "5088.61",
+      qty: "8733.11",
+      amount: "48450.68",
+      discount: "5088.61",
+      preTaxAmount: "48450.68",
+      hst: "0.00",
+      gst: "0.00",
+      pst: "0.00",
+      qst: "0.00",
     });
-    expect(byCode.DF).toEqual({ productCode: "DF", gallons: "174.43", amountUsd: "845.40", discountUsd: "0.00" });
-    expect(byCode.S).toEqual({ productCode: "S", gallons: null, amountUsd: "90.50", discountUsd: null });
+    expect(byCode.DF).toEqual({ productCode: "DF", qty: "174.43", amount: "845.40", discount: "0.00", preTaxAmount: "845.40", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00"});
+    expect(byCode.S).toEqual({ productCode: "S", qty: null, amount: "90.50", discount: null, preTaxAmount: null, hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00"});
     expect(byCode["Express Codes"]).toEqual({
       productCode: "Express Codes",
-      gallons: null,
-      amountUsd: "1543.13",
-      discountUsd: null,
+      qty: null,
+      amount: "1543.13",
+      discount: null,
+      preTaxAmount: null,
+      hst: "0.00",
+      gst: "0.00",
+      pst: "0.00",
+      qst: "0.00",
     });
-    expect(result.printedTotals.grandTotalUsd).toBe("50929.71");
+    expect(result.printedTotals.grandTotal).toBe("50929.71");
   });
 
   it("parses ~60 real stops (66 distinct base auth codes, 86 product lines), with no rejections", () => {
@@ -189,15 +206,15 @@ describe.skipIf(!hasRealFixture)("parseInvoiceCsv — real invoice 999210 (local
     const worked = result.lines.filter((l) => l.baseAuthCode === "A252014353");
     const ta = worked.find((l) => l.rawProductCode === "TA")!;
     const df = worked.find((l) => l.rawProductCode === "DF")!;
-    expect(ta.billedUsdPerGal).toBe("5.2395");
-    expect(ta.retailUsdPerGal).toBe("5.9890"); // printed as "5.989"
-    expect(df.billedUsdPerGal).toBe("4.8890"); // printed as "4.889"
+    expect(ta.billedPerUnit).toBe("5.2395");
+    expect(ta.retailPerUnit).toBe("5.9890"); // printed as "5.989"
+    expect(df.billedPerUnit).toBe("4.8890"); // printed as "4.889"
   });
 
   it("parses the sub-gallon swipe (0.04) and a large fill (243.95)", () => {
     const result = parseInvoiceCsv(readFileSync(REAL_PATH), DEFAULT_INVOICE_PRODUCT_CODES, "invoice_999210.csv");
-    expect(result.lines.some((l) => l.gallons === "0.04")).toBe(true);
-    expect(result.lines.some((l) => l.gallons === "243.95")).toBe(true);
+    expect(result.lines.some((l) => l.qty === "0.04")).toBe(true);
+    expect(result.lines.some((l) => l.qty === "243.95")).toBe(true);
   });
 });
 
@@ -240,6 +257,61 @@ describe("validateProductLine", () => {
     if (!result.ok) {
       expect(result.rejection.code).toBe("SCHEMA_ERROR");
       expect(result.rejection.lineNumber).toBe(7);
+    }
+  });
+});
+
+// T-61: the CUR column. Each case is composed in the test from the synthetic
+// CSV, never committed as its own fixture.
+describe("parseInvoiceCsv — currency (T-61)", () => {
+  const sample = () => redacted().toString("utf8");
+  /** The first fuel line's CUR cell replaced; every other row untouched. */
+  const withFirstFuelCur = (code: string) => sample().replace("22.50,US,", `22.50,${code},`);
+
+  it("reads every US row as USD, on the header and every line", () => {
+    const result = parseInvoiceCsv(redacted(), DEFAULT_INVOICE_PRODUCT_CODES, "invoice_100001.csv");
+    expect(result.header.currency).toBe("USD");
+    expect(result.lines.every((l) => l.currency === "USD")).toBe(true);
+    expect(result.expressRows.every((r) => r.currency === "USD")).toBe(true);
+  });
+
+  it("keeps the tax, discount-rate and discount cells of every line", () => {
+    const result = parseInvoiceCsv(redacted(), DEFAULT_INVOICE_PRODUCT_CODES, "invoice_100001.csv");
+    const ta = result.lines.find((l) => l.authCode === "B100001-TA")!;
+    expect(ta).toMatchObject({
+      preTaxAmount: "256.17", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00",
+      discRate: "0.3750", discount: "18.83", amount: "256.17",
+    });
+  });
+
+  it("rejects a CN invoice whole with CA_CSV_UNVERIFIED — a CA invoice imports from the PDF only (D30)", () => {
+    const allCn = sample().replace(/,US,/g, ",CN,");
+    const parse = () => parseInvoiceCsv(Buffer.from(allCn), DEFAULT_INVOICE_PRODUCT_CODES, "invoice_100001.csv");
+    expect(parse).toThrow(InvoiceFormatError);
+    try {
+      parse();
+    } catch (err) {
+      expect((err as InvoiceFormatError).code).toBe("CA_CSV_UNVERIFIED");
+    }
+  });
+
+  it("quarantines a row whose CUR is neither US nor CN as UNKNOWN_CURRENCY, never defaulting it", () => {
+    const result = parseInvoiceCsv(Buffer.from(withFirstFuelCur("EU")), DEFAULT_INVOICE_PRODUCT_CODES, "invoice_100001.csv");
+    expect(result.rejections).toEqual([
+      expect.objectContaining({ authCode: "B100001-DF", code: "UNKNOWN_CURRENCY", rawProduct: "DF" }),
+    ]);
+    expect(result.lines.map((l) => l.authCode)).not.toContain("B100001-DF");
+    expect(result.header.currency).toBe("USD");
+  });
+
+  it("rejects an invoice whose rows mix US and CN with MIXED_CURRENCY, never splitting it (D24)", () => {
+    const parse = () =>
+      parseInvoiceCsv(Buffer.from(withFirstFuelCur("CN")), DEFAULT_INVOICE_PRODUCT_CODES, "invoice_100001.csv");
+    expect(parse).toThrow(/MIXED_CURRENCY/);
+    try {
+      parse();
+    } catch (err) {
+      expect((err as InvoiceFormatError).code).toBe("MIXED_CURRENCY");
     }
   });
 });
