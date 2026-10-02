@@ -105,7 +105,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-59** | **"Show all sheet stations" dots vanish on a re-plan** | T-23 | **5** | **done — PR pending** |
 | **T-60** | **Canadian stations from BVD's travel-centre directory** | T-08 | **11** | **done — merged (`13e7c88`, PR #14)** |
 | **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **new** |
-| **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **new** |
+| **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **done — merged (`043eee2`, PR #15)** |
 | **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **new** |
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **new** |
 | **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
@@ -1298,10 +1298,10 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Dependencies.** T-58.
 
 **Definition of done.**
-- [ ] Both sets apply cleanly and produce identical counts: 21 more cards and drivers than today, the 20 new trucks, 16 new assignments.
-- [ ] Against `migrations/real`, every card on 999217 resolves to a driver (gated test).
-- [ ] Against `migrations/synthetic`, `sample-ca.pdf` (T-61) resolves every card, and the five unassigned drivers' stops resolve a driver and no truck.
-- [ ] `git grep` across the tracked tree finds none of the 21 real names or card numbers.
+- [x] Both sets apply cleanly and produce identical counts: 21 more cards and drivers than today, the 20 new trucks, 16 new assignments.
+- [x] Against `migrations/real`, every card on 999217 resolves to a driver (gated test).
+- [ ] Against `migrations/synthetic`, `sample-ca.pdf` (T-61) resolves every card, and the five unassigned drivers' stops resolve a driver and no truck. *(Roster half asserted in `referenceLayer.test.ts`; the `sample-ca.pdf` half lands with T-61.)*
+- [x] `git grep` across the tracked tree finds none of the 21 real names or card numbers.
 
 ---
 
