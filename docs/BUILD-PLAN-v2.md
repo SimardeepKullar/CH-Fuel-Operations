@@ -1221,7 +1221,7 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 
 **Files.** Modified: `importInvoice.ts`, `reconcile.ts`, `backend/src/anomaly/rules/subGallon.ts`, `priceAbovePublished.ts`, `backend/src/actuals/*.ts` (renamed columns; a temporary `currency = 'USD'` filter on every period-scoped query).
 
-**Logic.** `qty_unit` from currency. Reconciliation per line and per grand total, integer arithmetic: `pre_tax + hst + gst + pst + qst = amount`; `round(qty × billed) = amount`; `round(qty × disc_rate) = discount`. Sub-gallon: `qty_unit = 'L'` → gallons at the rule's input via the existing `units.ts` constant. Price-above-published: no published row → `discrepancy: null`. `occurred_at`: pin the interpretation with a test on the after-period-end transaction.
+**Logic.** `qty_unit` from currency. Reconciliation per line, integer arithmetic: `pre_tax + hst + gst + pst + qst = amount` and `retail − billed = disc_rate` exactly; `|qty × billed − amount|` and `|qty × disc_rate − discount|` within the printed figures' rounding bound (½¢ + 0.005 × price + 0.00005 × qty), skipped when `qty = 0`. Per printed product row the tax identity; the grand-total row's pre-tax and tax columns equal the sums over TA/TF/DF (T-61 design, amended 2026-10-01). Sub-gallon: `qty_unit = 'L'` → gallons at the rule's input via the existing `units.ts` constant. Price-above-published: no published row → `discrepancy: null`. `occurred_at`: pin the interpretation with a test on the after-period-end transaction.
 
 **Tests.** `sample-ca.pdf` imports with no quarantine; every check passes; the sub-diesel line is flagged and the DEF line not; the post-period-end transaction imports. `sample-redacted.pdf` results are byte-for-byte the same as before the ticket. `/overview?period=` and `/transactions?period=` for the CA fixture's printed start return nothing CA.
 **Pass:** all.
@@ -1232,7 +1232,7 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 
 **Files.** New: `backend/test/integration/invoice999217.test.ts` (`skipIf(!hasRealFixture)`, schema from `migrations/real`).
 
-**Tests.** 60 lines, 59 fuel stops, 34 cards, 9 stations resolved, 0 quarantined; grand total 46,837.33 CAD = 41,356.89 + 5,376.44; TA 21,318.77 L; DF 113.09 L; Scale 104.00. 999210's gated suite unchanged.
+**Tests.** 60 lines, 59 fuel stops, 34 cards, 9 stations resolved, 0 quarantined; grand total 46,837.33 CAD = 41,356.89 + 5,376.44 + Scale 104.00; TA 21,318.77 L; DF 113.09 L; Scale 104.00. 999210's gated suite unchanged.
 **Pass:** all, locally; `npm run verify` green in both views; `CLAUDE.md` rules updated.
 
 ---
