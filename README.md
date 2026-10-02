@@ -76,7 +76,7 @@ This is a real operating company's fuel and invoice data pipeline, so the repo i
 - All application source, migrations, tests, and documentation.
 - `migrations/synthetic/` — the schema, seeded with an **invented** fleet roster (made-up driver names, fuel-card numbers in a range obviously outside the supplier's real numbering). This is what a fresh clone, CI, and `npm run db:migrate` always apply.
 - `backend/test/fixtures/` — small, hand-written synthetic CSV/PDF fixtures standing in for real supplier price sheets and invoices. CI runs entirely against these.
-- `data/loves/LovesSearchResults.xlsx` — a public station-locator export (location and amenity fields only; see below).
+- `data/US-CA-GasStations/LovesSearchResults.xlsx` — a public station-locator export (location and amenity fields only; see below).
 
 **Never committed** (`.gitignore`), and not recoverable from this repo's history:
 - `data/bvd-prices/` and `data/bvd-invoices/` — the real supplier price sheets and invoices (real contract pricing, real per-driver fuel purchases).
@@ -86,7 +86,7 @@ This is a real operating company's fuel and invoice data pipeline, so the repo i
 
 A small number of tests assert exact figures from the real supplier invoice; they're gated behind `describe.skipIf(!hasRealFixture)` and simply skip when the underlying file isn't present — which is always the case in CI and on a fresh clone.
 
-Two supplier-data rules worth knowing if you're reading the code: prices from the station-locator export (`data/loves/`) are never stored, only location/amenity fields — those are street prices, not the negotiated contract prices this app runs on; and geocoded coordinates from the routing provider are never persisted past a 30-day cap, by license (station coordinates come only from the operator export, OpenStreetMap, or the Census gazetteer).
+Two supplier-data rules worth knowing if you're reading the code: prices from the station-locator export (`data/US-CA-GasStations/`) are never stored, only location/amenity fields — those are street prices, not the negotiated contract prices this app runs on; and geocoded coordinates from the routing provider are never persisted past a 30-day cap, by license (station coordinates come only from the operator export, OpenStreetMap, or the Census gazetteer).
 
 ## Documentation
 

@@ -136,8 +136,9 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
 - A station resolves on the invoice's `Site #` against `stations.site_ref` — the same identifier on both sides — falling back to the store number parsed from the name. This is not an exception to "store number comes from `NAME`, never `SITE`": `site_ref` is never treated as a store number.
 
 **Licensing and retention**
-- **Never store a provider geocode permanently.** 30-day cap. Station coordinates come only from the operator export, OSM, or the Census gazetteer.
-- **Never store price data from the Love's export.** Location and amenity fields only (`StoreType`, `ParkingSpaces`, `DEFLanes`). Those are street prices, not contract prices.
+- **Never store a provider geocode permanently.** 30-day cap. Station coordinates come only from an operator export (Love's, or BVD's own travel-centre directory for CA sites), OSM, or the Census gazetteer.
+- **Never store price data from the Love's export.** Location and amenity fields only (`StoreType`, `ParkingSpaces`, `DEFLanes`). Those are street prices, not contract prices. BVD's directory carries no prices at all, and its `operator_attrs` are the same kind of closed location/amenity set (§17.1).
+- **CA stations never reach the planner.** Directory rows are `country = 'CA'`, actuals-only (D29). The corridor scan and `GET /stations` filter on the fixed literal `s.country = 'US'` — never a parameter. An unpriced CA station near the border would otherwise appear as a "no price" exclusion.
 - **Route geometry does not expire in v1.** ORS is ODbL and carries no storage cap, so there is no `routes.expires_at`, no expiry trigger, no retention job and no `geometryExpired` field. Adopting HERE or Google brings all four back — §17 keeps the design. Do not add them before then.
 - `routes` is still a **cache** and `plans`/`plan_stops` are still the **record**. Refreshing a route writes to `routes` **only** — never to `plans` or `plan_stops`. Stored totals stay authoritative, because a refreshed line reflects today's road network, not the one that was planned.
 - `routes.line`/`polyline`/`legs` stay **nullable** despite never expiring — a provider may return no geometry, and a capped provider later needs a job rather than a migration.
@@ -177,7 +178,8 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
 | `data/bvd-prices/pcn-usd-9206810-981.csv` | August sheet | 605 data rows, effective 2026-08-22 |
 | `data/bvd-prices/2026-01/` | January corpus | 31 files, **30 distinct dates — 2026-01-11 missing**, 594 rows each |
 | `data/bvd-prices/2026-01/…-8097639-981 (1).csv` | Duplicate of its sibling | **Byte-identical**, SHA-256 `84fc7c50…` — the real idempotency test case |
-| `data/loves/LovesSearchResults.xlsx` | Operator export | 732 stores, header on row 3, footer row to drop, matches 604/605 — #306 is temporarily closed and absent, so it stays `unresolved` |
+| `data/US-CA-GasStations/LovesSearchResults.xlsx` | Operator export | 732 stores, header on row 3, footer row to drop, matches 604/605 — #306 is temporarily closed and absent, so it stays `unresolved` |
+| `data/US-CA-GasStations/bvd-travel-centres-2026-10-01.csv` | BVD's Canadian travel-centre directory (committed, D29) | 92 rows, 6 provinces, UTF-8 with BOM; 91 distinct `Site #` — one row (BVD Nisku) has none and is skipped. `Site #` is the invoice's `Site #` (58156 = BVD Comber) |
 | `migrations/real/` | Real fleet roster migration set (real driver names, real BVD fuel-card numbers) | Applied via `npm run db:migrate:real`; see T-58 |
 
 The missing January day and the duplicate file are **correct behaviour to report**, not bugs to suppress.

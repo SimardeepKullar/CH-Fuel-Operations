@@ -83,6 +83,25 @@ describe.skipIf(!hasDatabase)("GET /stations, /stations/{id}/prices (integration
       expect(exactOnly.stations.map((s) => s.name)).toEqual(["LOVES Exact"]);
     });
 
+    it("a CA directory station never appears — the sheet layer is US only (T-60)", async () => {
+      // BVD Comber as the directory loads it, and a US station across the
+      // Detroit River inside the same envelope.
+      await pool.query(
+        `INSERT INTO stations
+           (supplier, site_ref, name_raw, city_raw, city_normalized, state_usps, country,
+            geom, resolution, uncertainty_miles, resolution_source, truck_accessible)
+         VALUES ('BVD', '58156', 'BVD Comber', 'Comber', 'Comber', 'ON', 'CA',
+                 ST_SetSRID(ST_MakePoint(-82.54973, 42.23884), 4326)::geography,
+                 'exact', 0, 'bvd_directory', 'unverified')`,
+      );
+      await insertStation(pool, { siteRef: "DET", nameRaw: "LOVES #1", storeNumber: 1, lat: 42.3, lng: -83.1, resolution: "exact" });
+
+      const { stations, total } = await listStations("?bbox=-84,41,-82,43");
+
+      expect(total).toBe(1);
+      expect(stations.map((s) => s.name)).toEqual(["LOVES #1"]);
+    });
+
     it("an unresolved station never appears, filtered or not — it has no geom to plot", async () => {
       await insertStation(pool, { siteRef: "UN", nameRaw: "LOVES Unresolved", storeNumber: 3, lat: 35, lng: -97, resolution: "unresolved" });
       await insertStation(pool, { siteRef: "EX", nameRaw: "LOVES Exact", storeNumber: 1, lat: 35, lng: -97, resolution: "exact" });
