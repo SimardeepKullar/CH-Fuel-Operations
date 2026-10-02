@@ -289,6 +289,10 @@ export interface SchemaMigrationRow {
 
 export type PersonCardStatus = "active" | "inactive";
 export type InvoiceStatus = "quarantined" | "imported";
+/** BVD's `CUR`: `US` → `USD`, `CN` → `CAD` (D24). */
+export type InvoiceCurrency = "USD" | "CAD";
+/** Follows currency: a CAD invoice is litres (D25). */
+export type InvoiceQtyUnit = "gal" | "L";
 export type ReceiptStatus = "pending" | "confirmed" | "missing";
 export type ReceiptOutcome = "confirmed" | "missing";
 export type AnomalySeverity = "amber" | "red";
@@ -367,7 +371,10 @@ export interface InvoiceRow {
   period_end: Date;
   invoice_date: Date;
   due_date: Date;
-  grand_total_usd: Numeric;
+  currency: InvoiceCurrency;
+  qty_unit: InvoiceQtyUnit;
+  /** In `currency`, as printed (D25). */
+  grand_total: Numeric;
   status: InvoiceStatus;
   file_sha256: string;
   imported_at: Date;
@@ -376,11 +383,20 @@ export interface InvoiceRow {
 export interface InvoiceTotalRow {
   invoice_id: string;
   product_code: string;
-  gallons: Numeric;
-  amount_usd: Numeric;
+  /** In the invoice's `qty_unit`. */
+  qty: Numeric;
+  /** Final AMT, tax included, in the invoice's `currency`. */
+  amount: Numeric;
   /** BVD's own printed "Disc AMT" for this product code (T-33 follow-up).
-   * Null for a code with no per-gallon price to discount off of (e.g. "S"). */
-  discount_usd: Numeric | null;
+   * Null for a code with no per-unit price to discount off of (e.g. "S"). */
+  discount: Numeric | null;
+  /** Pre Tax AMT as printed; null where only a final amount is printed. */
+  pre_tax_amount: Numeric | null;
+  /** Sales tax as printed — zero on a US invoice. */
+  hst: Numeric;
+  gst: Numeric;
+  pst: Numeric;
+  qst: Numeric;
 }
 
 export interface FuelStopRow {
@@ -394,7 +410,7 @@ export interface FuelStopRow {
   unit_raw: string;
   driver_name_raw: string;
   station_id: string | null;
-  total_usd: Numeric;
+  total: Numeric;
   receipt_status: ReceiptStatus;
 }
 
@@ -402,11 +418,20 @@ export interface FuelStopLineRow {
   id: BigIntString;
   fuel_stop_id: string;
   product_code: string;
-  gallons: Numeric;
-  retail_usd_per_gal: Numeric;
-  /** numeric(9,4) — 4dp survives a round trip, never rounded to 2dp. */
-  billed_usd_per_gal: Numeric;
-  amount_usd: Numeric;
+  /** In the invoice's `qty_unit`; prices per that unit, in its `currency` (D25). */
+  qty: Numeric;
+  retail_per_unit: Numeric;
+  /** numeric(9,4) — 4dp survives a round trip, never rounded to 2dp. Tax-inclusive. */
+  billed_per_unit: Numeric;
+  /** Final AMT, tax included. */
+  amount: Numeric;
+  /** Pre Tax AMT as printed; null where only a final amount is printed. */
+  pre_tax_amount: Numeric | null;
+  /** Sales tax as printed — zero on a US invoice. */
+  hst: Numeric;
+  gst: Numeric;
+  pst: Numeric;
+  qst: Numeric;
 }
 
 export interface ExpressChargeRow {
@@ -422,9 +447,9 @@ export interface ExpressChargeRow {
   trailer_raw: string | null;
   cdl_raw: string | null;
   trip_number_raw: string | null;
-  amount_usd: Numeric;
-  fee_usd: Numeric;
-  total_usd: Numeric;
+  amount: Numeric;
+  fee: Numeric;
+  total: Numeric;
   payee: string | null;
   note: string | null;
   category: string | null;

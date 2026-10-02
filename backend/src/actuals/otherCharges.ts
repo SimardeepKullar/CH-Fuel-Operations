@@ -80,9 +80,9 @@ interface ExpressChargeRowWithJoins {
   trailer_raw: string | null;
   cdl_raw: string | null;
   trip_number_raw: string | null;
-  amount_usd: string;
-  fee_usd: string;
-  total_usd: string;
+  amount: string;
+  fee: string;
+  total: string;
   payee: string | null;
   note: string | null;
   category: string | null;
@@ -90,9 +90,9 @@ interface ExpressChargeRowWithJoins {
 
 interface TotalsRow {
   count: string;
-  amount_usd: string;
-  fee_usd: string;
-  total_usd: string;
+  amount: string;
+  fee: string;
+  total: string;
 }
 
 function toItem(row: ExpressChargeRowWithJoins): ExpressChargeItem {
@@ -114,9 +114,9 @@ function toItem(row: ExpressChargeRowWithJoins): ExpressChargeItem {
     trailerRaw: row.trailer_raw,
     cdlRaw: row.cdl_raw,
     tripNumberRaw: row.trip_number_raw,
-    amountUsd: Number(row.amount_usd),
-    feeUsd: Number(row.fee_usd),
-    totalUsd: Number(row.total_usd),
+    amountUsd: Number(row.amount),
+    feeUsd: Number(row.fee),
+    totalUsd: Number(row.total),
     currency: "USD",
     payee: row.payee,
     note: row.note,
@@ -156,7 +156,7 @@ export async function listExpressCharges(pool: Pool, period: string): Promise<Ex
               ec.driver_id, d.display_name AS driver_display_name, ec.driver_name_raw, ec.match_status,
               ec.truck_id, t.unit_number AS truck_unit_number, ec.unit_raw,
               ec.trailer_raw, ec.cdl_raw, ec.trip_number_raw,
-              ec.amount_usd, ec.fee_usd, ec.total_usd,
+              ec.amount, ec.fee, ec.total,
               ec.payee, ec.note, ec.category
        FROM express_charges ec
        LEFT JOIN drivers d ON d.id = ec.driver_id
@@ -167,9 +167,9 @@ export async function listExpressCharges(pool: Pool, period: string): Promise<Ex
     ),
     pool.query<TotalsRow>(
       `SELECT count(*) AS count,
-              COALESCE(SUM(amount_usd), 0) AS amount_usd,
-              COALESCE(SUM(fee_usd), 0) AS fee_usd,
-              COALESCE(SUM(total_usd), 0) AS total_usd
+              COALESCE(SUM(amount), 0) AS amount,
+              COALESCE(SUM(fee), 0) AS fee,
+              COALESCE(SUM(total), 0) AS total
        FROM express_charges WHERE invoice_id = $1`,
       [invoiceId],
     ),
@@ -182,9 +182,9 @@ export async function listExpressCharges(pool: Pool, period: string): Promise<Ex
     rows: rows.map(toItem),
     totals: {
       count: Number(totals.count),
-      amountUsd: Number(totals.amount_usd),
-      feeUsd: Number(totals.fee_usd),
-      totalUsd: Number(totals.total_usd),
+      amountUsd: Number(totals.amount),
+      feeUsd: Number(totals.fee),
+      totalUsd: Number(totals.total),
       currency: "USD",
     },
   };

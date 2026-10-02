@@ -94,8 +94,8 @@ describe.skipIf(!hasDatabase)("importInvoice (integration)", () => {
     expect(express.rows[0].count).toBe("2");
 
     const sum = await scopedPool.query(
-      `SELECT (SELECT COALESCE(SUM(amount_usd), 0) FROM fuel_stop_lines) +
-              (SELECT COALESCE(SUM(total_usd), 0) FROM express_charges) AS total`,
+      `SELECT (SELECT COALESCE(SUM(amount), 0) FROM fuel_stop_lines) +
+              (SELECT COALESCE(SUM(total), 0) FROM express_charges) AS total`,
     );
     expect(sum.rows[0].total).toBe("840.67");
   });

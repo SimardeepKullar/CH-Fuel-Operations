@@ -26,7 +26,7 @@ export interface PlanStopForMatch {
 /**
  * One actual fuel stop, shaped for matching. Gallons/price are the diesel
  * line only (`fuel_stop_lines` filtered to the diesel product code) — never
- * `fuel_stops.total_usd`, which is DEF-inclusive (CLAUDE.md).
+ * `fuel_stops.total`, which is DEF-inclusive (CLAUDE.md).
  */
 export interface FuelStopForMatch {
   fuelStopId: string;

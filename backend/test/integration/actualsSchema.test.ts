@@ -155,14 +155,16 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     invoiceNumber: string,
     fileSha256: string,
     status: "quarantined" | "imported" = "imported",
+    currency = "USD",
+    qtyUnit = "gal",
   ): Promise<string> {
     const { rows } = await scopedPool.query<{ id: string }>(
       `INSERT INTO invoices
          (invoice_number, period_start, period_end, invoice_date, due_date,
-          grand_total_usd, status, file_sha256)
-       VALUES ($1, '2026-09-03', '2026-09-09', '2026-09-10', '2026-09-11', 50929.71, $3, $2)
+          currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ($1, '2026-09-03', '2026-09-09', '2026-09-10', '2026-09-11', $4, $5, 50929.71, $3, $2)
        RETURNING id`,
-      [invoiceNumber, fileSha256, status],
+      [invoiceNumber, fileSha256, status, currency, qtyUnit],
     );
     const id = rows[0]?.id;
     if (!id) throw new Error("insertInvoice failed");
@@ -178,7 +180,7 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     const { rows } = await scopedPool.query<{ id: string }>(
       `INSERT INTO fuel_stops
          (invoice_id, base_auth_code, occurred_at, card_id, unit_raw,
-          driver_name_raw, station_id, total_usd)
+          driver_name_raw, station_id, total)
        VALUES ($1, $2, now(), $3, '072', 'JORDAN', $4, 218.35)
        RETURNING id`,
       [invoiceId, baseAuthCode, cardId, stationId ?? null],
@@ -188,21 +190,50 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     return id;
   }
 
-  it("round-trips 5.2395 in fuel_stop_lines.billed_usd_per_gal without rounding to 2dp", async () => {
+  it("round-trips 5.2395 in fuel_stop_lines.billed_per_unit without rounding to 2dp", async () => {
     const cardId = await insertCard("C3");
     const invoiceId = await insertInvoice("INV-1", "a".repeat(64));
     const stopId = await insertFuelStop(invoiceId, cardId, "AUTH1");
     await scopedPool.query(
       `INSERT INTO fuel_stop_lines
-         (fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd)
+         (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
        VALUES ($1, 'TA', 41.67, 5.9890, 5.2395, 218.15)`,
       [stopId],
     );
-    const { rows } = await scopedPool.query<{ billed_usd_per_gal: string }>(
-      `SELECT billed_usd_per_gal FROM fuel_stop_lines WHERE fuel_stop_id = $1`,
+    const { rows } = await scopedPool.query<{ billed_per_unit: string }>(
+      `SELECT billed_per_unit FROM fuel_stop_lines WHERE fuel_stop_id = $1`,
       [stopId],
     );
-    expect(rows[0]?.billed_usd_per_gal).toBe("5.2395");
+    expect(rows[0]?.billed_per_unit).toBe("5.2395");
+  });
+
+  it("accepts currency USD/CAD and qty_unit gal/L, and rejects 'EUR' and 'm3' (T-61)", async () => {
+    await insertInvoice("INV-CAD", "1".repeat(64), "imported", "CAD", "L");
+    await expect(insertInvoice("INV-EUR", "2".repeat(64), "imported", "EUR", "L")).rejects.toThrow(
+      /invoices_currency_check/,
+    );
+    await expect(insertInvoice("INV-M3", "3".repeat(64), "imported", "CAD", "m3")).rejects.toThrow(
+      /invoices_qty_unit_check/,
+    );
+  });
+
+  it("defaults the four tax columns to 0 and leaves pre_tax_amount null on a line and a totals row (T-61)", async () => {
+    const cardId = await insertCard("C3T");
+    const invoiceId = await insertInvoice("INV-TAX", "4".repeat(64));
+    const stopId = await insertFuelStop(invoiceId, cardId, "AUTHT");
+    await scopedPool.query(
+      `INSERT INTO fuel_stop_lines (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
+       VALUES ($1, 'TA', 1.00, 1.0000, 1.0000, 1.00)`,
+      [stopId],
+    );
+    await scopedPool.query(
+      "INSERT INTO invoice_totals (invoice_id, product_code, qty, amount) VALUES ($1, 'TA', 1.00, 1.00)",
+      [invoiceId],
+    );
+    for (const table of ["fuel_stop_lines", "invoice_totals"]) {
+      const { rows } = await scopedPool.query(`SELECT pre_tax_amount, hst, gst, pst, qst FROM ${table}`);
+      expect(rows).toEqual([{ pre_tax_amount: null, hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00" }]);
+    }
   });
 
   it("rejects the same file_sha256 twice, and the same invoice_number with a different hash under a different constraint", async () => {
@@ -224,7 +255,7 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     const insertLine = () =>
       scopedPool.query(
         `INSERT INTO fuel_stop_lines
-           (fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd)
+           (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
          VALUES ($1, 'TA', 41.67, 5.9890, 5.2395, 218.15)`,
         [stopId],
       );
@@ -248,7 +279,7 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     const invoiceId = await insertInvoice("INV-4", "g".repeat(64));
     await scopedPool.query(
       `INSERT INTO express_charges
-         (invoice_id, express_code, occurred_at, truck_id, unit_raw, amount_usd, total_usd)
+         (invoice_id, express_code, occurred_at, truck_id, unit_raw, amount, total)
        VALUES ($1, 'LUMPER', now(), $2, '098', 200.00, 203.00)`,
       [invoiceId, truckId],
     );
@@ -274,13 +305,13 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     const stopId = await insertFuelStop(invoiceId, cardId, "AUTH5", stationId);
     await scopedPool.query(
       `INSERT INTO fuel_stop_lines
-         (fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd)
+         (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
        VALUES ($1, 'TA', 41.67, 5.9890, 5.2395, 218.15)`,
       [stopId],
     );
     await scopedPool.query(
       `INSERT INTO express_charges
-         (invoice_id, express_code, occurred_at, truck_id, unit_raw, amount_usd, total_usd)
+         (invoice_id, express_code, occurred_at, truck_id, unit_raw, amount, total)
        VALUES ($1, 'LUMPER', now(), $2, '074', 200.00, 203.00)`,
       [invoiceId, truckId],
     );

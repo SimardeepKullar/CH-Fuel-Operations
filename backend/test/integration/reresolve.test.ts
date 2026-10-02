@@ -30,14 +30,14 @@ async function seedFuelStop(pool: Pool): Promise<Fixture> {
   const originalTruckId = originalTruckRows[0]!.id;
 
   const { rows: invoiceRows } = await pool.query<{ id: string }>(
-    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, grand_total_usd, status, file_sha256)
-     VALUES ('re-resolve-test', '2026-09-01', '2026-09-07', '2026-09-08', '2026-09-09', 100.00, 'imported', repeat('a', 64))
+    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ('re-resolve-test', '2026-09-01', '2026-09-07', '2026-09-08', '2026-09-09', 'USD', 'gal', 100.00, 'imported', repeat('a', 64))
      RETURNING id`,
   );
 
   const { rows: fuelStopRows } = await pool.query<{ id: string }>(
     `INSERT INTO fuel_stops
-       (invoice_id, base_auth_code, occurred_at, card_id, truck_id, driver_id, unit_raw, driver_name_raw, total_usd)
+       (invoice_id, base_auth_code, occurred_at, card_id, truck_id, driver_id, unit_raw, driver_name_raw, total)
      VALUES ($1, 'B900001-TA', '2026-09-03T05:35:00Z', $2, $3, $4, '072', 'JORDAN', 100.00)
      RETURNING id`,
     [invoiceRows[0]!.id, card!.id, originalTruckId, driverId],

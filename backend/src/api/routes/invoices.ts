@@ -108,7 +108,7 @@ interface InvoiceListRow {
   invoice_number: string;
   period_start: Date;
   period_end: Date;
-  grand_total_usd: string;
+  grand_total: string;
   status: "imported" | "quarantined";
   imported_at: Date;
 }
@@ -136,7 +136,7 @@ function toListItem(row: InvoiceListRow): InvoiceListItem {
     invoiceNumber: row.invoice_number,
     periodStart: row.period_start.toISOString().slice(0, 10),
     periodEnd: row.period_end.toISOString().slice(0, 10),
-    grandTotalUsd: Number(row.grand_total_usd),
+    grandTotalUsd: Number(row.grand_total),
     status: row.status,
     importedAt: row.imported_at.toISOString(),
   };
@@ -160,7 +160,7 @@ export async function handleListInvoices(pool: Pool, url: URL): Promise<Response
   const { page, pageSize } = parsed.data;
 
   const { rows } = await pool.query<InvoiceListRow>(
-    `SELECT id, invoice_number, period_start, period_end, grand_total_usd, status, imported_at
+    `SELECT id, invoice_number, period_start, period_end, grand_total, status, imported_at
      FROM invoices
      ORDER BY imported_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
@@ -205,7 +205,7 @@ export interface InvoiceDetail extends InvoiceListItem {
  */
 export async function handleGetInvoice(pool: Pool, id: string, url: URL): Promise<Response> {
   const { rows } = await pool.query<InvoiceListRow>(
-    `SELECT id, invoice_number, period_start, period_end, grand_total_usd, status, imported_at
+    `SELECT id, invoice_number, period_start, period_end, grand_total, status, imported_at
      FROM invoices
      WHERE id = $1`,
     [id],

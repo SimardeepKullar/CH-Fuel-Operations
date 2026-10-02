@@ -83,7 +83,7 @@ interface TransactionRow {
   id: string;
   base_auth_code: string;
   occurred_at: Date;
-  total_usd: string;
+  total: string;
   receipt_status: ReceiptStatus;
   unit_raw: string;
   driver_name_raw: string;
@@ -102,25 +102,26 @@ interface TransactionRow {
 
 const SORT_COLUMNS: Record<TransactionSortField, string> = {
   occurred_at: "fs.occurred_at",
-  total_usd: "fs.total_usd",
+  // The API sort value keeps its name until T-63 reshapes the contract.
+  total_usd: "fs.total",
 };
 
 const BASE_SELECT = `
-  SELECT fs.id, fs.base_auth_code, fs.occurred_at, fs.total_usd, fs.receipt_status,
+  SELECT fs.id, fs.base_auth_code, fs.occurred_at, fs.total, fs.receipt_status,
          fs.unit_raw, fs.driver_name_raw,
          fc.id AS card_id, fc.card_number,
          t.unit_number AS truck_unit_number,
          d.display_name AS driver_display_name,
          s.id AS station_id, s.name_raw AS station_name_raw,
          s.city_raw AS station_city_raw, s.state_usps AS station_state_usps,
-         ta.gallons AS ta_gallons, ta.retail_usd_per_gal AS ta_retail, ta.billed_usd_per_gal AS ta_billed
+         ta.qty AS ta_gallons, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed
   FROM fuel_stops fs
   JOIN fuel_cards fc ON fc.id = fs.card_id
   LEFT JOIN trucks t ON t.id = fs.truck_id
   LEFT JOIN drivers d ON d.id = fs.driver_id
   LEFT JOIN stations s ON s.id = fs.station_id
   LEFT JOIN LATERAL (
-    SELECT gallons, retail_usd_per_gal, billed_usd_per_gal
+    SELECT qty, retail_per_unit, billed_per_unit
     FROM fuel_stop_lines
     WHERE fuel_stop_id = fs.id AND product_code = 'TA'
     LIMIT 1
@@ -180,7 +181,7 @@ function toListItem(row: TransactionRow, flagsByStop: ReadonlyMap<string, Anomal
     gallons: row.ta_gallons === null ? null : Number(row.ta_gallons),
     retailUsdPerGal: row.ta_retail === null ? null : Number(row.ta_retail),
     billedUsdPerGal: row.ta_billed === null ? null : Number(row.ta_billed),
-    totalUsd: Number(row.total_usd),
+    totalUsd: Number(row.total),
     currency: "USD",
     receiptStatus: row.receipt_status,
     flags: flagsByStop.get(row.id) ?? [],
@@ -218,10 +219,10 @@ async function loadFlags(pool: Pool, stopIds: readonly string[]): Promise<Map<st
 interface FuelStopLineRow {
   fuel_stop_id: string;
   product_code: string;
-  gallons: string;
-  retail_usd_per_gal: string;
-  billed_usd_per_gal: string;
-  amount_usd: string;
+  qty: string;
+  retail_per_unit: string;
+  billed_per_unit: string;
+  amount: string;
 }
 
 async function loadLines(pool: Pool, stopIds: readonly string[]): Promise<Map<string, TransactionLine[]>> {
@@ -230,7 +231,7 @@ async function loadLines(pool: Pool, stopIds: readonly string[]): Promise<Map<st
     return byStop;
   }
   const { rows } = await pool.query<FuelStopLineRow>(
-    `SELECT fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd
+    `SELECT fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount
      FROM fuel_stop_lines
      WHERE fuel_stop_id = ANY($1)
      ORDER BY fuel_stop_id, product_code`,
@@ -239,10 +240,10 @@ async function loadLines(pool: Pool, stopIds: readonly string[]): Promise<Map<st
   for (const row of rows) {
     const line: TransactionLine = {
       productCode: row.product_code,
-      gallons: Number(row.gallons),
-      retailUsdPerGal: Number(row.retail_usd_per_gal),
-      billedUsdPerGal: Number(row.billed_usd_per_gal),
-      amountUsd: Number(row.amount_usd),
+      gallons: Number(row.qty),
+      retailUsdPerGal: Number(row.retail_per_unit),
+      billedUsdPerGal: Number(row.billed_per_unit),
+      amountUsd: Number(row.amount),
       currency: "USD",
     };
     const existing = byStop.get(row.fuel_stop_id);
@@ -408,7 +409,7 @@ async function findDispatchedPlanId(pool: Pool, truckId: string | null, occurred
  */
 export async function getTransactionById(pool: Pool, id: string): Promise<TransactionDetail | null> {
   const { rows } = await pool.query<DetailRow>(
-    `SELECT fs.id, fs.invoice_id, fs.base_auth_code, fs.occurred_at, fs.total_usd, fs.receipt_status,
+    `SELECT fs.id, fs.invoice_id, fs.base_auth_code, fs.occurred_at, fs.total, fs.receipt_status,
             fs.unit_raw, fs.driver_name_raw, fs.truck_id,
             fc.id AS card_id, fc.card_number,
             t.unit_number AS truck_unit_number,
@@ -416,14 +417,14 @@ export async function getTransactionById(pool: Pool, id: string): Promise<Transa
             s.id AS station_id, s.name_raw AS station_name_raw,
             s.city_raw AS station_city_raw, s.state_usps AS station_state_usps,
             s.resolution AS station_resolution, s.resolution_source AS station_resolution_source,
-            ta.gallons AS ta_gallons, ta.retail_usd_per_gal AS ta_retail, ta.billed_usd_per_gal AS ta_billed
+            ta.qty AS ta_gallons, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed
      FROM fuel_stops fs
      JOIN fuel_cards fc ON fc.id = fs.card_id
      LEFT JOIN trucks t ON t.id = fs.truck_id
      LEFT JOIN drivers d ON d.id = fs.driver_id
      LEFT JOIN stations s ON s.id = fs.station_id
      LEFT JOIN LATERAL (
-       SELECT gallons, retail_usd_per_gal, billed_usd_per_gal
+       SELECT qty, retail_per_unit, billed_per_unit
        FROM fuel_stop_lines
        WHERE fuel_stop_id = fs.id AND product_code = 'TA'
        LIMIT 1

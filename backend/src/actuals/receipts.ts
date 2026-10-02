@@ -81,7 +81,7 @@ export interface ReceiptQueueResult {
 interface QueueRow {
   id: string;
   occurred_at: Date;
-  total_usd: string;
+  total: string;
   receipt_status: ReceiptStatus;
   unit_raw: string;
   driver_name_raw: string;
@@ -101,7 +101,7 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
     driver: driverRawResolved(row),
     truck: truckRawResolved(row),
     station: stationSummary(row),
-    totalUsd: Number(row.total_usd),
+    totalUsd: Number(row.total),
     currency: "USD",
     receiptStatus: row.receipt_status,
     hasException: row.has_exception,
@@ -133,7 +133,7 @@ export async function listReceiptQueue(
 
   const [{ rows }, progress] = await Promise.all([
     pool.query<QueueRow>(
-      `SELECT fs.id, fs.occurred_at, fs.total_usd, fs.receipt_status,
+      `SELECT fs.id, fs.occurred_at, fs.total, fs.receipt_status,
               fs.unit_raw, fs.driver_name_raw,
               t.unit_number AS truck_unit_number,
               d.display_name AS driver_display_name,

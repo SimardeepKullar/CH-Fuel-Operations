@@ -37,8 +37,8 @@ export async function insertInvoice(
   invoice: { number: string; periodStart: string; periodEnd: string },
 ): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(
-    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, grand_total_usd, status, file_sha256)
-     VALUES ($1, $2::date, $3::date, $3::date, $3::date, 0, 'imported', $4)
+    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ($1, $2::date, $3::date, $3::date, $3::date, 'USD', 'gal', 0, 'imported', $4)
      RETURNING id`,
     [invoice.number, invoice.periodStart, invoice.periodEnd, createHash("sha256").update(invoice.number).digest("hex")],
   );
@@ -126,7 +126,7 @@ export async function insertStop(pool: Pool, stop: FixtureStop): Promise<string>
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO fuel_stops
        (invoice_id, base_auth_code, occurred_at, card_id, truck_id, driver_id, unit_raw, driver_name_raw,
-        station_id, total_usd, receipt_status)
+        station_id, total, receipt_status)
      VALUES ($1, $2, $3::timestamptz, $4, $5, $6, '', '', $7, $8, $9)
      RETURNING id`,
     [
@@ -145,7 +145,7 @@ export async function insertStop(pool: Pool, stop: FixtureStop): Promise<string>
 
   for (const [i, line] of stop.lines.entries()) {
     await pool.query(
-      `INSERT INTO fuel_stop_lines (fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd)
+      `INSERT INTO fuel_stop_lines (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
        VALUES ($1, $2, $3, $4, $4, $5)`,
       [stopId, line.code, line.gallons, line.billed, amounts[i]],
     );

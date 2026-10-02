@@ -50,9 +50,9 @@ interface StopRow {
 interface LineRow {
   fuel_stop_id: string;
   product_code: string;
-  gallons: string;
-  amount_usd: string;
-  billed_usd_per_gal: string;
+  qty: string;
+  amount: string;
+  billed_per_unit: string;
 }
 
 async function loadThresholds(db: Db): Promise<Map<RuleName, unknown>> {
@@ -98,7 +98,7 @@ async function loadStops(db: Db, invoiceId: string): Promise<StopRow[]> {
 
 async function loadLines(db: Db, invoiceId: string): Promise<Map<string, LineRow[]>> {
   const { rows } = await db.query<LineRow>(
-    `SELECT fsl.fuel_stop_id, fsl.product_code, fsl.gallons, fsl.amount_usd, fsl.billed_usd_per_gal
+    `SELECT fsl.fuel_stop_id, fsl.product_code, fsl.qty, fsl.amount, fsl.billed_per_unit
      FROM fuel_stop_lines fsl
      JOIN fuel_stops fs ON fs.id = fsl.fuel_stop_id
      WHERE fs.invoice_id = $1`,
@@ -154,7 +154,7 @@ function occurredOnDate(occurredAt: Date): string {
 
 function billedDieselPrice(lines: readonly LineRow[], fuelProductCode: string): string | null {
   const line = lines.find((l) => l.product_code === fuelProductCode);
-  return line ? line.billed_usd_per_gal : null;
+  return line ? line.billed_per_unit : null;
 }
 
 /**
@@ -206,8 +206,8 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
     id: s.id,
     lines: (linesByStop.get(s.id) ?? []).map((l) => ({
       productCode: l.product_code,
-      gallons: l.gallons,
-      amountUsd: l.amount_usd,
+      gallons: l.qty,
+      amountUsd: l.amount,
     })),
   }));
   for (const finding of subGallon(subGallonStops, thresholds.get("sub_gallon") as SubGallonConfig)) {
@@ -237,8 +237,8 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
     id: s.id,
     lines: (linesByStop.get(s.id) ?? []).map((l) => ({
       productCode: l.product_code,
-      gallons: l.gallons,
-      amountUsd: l.amount_usd,
+      gallons: l.qty,
+      amountUsd: l.amount,
     })),
   }));
   for (const finding of chargesNoFuel(chargesNoFuelStops, thresholds.get("charges_no_fuel") as ChargesNoFuelConfig)) {

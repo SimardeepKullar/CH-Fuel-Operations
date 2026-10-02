@@ -235,7 +235,7 @@ async function loadTruckDays(pool: Pool, from: string, to: string): Promise<Truc
     `SELECT fs.truck_id,
             (fs.occurred_at AT TIME ZONE 'UTC')::date::text AS day,
             array_agg(fs.station_id ORDER BY fs.occurred_at) AS station_ids,
-            SUM(fsl.gallons * fsl.billed_usd_per_gal) AS actual_cost_usd
+            SUM(fsl.qty * fsl.billed_per_unit) AS actual_cost_usd
        FROM fuel_stops fs
        JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id AND fsl.product_code = 'TA'
       WHERE fs.truck_id IS NOT NULL

@@ -203,8 +203,8 @@ async function insertInvoiceRow(
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO invoices
        (invoice_number, period_start, period_end, invoice_date, due_date,
-        grand_total_usd, status, file_sha256)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ($1, $2, $3, $4, $5, 'USD', 'gal', $6, $7, $8)
      RETURNING id`,
     [
       parsed.header.invoiceNumber,
@@ -240,7 +240,7 @@ async function insertInvoiceTotals(
       continue; // no printed figure for this code — nothing to record
     }
     await client.query(
-      `INSERT INTO invoice_totals (invoice_id, product_code, gallons, amount_usd, discount_usd)
+      `INSERT INTO invoice_totals (invoice_id, product_code, qty, amount, discount)
        VALUES ($1, $2, $3, $4, $5)`,
       [invoiceId, rawCode, printedRow.gallons ?? "0.00", printedRow.amountUsd, printedRow.discountUsd],
     );
@@ -257,7 +257,7 @@ async function insertFuelStop(
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO fuel_stops
        (invoice_id, base_auth_code, occurred_at, card_id, truck_id, driver_id,
-        unit_raw, driver_name_raw, station_id, total_usd)
+        unit_raw, driver_name_raw, station_id, total)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
@@ -280,7 +280,7 @@ async function insertFuelStop(
   for (const line of group.lines) {
     await client.query(
       `INSERT INTO fuel_stop_lines
-         (fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd)
+         (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [fuelStopId, line.rawProductCode, line.gallons, line.retailUsdPerGal, line.billedUsdPerGal, line.amountUsd],
     );
@@ -297,7 +297,7 @@ async function insertExpressCharge(
   await client.query(
     `INSERT INTO express_charges
        (invoice_id, express_code, occurred_at, truck_id, unit_raw,
-        driver_id, driver_name_raw, amount_usd, fee_usd, total_usd, payee, note,
+        driver_id, driver_name_raw, amount, fee, total, payee, note,
         category, match_status, trailer_raw, cdl_raw, trip_number_raw)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [

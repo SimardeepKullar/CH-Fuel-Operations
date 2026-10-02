@@ -62,8 +62,8 @@ describe.skipIf(!hasDatabase)("GET /express-charges (integration)", () => {
     app = createApp({ pool: scopedPool });
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, grand_total_usd, status, file_sha256)
-       VALUES ('T36-TEST', '2026-03-01', '2026-03-07', '2026-03-08', '2026-03-09', 0, 'imported', repeat('0', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('T36-TEST', '2026-03-01', '2026-03-07', '2026-03-08', '2026-03-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
     );
     const invoiceId = (await scopedPool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = 'T36-TEST'"))
       .rows[0]!.id;
@@ -77,7 +77,7 @@ describe.skipIf(!hasDatabase)("GET /express-charges (integration)", () => {
     await scopedPool.query(
       `INSERT INTO express_charges
          (invoice_id, express_code, occurred_at, truck_id, unit_raw, driver_id, driver_name_raw,
-          amount_usd, fee_usd, total_usd, payee, note, category, match_status)
+          amount, fee, total, payee, note, category, match_status)
        VALUES
          ($1, 'X2', '2026-03-03T10:00:00Z', NULL, NULL, NULL, NULL, 200.00, 3.00, 203.00, 'lumper fees', '  Lumper ', NULL, 'unmatched'),
          ($1, 'X1', '2026-03-02T10:00:00Z', $2, '  T36-1 ', $3, 'T36 driver', 110.00, 3.00, 113.00, NULL, 'repair', 'Repairs', 'matched')`,

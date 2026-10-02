@@ -89,9 +89,9 @@ export async function getStationBilledPrices(pool: Pool, id: string): Promise<St
       `SELECT to_char((fs.occurred_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
               count(DISTINCT fs.id) AS stop_count,
               count(DISTINCT fs.card_id) AS card_count,
-              SUM(fsl.gallons) AS gallons,
-              SUM(fsl.gallons * fsl.billed_usd_per_gal) AS weighted_num,
-              array_agg(DISTINCT fsl.billed_usd_per_gal ORDER BY fsl.billed_usd_per_gal) AS prices
+              SUM(fsl.qty) AS gallons,
+              SUM(fsl.qty * fsl.billed_per_unit) AS weighted_num,
+              array_agg(DISTINCT fsl.billed_per_unit ORDER BY fsl.billed_per_unit) AS prices
        FROM fuel_stops fs
        JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id AND fsl.product_code = $2
        WHERE fs.station_id = $1

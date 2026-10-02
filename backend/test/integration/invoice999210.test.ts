@@ -100,12 +100,12 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
     expect((await scopedPool.query("SELECT count(*) FROM express_charges")).rows[0]!.count).toBe("6");
   });
 
-  it("Σ fuel_stop_lines.amount_usd + Σ express_charges.total_usd = 50929.71", async () => {
+  it("Σ fuel_stop_lines.amount + Σ express_charges.total = 50929.71", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
     const { rows } = await scopedPool.query<{ total: string }>(
-      `SELECT (SELECT COALESCE(SUM(amount_usd), 0) FROM fuel_stop_lines) +
-              (SELECT COALESCE(SUM(total_usd), 0) FROM express_charges) AS total`,
+      `SELECT (SELECT COALESCE(SUM(amount), 0) FROM fuel_stop_lines) +
+              (SELECT COALESCE(SUM(total), 0) FROM express_charges) AS total`,
     );
     expect(rows[0]!.total).toBe("50929.71");
   });
@@ -114,12 +114,12 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
     const ta = await scopedPool.query<{ g: string }>(
-      "SELECT COALESCE(SUM(gallons), 0) AS g FROM fuel_stop_lines WHERE product_code = 'TA'",
+      "SELECT COALESCE(SUM(qty), 0) AS g FROM fuel_stop_lines WHERE product_code = 'TA'",
     );
     expect(ta.rows[0]!.g).toBe("8733.11");
 
     const df = await scopedPool.query<{ g: string }>(
-      "SELECT COALESCE(SUM(gallons), 0) AS g FROM fuel_stop_lines WHERE product_code = 'DF'",
+      "SELECT COALESCE(SUM(qty), 0) AS g FROM fuel_stop_lines WHERE product_code = 'DF'",
     );
     expect(df.rows[0]!.g).toBe("174.43");
   });
@@ -128,28 +128,28 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
     const weighted = await scopedPool.query<{ avg: string }>(
-      `SELECT round(SUM(gallons * billed_usd_per_gal) / SUM(gallons), 2) AS avg
+      `SELECT round(SUM(qty * billed_per_unit) / SUM(qty), 2) AS avg
        FROM fuel_stop_lines WHERE product_code = 'TA'`,
     );
     expect(weighted.rows[0]!.avg).toBe("5.55");
 
     const unweighted = await scopedPool.query<{ avg: string }>(
-      `SELECT round(AVG(billed_usd_per_gal), 2) AS avg
+      `SELECT round(AVG(billed_per_unit), 2) AS avg
        FROM fuel_stop_lines WHERE product_code = 'TA'`,
     );
     expect(unweighted.rows[0]!.avg).not.toBe(weighted.rows[0]!.avg);
   });
 
-  it("invoice_totals.discount_usd is BVD's printed Disc AMT (T-33 follow-up), not recomputed from retail/billed", async () => {
+  it("invoice_totals.discount is BVD's printed Disc AMT (T-33 follow-up), not recomputed from retail/billed", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
-    const { rows } = await scopedPool.query<{ product_code: string; discount_usd: string | null }>(
-      "SELECT product_code, discount_usd FROM invoice_totals ORDER BY product_code",
+    const { rows } = await scopedPool.query<{ product_code: string; discount: string | null }>(
+      "SELECT product_code, discount FROM invoice_totals ORDER BY product_code",
     );
     expect(rows).toEqual([
-      { product_code: "DF", discount_usd: "0.00" },
-      { product_code: "S", discount_usd: null },
-      { product_code: "TA", discount_usd: "5088.61" },
+      { product_code: "DF", discount: "0.00" },
+      { product_code: "S", discount: null },
+      { product_code: "TA", discount: "5088.61" },
     ]);
   });
 
@@ -171,8 +171,8 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
 
     // Same invoice, same money — the PDF balances to the same printed totals.
     const { rows: totals } = await scopedPool.query<{ total: string }>(
-      `SELECT (SELECT COALESCE(SUM(amount_usd), 0) FROM fuel_stop_lines) +
-              (SELECT COALESCE(SUM(total_usd), 0) FROM express_charges) AS total`,
+      `SELECT (SELECT COALESCE(SUM(amount), 0) FROM fuel_stop_lines) +
+              (SELECT COALESCE(SUM(total), 0) FROM express_charges) AS total`,
     );
     expect(totals[0]!.total).toBe("50929.71");
 

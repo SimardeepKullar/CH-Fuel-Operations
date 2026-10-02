@@ -333,12 +333,12 @@ describe.skipIf(!hasDatabase)("fuel_stops default-sort query plan (integration)"
     await runMigrations(scopedPool, migrationsDir);
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, grand_total_usd, status, file_sha256)
-       VALUES ('EXPLAIN-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 0, 'imported', repeat('0', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('EXPLAIN-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
     );
     await scopedPool.query("INSERT INTO fuel_cards (card_number) VALUES ('9999999')");
     await scopedPool.query(
-      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total_usd)
+      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total)
        SELECT (SELECT id FROM invoices WHERE invoice_number = 'EXPLAIN-TEST'),
               'EXPLAIN-' || gs,
               TIMESTAMPTZ '2020-01-01' - (gs || ' minutes')::interval,
@@ -389,13 +389,13 @@ describe.skipIf(!hasDatabase)("anomalyOnly excludes a charges_no_fuel-only stop 
     await runMigrations(scopedPool, migrationsDir);
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, grand_total_usd, status, file_sha256)
-       VALUES ('T-40I-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 0, 'imported', repeat('1', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('T-40I-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('1', 64))`,
     );
     await scopedPool.query("INSERT INTO fuel_cards (card_number) VALUES ('9999901'), ('9999902')");
 
     const { rows: scaleOnlyRows } = await scopedPool.query<{ id: string }>(
-      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total_usd)
+      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total)
        VALUES ((SELECT id FROM invoices WHERE invoice_number = 'T-40I-TEST'), 'SCALE-ONLY',
                TIMESTAMPTZ '2020-01-01', (SELECT id FROM fuel_cards WHERE card_number = '9999901'),
                '900', 'SCALE ONLY DRIVER', 15.00)
@@ -403,7 +403,7 @@ describe.skipIf(!hasDatabase)("anomalyOnly excludes a charges_no_fuel-only stop 
     );
     const scaleOnlyStopId = scaleOnlyRows[0]!.id;
     const { rows: scaleAndMismatchRows } = await scopedPool.query<{ id: string }>(
-      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total_usd)
+      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total)
        VALUES ((SELECT id FROM invoices WHERE invoice_number = 'T-40I-TEST'), 'SCALE-AND-MISMATCH',
                TIMESTAMPTZ '2020-01-02', (SELECT id FROM fuel_cards WHERE card_number = '9999902'),
                '901', 'SCALE AND MISMATCH DRIVER', 20.00)

@@ -89,12 +89,12 @@ export interface OverviewOptions {
 
 interface InvoiceRow {
   id: string;
-  grand_total_usd: string;
+  grand_total: string;
 }
 
 async function loadInvoice(pool: Pool, period: string): Promise<InvoiceRow | null> {
   const { rows } = await pool.query<InvoiceRow>(
-    "SELECT id, grand_total_usd FROM invoices WHERE period_start = $1::date",
+    "SELECT id, grand_total FROM invoices WHERE period_start = $1::date",
     [period],
   );
   return rows[0] ?? null;
@@ -117,9 +117,9 @@ function emptyKpis(period: string): OverviewKpis {
 
 interface InvoiceTotalRow {
   product_code: string;
-  gallons: string;
-  amount_usd: string;
-  discount_usd: string | null;
+  qty: string;
+  amount: string;
+  discount: string | null;
 }
 
 interface DieselAggRow {
@@ -128,8 +128,8 @@ interface DieselAggRow {
 }
 
 interface ExpressAggRow {
-  total_usd: string | null;
-  fee_usd: string | null;
+  total: string | null;
+  fee: string | null;
 }
 
 interface ReceiptAggRow {
@@ -139,15 +139,15 @@ interface ReceiptAggRow {
 
 /** `avgBilledUsdPerGal`'s gallons-weighted numerator/denominator — the
  * proven formula (invoice999210.test.ts). Discount is read straight off
- * `invoice_totals.discount_usd` instead (`loadInvoiceTotals` below): BVD's
+ * `invoice_totals.discount` instead (`loadInvoiceTotals` below): BVD's
  * printed per-line "Disc AMT" doesn't reproduce from gallons ×
  * (retail − billed) at the 4dp precision this schema stores prices at, so
  * recomputing it drifted a few cents from the printed figure. */
 async function loadDieselAgg(pool: Pool, invoiceId: string): Promise<DieselAggRow> {
   const { rows } = await pool.query<DieselAggRow>(
     `SELECT
-       SUM(fsl.gallons) AS ta_gallons,
-       SUM(fsl.gallons * fsl.billed_usd_per_gal) AS weighted_num
+       SUM(fsl.qty) AS ta_gallons,
+       SUM(fsl.qty * fsl.billed_per_unit) AS weighted_num
      FROM fuel_stop_lines fsl
      JOIN fuel_stops fs ON fs.id = fsl.fuel_stop_id
      WHERE fs.invoice_id = $1 AND fsl.product_code = 'TA'`,
@@ -156,12 +156,12 @@ async function loadDieselAgg(pool: Pool, invoiceId: string): Promise<DieselAggRo
   return rows[0]!;
 }
 
-/** `discount_usd` is BVD's own printed "Disc AMT" per product code, from the
+/** `discount` is BVD's own printed "Disc AMT" per product code, from the
  * invoice's Grand Totals section — trusted as given, same as the gallons
  * and amount columns this table already stores from that section (A11). */
 async function loadInvoiceTotals(pool: Pool, invoiceId: string): Promise<Map<string, InvoiceTotalRow>> {
   const { rows } = await pool.query<InvoiceTotalRow>(
-    "SELECT product_code, gallons, amount_usd, discount_usd FROM invoice_totals WHERE invoice_id = $1",
+    "SELECT product_code, qty, amount, discount FROM invoice_totals WHERE invoice_id = $1",
     [invoiceId],
   );
   return new Map(rows.map((r) => [r.product_code, r]));
@@ -169,7 +169,7 @@ async function loadInvoiceTotals(pool: Pool, invoiceId: string): Promise<Map<str
 
 async function loadExpressAgg(pool: Pool, invoiceId: string): Promise<ExpressAggRow> {
   const { rows } = await pool.query<ExpressAggRow>(
-    "SELECT SUM(total_usd) AS total_usd, SUM(fee_usd) AS fee_usd FROM express_charges WHERE invoice_id = $1",
+    "SELECT SUM(total) AS total, SUM(fee) AS fee FROM express_charges WHERE invoice_id = $1",
     [invoiceId],
   );
   return rows[0]!;
@@ -216,19 +216,19 @@ async function loadKpis(pool: Pool, period: string, invoice: InvoiceRow | null):
   const taGallons = dieselAgg.ta_gallons === null ? 0 : Number(dieselAgg.ta_gallons);
   const avgBilledUsdPerGal = taGallons > 0 ? Number(dieselAgg.weighted_num) / taGallons : null;
   const discountTotal = [...totals.values()].reduce(
-    (sum, row) => sum + (row.discount_usd === null ? 0 : Number(row.discount_usd)),
+    (sum, row) => sum + (row.discount === null ? 0 : Number(row.discount)),
     0,
   );
-  const scaleUsd = scale ? Number(scale.amount_usd) : 0;
-  const expressUsd = expressAgg.total_usd === null ? 0 : Number(expressAgg.total_usd);
-  const expressFeeUsd = expressAgg.fee_usd === null ? 0 : Number(expressAgg.fee_usd);
+  const scaleUsd = scale ? Number(scale.amount) : 0;
+  const expressUsd = expressAgg.total === null ? 0 : Number(expressAgg.total);
+  const expressFeeUsd = expressAgg.fee === null ? 0 : Number(expressAgg.fee);
 
   return {
     period,
     invoiceId: invoice.id,
-    total: { amountUsd: Number(invoice.grand_total_usd), currency: "USD" },
-    diesel: { gallons: ta ? Number(ta.gallons) : 0, amountUsd: ta ? Number(ta.amount_usd) : 0, currency: "USD" },
-    def: { gallons: df ? Number(df.gallons) : 0, amountUsd: df ? Number(df.amount_usd) : 0, currency: "USD" },
+    total: { amountUsd: Number(invoice.grand_total), currency: "USD" },
+    diesel: { gallons: ta ? Number(ta.qty) : 0, amountUsd: ta ? Number(ta.amount) : 0, currency: "USD" },
+    def: { gallons: df ? Number(df.qty) : 0, amountUsd: df ? Number(df.amount) : 0, currency: "USD" },
     avgBilledUsdPerGal,
     discount: {
       totalUsd: Math.round(discountTotal * 100) / 100,
@@ -262,8 +262,8 @@ interface TrendRow {
 async function loadTrend(pool: Pool, period: string, limit: number): Promise<OverviewTrendPoint[]> {
   const { rows } = await pool.query<TrendRow>(
     `SELECT i.id AS invoice_id, i.period_start,
-            SUM(fsl.gallons) FILTER (WHERE fsl.product_code = 'TA') AS ta_gallons,
-            SUM(fsl.gallons * fsl.billed_usd_per_gal) FILTER (WHERE fsl.product_code = 'TA') AS weighted_num
+            SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA') AS ta_gallons,
+            SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA') AS weighted_num
      FROM invoices i
      LEFT JOIN fuel_stops fs ON fs.invoice_id = i.id
      LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
@@ -289,33 +289,33 @@ async function loadTrend(pool: Pool, period: string, limit: number): Promise<Ove
 interface TopSpendRow {
   driver_id: string | null;
   display_name: string | null;
-  total_usd: string;
+  total: string;
   ta_gallons: string | null;
   weighted_num: string | null;
 }
 
 /** Lines are folded into one row per stop *before* the group-by: summing
- * `fuel_stops.total_usd` straight across a join to `fuel_stop_lines` counts a
+ * `fuel_stops.total` straight across a join to `fuel_stop_lines` counts a
  * stop's total once per line, so a stop with a TA and a DF line was doubled. */
 async function loadTopSpendByDriver(pool: Pool, invoiceId: string, limit: number): Promise<OverviewTopSpendDriver[]> {
   const { rows } = await pool.query<TopSpendRow>(
     `WITH stop_agg AS (
-       SELECT fs.id, fs.driver_id, fs.total_usd,
-              SUM(fsl.gallons) FILTER (WHERE fsl.product_code = 'TA') AS ta_gallons,
-              SUM(fsl.gallons * fsl.billed_usd_per_gal) FILTER (WHERE fsl.product_code = 'TA') AS weighted_num
+       SELECT fs.id, fs.driver_id, fs.total,
+              SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA') AS ta_gallons,
+              SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA') AS weighted_num
        FROM fuel_stops fs
        LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
        WHERE fs.invoice_id = $1
        GROUP BY fs.id
      )
      SELECT s.driver_id, d.display_name,
-            SUM(s.total_usd) AS total_usd,
+            SUM(s.total) AS total,
             SUM(s.ta_gallons) AS ta_gallons,
             SUM(s.weighted_num) AS weighted_num
      FROM stop_agg s
      LEFT JOIN drivers d ON d.id = s.driver_id
      GROUP BY s.driver_id, d.display_name
-     ORDER BY total_usd DESC
+     ORDER BY total DESC
      LIMIT $2`,
     [invoiceId, limit],
   );
@@ -325,7 +325,7 @@ async function loadTopSpendByDriver(pool: Pool, invoiceId: string, limit: number
     return {
       driverId: row.driver_id,
       driverName: row.display_name,
-      totalUsd: Number(row.total_usd),
+      totalUsd: Number(row.total),
       gallons: taGallons,
       avgBilledUsdPerGal: taGallons > 0 ? Number(row.weighted_num) / taGallons : null,
     };
