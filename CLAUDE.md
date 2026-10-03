@@ -135,6 +135,14 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
 - The PDF's tables are drawn with fills, not ruled lines, so `pdf-parse`'s table extraction finds nothing. Rows are read off the text layer by anchoring on shapes that cannot collide and walking inward — see `parseInvoicePdf.ts`. It prints money with thousands separators; strip them at that boundary, never by loosening `toDecimalString`.
 - A station resolves on the invoice's `Site #` against `stations.site_ref` — the same identifier on both sides — falling back to the store number parsed from the name. This is not an exception to "store number comes from `NAME`, never `SITE`": `site_ref` is never treated as a store number.
 
+**Invoices: CA (T-61)**
+- BVD bills Canadian fuel on its **own invoice**, and `CUR` reads **`CN`** — not `CA`, not `CAD`. `US` → `USD`, `CN` → `CAD`; any other code is an `UNKNOWN_CURRENCY` row rejection, and two currencies in one file reject it whole (`MIXED_CURRENCY`). Never default a currency.
+- A CA invoice is **litres and CAD per litre**, and the billed price **includes 13% HST**: Pre Tax AMT + HST + GST + PST + QST = Final AMT exactly. The grand-total row's pre-tax and tax columns cover TA/TF/DF only — Scale, Manual and Express print a final amount alone, so on 999217 it is 41,356.89 + 5,376.44 + **Scale 104.00** = 46,837.33.
+- **QTY × Billed ≠ Final AMT to the cent** on most real lines, US or CA — BVD prints QTY at 2dp and prices at 4dp from unrounded figures. Reconcile it within the rounding bound (`withinRoundingBound` in `reconcile.ts`), never to the cent and never with a loose tolerance. Retail − Billed = Disc Rate *is* exact.
+- A CA invoice imports from the **PDF only** (`CA_CSV_UNVERIFIED`, D30). A CA site name carries no `#` ("BVD MISSISSAUGA - SHAWSON"); the PDF reader splits it from the city at the layout's tab.
+- Invoice quantities and money are stored **as printed** — `currency` and `qty_unit` on `invoices`, no `_usd` or gallon suffix on any invoice column (D25). A threshold in gallons (the sub-gallon rule) converts at the rule's input with `litersToGallons`; nothing converted is stored.
+- Until T-63, every period-scoped read filters `invoices.currency = 'USD'`, so a CA invoice cannot leak into a US screen.
+
 **Licensing and retention**
 - **Never store a provider geocode permanently.** 30-day cap. Station coordinates come only from an operator export (Love's, or BVD's own travel-centre directory for CA sites), OSM, or the Census gazetteer.
 - **Never store price data from the Love's export.** Location and amenity fields only (`StoreType`, `ParkingSpaces`, `DEFLanes`). Those are street prices, not contract prices. BVD's directory carries no prices at all, and its `operator_attrs` are the same kind of closed location/amenity set (§17.1).
@@ -162,6 +170,8 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
   4. **The map renderer**, for geometry MapLibre draws on the ground in metres — today only a city-tier stop's uncertainty circle. One function, `uncertaintyRadiusMeters()` in `frontend/src/map/layers.ts`, via `milesToMeters`; the metres are drawn and never stored, returned or passed on (T-22).
 
   A stray `metersToMiles` anywhere else is a bug. Recorded ORS fixtures and `providerRaw` stay metric — they are the provider's, as recorded.
+
+  **The one exception is invoice quantities and money (D25):** stored as BVD printed them — litres and CAD on a CA invoice — beside `invoices.qty_unit` and `currency`, and converted only at the API or at a gallon-denominated rule's input. Distances are untouched.
 - `backend/src/api/` stays **framework-free** — it mounts in one Next route file and is testable without a server.
 - Services take no argv and print nothing. CLIs do argv and stdout, and nothing else.
 - **Nulls are meaningful.** "No cap" on `maxStops` and `maxDetourMiles` must survive the round trip and must never become `0`.

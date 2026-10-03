@@ -30,8 +30,8 @@ const DUPLICATE_LINE_CSV = Buffer.from(
     "Fuel Card Transactions",
     "Transactions for Card # 1000001",
     "Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR",
-    "B900001-TA,DRIVER ONE,101,2026-01-05 10:00:00,90001,SAMPLE #1,SAMPLETON,TX,TA,25.00,5.5000,5.1234,128.09,0,0,0,0,0.375,9.42,128.09,US,",
-    "B900001-TA,DRIVER ONE,101,2026-01-05 10:00:00,90001,SAMPLE #1,SAMPLETON,TX,TA,25.00,5.5000,5.1234,128.08,0,0,0,0,0.375,9.41,128.08,US,",
+    "B900001-TA,DRIVER ONE,101,2026-01-05 10:00:00,90001,SAMPLE #1,SAMPLETON,TX,TA,25.00,5.5000,5.1234,128.09,0,0,0,0,0.3766,9.42,128.09,US,",
+    "B900001-TA,DRIVER ONE,101,2026-01-05 10:00:00,90001,SAMPLE #1,SAMPLETON,TX,TA,25.00,5.5000,5.1234,128.08,0,0,0,0,0.3766,9.41,128.08,US,",
     ",,,,,Transaction Subtotal,,,,50.00,,,256.17,0,0,0,0,,18.83,256.17,,",
     ",,,,,Card Subtotal,TA,,,50.00,,,256.17,0,0,0,0,0.375,18.83,256.17,US,",
     ",,,,,,Sub Total,,,,,,256.17,0,0,0,0,,18.83,256.17,US,",
@@ -94,8 +94,8 @@ describe.skipIf(!hasDatabase)("importInvoice (integration)", () => {
     expect(express.rows[0].count).toBe("2");
 
     const sum = await scopedPool.query(
-      `SELECT (SELECT COALESCE(SUM(amount_usd), 0) FROM fuel_stop_lines) +
-              (SELECT COALESCE(SUM(total_usd), 0) FROM express_charges) AS total`,
+      `SELECT (SELECT COALESCE(SUM(amount), 0) FROM fuel_stop_lines) +
+              (SELECT COALESCE(SUM(total), 0) FROM express_charges) AS total`,
     );
     expect(sum.rows[0].total).toBe("840.67");
   });

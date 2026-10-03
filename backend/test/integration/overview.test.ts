@@ -87,17 +87,17 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
   it("the weighted average diverges from a naive mean of per-line prices, proving the weighting", async () => {
     const result = await getOverview(scopedPool, "2026-09-03");
     const { rows } = await scopedPool.query<{ avg: string }>(
-      "SELECT AVG(billed_usd_per_gal) AS avg FROM fuel_stop_lines WHERE product_code = 'TA'",
+      "SELECT AVG(billed_per_unit) AS avg FROM fuel_stop_lines WHERE product_code = 'TA'",
     );
     const unweightedMean = Number(rows[0]!.avg);
     expect(result.kpis.avgBilledUsdPerGal).not.toBeCloseTo(unweightedMean, 2);
   });
 
   /**
-   * Discount is read straight off `invoice_totals.discount_usd` — BVD's own
+   * Discount is read straight off `invoice_totals.discount` — BVD's own
    * printed per-code "Disc AMT" from the invoice's Grand Totals section,
    * trusted as given (T-33 follow-up). Recomputing gallons × (retail −
-   * billed) from the 4dp `retail_usd_per_gal`/`billed_usd_per_gal` columns
+   * billed) from the 4dp `retail_per_unit`/`billed_per_unit` columns
    * does *not* reproduce this exactly — it drifts a few cents from BVD's own
    * internal rounding — which is exactly why this reads the printed figure
    * instead of deriving it.
@@ -210,8 +210,8 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
     }
 
     const { rows: invoiceRows } = await scopedPool.query<{ id: string }>(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, grand_total_usd, status, file_sha256)
-       VALUES ($1, $2::date, $2::date, $2::date, $2::date, $3, 'imported', $4)
+      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ($1, $2::date, $2::date, $2::date, $2::date, 'USD', 'gal', $3, 'imported', $4)
        RETURNING id`,
       [invoiceNumber, periodStart, taAmount.toFixed(2), sha256Hex(invoiceNumber)],
     );
@@ -256,7 +256,7 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
       }
 
       const { rows: stopRows } = await scopedPool.query<{ id: string }>(
-        `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, driver_id, unit_raw, driver_name_raw, total_usd)
+        `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, driver_id, unit_raw, driver_name_raw, total)
          VALUES ($1, $2, $3::date, $4, $5, '000', $6, $7)
          RETURNING id`,
         [invoiceId, `SYN-${stop.cardNumber}-${i}`, periodStart, cardId, driverId, stop.driverName, amountUsd],
@@ -265,14 +265,14 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
       stopIds.push(stopId);
 
       await scopedPool.query(
-        `INSERT INTO fuel_stop_lines (fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd)
+        `INSERT INTO fuel_stop_lines (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
          VALUES ($1, 'TA', $2, $3, $4, $5)`,
         [stopId, stop.gallons, stop.retail, stop.billed, amountUsd],
       );
     }
 
     await scopedPool.query(
-      "INSERT INTO invoice_totals (invoice_id, product_code, gallons, amount_usd) VALUES ($1, 'TA', $2, $3)",
+      "INSERT INTO invoice_totals (invoice_id, product_code, qty, amount) VALUES ($1, 'TA', $2, $3)",
       [invoiceId, taGallons.toFixed(2), taAmount.toFixed(2)],
     );
 

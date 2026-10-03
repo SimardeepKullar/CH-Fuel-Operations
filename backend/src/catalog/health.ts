@@ -116,6 +116,7 @@ async function loadLatestInvoicePeriod(pool: Pool): Promise<string | null> {
     `SELECT to_char(period_start, 'YYYY-MM-DD') AS period
      FROM invoices
      WHERE status = 'imported'
+       AND currency = 'USD' -- the US screens' default period; US invoices only until T-63's billing weeks (T-61).
      ORDER BY period_start DESC
      LIMIT 1`,
   );

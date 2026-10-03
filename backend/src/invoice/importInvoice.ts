@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
 import { runAnomalies } from "../anomaly/runAnomalies.js";
 import { getCardByNumber } from "../catalog/cards.js";
 import { getTruckByUnitNumber } from "../catalog/trucks.js";
@@ -194,6 +195,12 @@ async function resolveExpressChargeDrivers(
   return resolutions;
 }
 
+/** Quantity unit follows currency (D25): BVD bills Canadian fuel in litres
+ * and US fuel in gallons — measured on 999217 and 999210, one each. */
+export function qtyUnitFor(currency: InvoiceCurrency): InvoiceQtyUnit {
+  return currency === "CAD" ? "L" : "gal";
+}
+
 async function insertInvoiceRow(
   client: PoolClient,
   parsed: ParsedInvoice,
@@ -203,8 +210,8 @@ async function insertInvoiceRow(
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO invoices
        (invoice_number, period_start, period_end, invoice_date, due_date,
-        grand_total_usd, status, file_sha256)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
       parsed.header.invoiceNumber,
@@ -212,7 +219,9 @@ async function insertInvoiceRow(
       parsed.header.periodEnd,
       parsed.header.invoiceDate,
       parsed.header.dueDate,
-      parsed.printedTotals.grandTotalUsd,
+      parsed.header.currency,
+      qtyUnitFor(parsed.header.currency),
+      parsed.printedTotals.grandTotal,
       status,
       fileSha256,
     ],
@@ -240,9 +249,13 @@ async function insertInvoiceTotals(
       continue; // no printed figure for this code — nothing to record
     }
     await client.query(
-      `INSERT INTO invoice_totals (invoice_id, product_code, gallons, amount_usd, discount_usd)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [invoiceId, rawCode, printedRow.gallons ?? "0.00", printedRow.amountUsd, printedRow.discountUsd],
+      `INSERT INTO invoice_totals
+         (invoice_id, product_code, qty, amount, discount, pre_tax_amount, hst, gst, pst, qst)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        invoiceId, rawCode, printedRow.qty ?? "0.00", printedRow.amount, printedRow.discount,
+        printedRow.preTaxAmount, printedRow.hst, printedRow.gst, printedRow.pst, printedRow.qst,
+      ],
     );
   }
 }
@@ -257,7 +270,7 @@ async function insertFuelStop(
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO fuel_stops
        (invoice_id, base_auth_code, occurred_at, card_id, truck_id, driver_id,
-        unit_raw, driver_name_raw, station_id, total_usd)
+        unit_raw, driver_name_raw, station_id, total)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
@@ -270,7 +283,7 @@ async function insertFuelStop(
       group.unitRaw,
       group.driverNameRaw,
       resolution.stationId,
-      group.totalUsd,
+      group.total,
     ],
   );
   const fuelStopId = rows[0]?.id;
@@ -280,9 +293,13 @@ async function insertFuelStop(
   for (const line of group.lines) {
     await client.query(
       `INSERT INTO fuel_stop_lines
-         (fuel_stop_id, product_code, gallons, retail_usd_per_gal, billed_usd_per_gal, amount_usd)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [fuelStopId, line.rawProductCode, line.gallons, line.retailUsdPerGal, line.billedUsdPerGal, line.amountUsd],
+         (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount,
+          pre_tax_amount, hst, gst, pst, qst)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        fuelStopId, line.rawProductCode, line.qty, line.retailPerUnit, line.billedPerUnit, line.amount,
+        line.preTaxAmount, line.hst, line.gst, line.pst, line.qst,
+      ],
     );
   }
 }
@@ -297,7 +314,7 @@ async function insertExpressCharge(
   await client.query(
     `INSERT INTO express_charges
        (invoice_id, express_code, occurred_at, truck_id, unit_raw,
-        driver_id, driver_name_raw, amount_usd, fee_usd, total_usd, payee, note,
+        driver_id, driver_name_raw, amount, fee, total, payee, note,
         category, match_status, trailer_raw, cdl_raw, trip_number_raw)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [
@@ -308,9 +325,9 @@ async function insertExpressCharge(
       row.unitRaw,
       driverResolution.driverId,
       row.driverNameRaw,
-      row.amountUsd,
-      row.feeUsd,
-      row.totalUsd,
+      row.amount,
+      row.fee,
+      row.total,
       row.payee,
       row.note,
       row.category,
@@ -405,7 +422,8 @@ export async function importInvoice(
     fileSha256,
     periodStart: parsed.header.periodStart,
     periodEnd: parsed.header.periodEnd,
-    grandTotalUsd: parsed.printedTotals.grandTotalUsd,
+    currency: parsed.header.currency,
+    grandTotalUsd: parsed.printedTotals.grandTotal,
     productTotals: parsed.printedTotals.products,
     parserRejections: parsed.rejections,
     reconcileResult,

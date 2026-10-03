@@ -340,7 +340,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /stations/{id}/billed-pric
   it("the day rows reconcile with the stored lines: Σ stopCount and Σ gallons match SQL over this station's diesel", async () => {
     const { days } = await getPrices();
     const { rows } = await scopedPool.query<{ stops: string; gallons: string }>(
-      `SELECT count(DISTINCT fs.id) AS stops, SUM(fsl.gallons) AS gallons
+      `SELECT count(DISTINCT fs.id) AS stops, SUM(fsl.qty) AS gallons
        FROM fuel_stops fs JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id AND fsl.product_code = 'TA'
        WHERE fs.station_id = $1`,
       [stationId],

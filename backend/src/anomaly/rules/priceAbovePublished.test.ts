@@ -12,7 +12,7 @@ const CONFIG: PriceAbovePublishedConfig = { maxOverageUsdPerGal: "0.10", fuelPro
 describe("priceAbovePublished", () => {
   it("reports not_computable — never 'no anomaly' — when no published price file exists for the date (999210)", () => {
     const stops: PriceAbovePublishedStop[] = [
-      { id: "stop-jan11", stationId: "station-1", occurredOn: "2026-01-11", billedUsdPerGal: "5.2395" },
+      { id: "stop-jan11", stationId: "station-1", occurredOn: "2026-01-11", billedUsdPerGal: "5.2395", currency: "USD" },
     ];
 
     const results = priceAbovePublished(stops, new Map(), CONFIG);
@@ -28,7 +28,7 @@ describe("priceAbovePublished", () => {
 
   it("reports not_computable when the station itself never resolved", () => {
     const stops: PriceAbovePublishedStop[] = [
-      { id: "stop-unresolved", stationId: null, occurredOn: "2026-09-04", billedUsdPerGal: "5.2395" },
+      { id: "stop-unresolved", stationId: null, occurredOn: "2026-09-04", billedUsdPerGal: "5.2395", currency: "USD" },
     ];
 
     expect(priceAbovePublished(stops, new Map(), CONFIG)).toEqual([
@@ -38,7 +38,7 @@ describe("priceAbovePublished", () => {
 
   it("flags a billed price materially above the published price", () => {
     const stops: PriceAbovePublishedStop[] = [
-      { id: "stop-over", stationId: "station-1", occurredOn: "2026-09-04", billedUsdPerGal: "5.5000" },
+      { id: "stop-over", stationId: "station-1", occurredOn: "2026-09-04", billedUsdPerGal: "5.5000", currency: "USD" },
     ];
     const published = new Map([[publishedPriceKey("station-1", "2026-09-04"), "5.2000"]]);
 
@@ -67,7 +67,7 @@ describe("priceAbovePublished", () => {
 
   it("clears (no result) when billed matches the published price within tolerance", () => {
     const stops: PriceAbovePublishedStop[] = [
-      { id: "stop-ok", stationId: "station-1", occurredOn: "2026-09-04", billedUsdPerGal: "5.2050" },
+      { id: "stop-ok", stationId: "station-1", occurredOn: "2026-09-04", billedUsdPerGal: "5.2050", currency: "USD" },
     ];
     const published = new Map([[publishedPriceKey("station-1", "2026-09-04"), "5.2000"]]);
 
@@ -76,7 +76,7 @@ describe("priceAbovePublished", () => {
 
   it("skips a stop with no diesel line rather than reporting it not_computable", () => {
     const stops: PriceAbovePublishedStop[] = [
-      { id: "stop-scale-only", stationId: "station-1", occurredOn: "2026-09-04", billedUsdPerGal: null },
+      { id: "stop-scale-only", stationId: "station-1", occurredOn: "2026-09-04", billedUsdPerGal: null, currency: "USD" },
     ];
 
     expect(priceAbovePublished(stops, new Map(), CONFIG)).toEqual([]);
@@ -86,5 +86,19 @@ describe("priceAbovePublished", () => {
     expect(
       toAnomalyFinding({ status: "not_computable", subjectId: "x", reason: "no data" }),
     ).toBeNull();
+  });
+});
+
+describe("priceAbovePublished — a CA stop (T-61)", () => {
+  it("reports a CAD stop as not computable — there is no Canadian published price — and never compares it", () => {
+    const published = new Map([[publishedPriceKey("station-ca", "2026-09-04"), "1.0000"]]);
+    const results = priceAbovePublished(
+      [{ id: "stop-ca", stationId: "station-ca", occurredOn: "2026-09-04", billedUsdPerGal: "2.2427", currency: "CAD" }],
+      published,
+      { maxOverageUsdPerGal: "0.10", fuelProductCode: "TA" },
+    );
+    expect(results).toEqual([
+      { status: "not_computable", subjectId: "stop-ca", reason: "no published price exists for a Canadian stop" },
+    ]);
   });
 });

@@ -138,10 +138,10 @@ describe.skipIf(!hasDatabase)("backfillInvoiceFiles (integration)", () => {
 
       const normalize = async (pool: Pool) => {
         const invoices = await pool.query(
-          "SELECT invoice_number, status, grand_total_usd FROM invoices ORDER BY invoice_number",
+          "SELECT invoice_number, status, grand_total FROM invoices ORDER BY invoice_number",
         );
         const stops = await pool.query(
-          `SELECT i.invoice_number, fs.base_auth_code, fs.total_usd
+          `SELECT i.invoice_number, fs.base_auth_code, fs.total
              FROM fuel_stops fs JOIN invoices i ON i.id = fs.invoice_id
             ORDER BY i.invoice_number, fs.base_auth_code`,
         );

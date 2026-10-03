@@ -36,7 +36,8 @@ interface InvoiceRow {
 
 async function loadInvoice(pool: Pool, period: string): Promise<InvoiceRow | null> {
   const { rows } = await pool.query<InvoiceRow>(
-    `SELECT id, period_start::text, period_end::text FROM invoices WHERE period_start = $1::date`,
+    // Plans are US-only, so Plan vs Actual reads US invoices only (T-61, T-63).
+    `SELECT id, period_start::text, period_end::text FROM invoices WHERE period_start = $1::date AND currency = 'USD'`,
     [period],
   );
   return rows[0] ?? null;
@@ -85,20 +86,20 @@ interface FuelStopSourceRow {
   station_id: string | null;
   truck_id: string | null;
   diesel_gallons: string | null;
-  diesel_amount_usd: string | null;
+  diesel_amount: string | null;
 }
 
 /**
  * Every fuel stop on the invoice, diesel-only gallons/amount aggregated per
- * stop (never `fuel_stops.total_usd`, which is DEF-inclusive — CLAUDE.md). A
+ * stop (never `fuel_stops.total`, which is DEF-inclusive — CLAUDE.md). A
  * stop with no diesel line (e.g. DEF-only) has `null` aggregates and is
  * dropped before matching — it has nothing for `delta_usd` to compare.
  */
 async function loadFuelStops(pool: Pool, invoiceId: string): Promise<FuelStopForMatch[]> {
   const { rows } = await pool.query<FuelStopSourceRow>(
     `SELECT fs.id AS fuel_stop_id, fs.occurred_at, fs.station_id, fs.truck_id,
-            SUM(fsl.gallons) FILTER (WHERE fsl.product_code = 'TA') AS diesel_gallons,
-            SUM(fsl.gallons * fsl.billed_usd_per_gal) FILTER (WHERE fsl.product_code = 'TA') AS diesel_amount_usd
+            SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA') AS diesel_gallons,
+            SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA') AS diesel_amount
        FROM fuel_stops fs
        LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
       WHERE fs.invoice_id = $1
@@ -115,7 +116,7 @@ async function loadFuelStops(pool: Pool, invoiceId: string): Promise<FuelStopFor
       stationId: r.station_id,
       truckId: r.truck_id,
       dieselGallons: gallons,
-      billedUsdPerGal: Number(r.diesel_amount_usd) / gallons,
+      billedUsdPerGal: Number(r.diesel_amount) / gallons,
       // T-38 leaves split-fill detection caller-supplied (match.ts) rather
       // than guessing a timing heuristic; the live endpoint reports none
       // today. Left as a documented, deliberate scope cut, not a bug — see

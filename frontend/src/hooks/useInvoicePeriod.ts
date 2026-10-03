@@ -74,8 +74,10 @@ export function useInvoicePeriod(): UseInvoicePeriodResult {
       .then(([health, invoices]) => {
         if (cancelled) return;
         setDefaultPeriod(health.latestInvoicePeriod);
+        // US invoices only until T-63 pairs US and CA invoices into
+        // billing weeks: the period-scoped endpoints read USD alone (T-61).
         const imported = invoices.rows
-          .filter((row) => row.status === "imported")
+          .filter((row) => row.status === "imported" && row.currency === "USD")
           .sort((a, b) => b.periodStart.localeCompare(a.periodStart));
         setOptions(imported.map(toOption));
       })

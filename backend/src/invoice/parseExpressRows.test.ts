@@ -42,16 +42,16 @@ describe("parseExpressRows — pdf layout", () => {
     expect(rows.find((r) => r.expressCode === "9000001")).toMatchObject({
       unitRaw: "101",
       driverNameRaw: "SAMPLE DRIVER",
-      amountUsd: "50.00",
-      feeUsd: "3.00",
-      totalUsd: "53.00",
+      amount: "50.00",
+      fee: "3.00",
+      total: "53.00",
       payee: "lumper",
     });
 
     expect(rows.find((r) => r.expressCode === "9000002")).toMatchObject({
       unitRaw: "102",
       driverNameRaw: null,
-      totalUsd: "78.00",
+      total: "78.00",
     });
   });
 
@@ -61,7 +61,7 @@ describe("parseExpressRows — pdf layout", () => {
   });
 
   it("asserts the flat $3.00 fee on every row", () => {
-    expect(parseExpressRows(PDF_ROWS, "pdf").every((r) => r.feeUsd === "3.00")).toBe(true);
+    expect(parseExpressRows(PDF_ROWS, "pdf").every((r) => r.fee === "3.00")).toBe(true);
   });
 
   it("fails loudly on a fee that is not $3.00, rather than passing it through", () => {
@@ -73,7 +73,7 @@ describe("parseExpressRows — pdf layout", () => {
 
   it("sums the sample's express amounts as expected", () => {
     const rows = parseExpressRows(PDF_ROWS, "pdf");
-    const totalCents = rows.reduce((sum, r) => sum + Math.round(Number(r.totalUsd) * 100), 0);
+    const totalCents = rows.reduce((sum, r) => sum + Math.round(Number(r.total) * 100), 0);
     expect(totalCents).toBe(17400); // 53.00 + 78.00 + 43.00
   });
 
@@ -91,9 +91,9 @@ describe("parseExpressRows — csv layout", () => {
     expect(rows[0]).toMatchObject({
       expressCode: "9000001",
       authCodeRef: "E1000001",
-      amountUsd: "50.00",
-      feeUsd: "3.00",
-      totalUsd: "53.00",
+      amount: "50.00",
+      fee: "3.00",
+      total: "53.00",
       payee: "lumper",
     });
   });
@@ -111,8 +111,8 @@ describe("parseExpressRows — csv layout", () => {
     const fromCsv = parseExpressRows(CSV_ROWS, "csv");
     for (const csvRow of fromCsv) {
       const pdfRow = fromPdf.find((r) => r.expressCode === csvRow.expressCode)!;
-      expect(csvRow.amountUsd).toBe(pdfRow.amountUsd);
-      expect(csvRow.totalUsd).toBe(pdfRow.totalUsd);
+      expect(csvRow.amount).toBe(pdfRow.amount);
+      expect(csvRow.total).toBe(pdfRow.total);
       expect(csvRow.authCodeRef).toBe(pdfRow.authCodeRef);
     }
   });

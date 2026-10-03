@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { z } from "zod";
+import type { InvoiceCurrency } from "../../db/types.js";
 import { detectInvoiceFormat } from "../../invoice/detectFormat.js";
 import { importInvoice, type ImportInvoiceMeta, type ImportInvoiceResult } from "../../invoice/importInvoice.js";
 import { parseInvoicePdf } from "../../invoice/parseInvoicePdf.js";
@@ -108,7 +109,8 @@ interface InvoiceListRow {
   invoice_number: string;
   period_start: Date;
   period_end: Date;
-  grand_total_usd: string;
+  currency: InvoiceCurrency;
+  grand_total: string;
   status: "imported" | "quarantined";
   imported_at: Date;
 }
@@ -118,6 +120,9 @@ export interface InvoiceListItem {
   invoiceNumber: string;
   periodStart: string;
   periodEnd: string;
+  /** The invoice's currency (D24); `grandTotalUsd` is in it, whatever its
+   * name, until T-63 reshapes the contract. */
+  currency: InvoiceCurrency;
   grandTotalUsd: number;
   status: "imported" | "quarantined";
   importedAt: string;
@@ -136,7 +141,8 @@ function toListItem(row: InvoiceListRow): InvoiceListItem {
     invoiceNumber: row.invoice_number,
     periodStart: row.period_start.toISOString().slice(0, 10),
     periodEnd: row.period_end.toISOString().slice(0, 10),
-    grandTotalUsd: Number(row.grand_total_usd),
+    currency: row.currency,
+    grandTotalUsd: Number(row.grand_total),
     status: row.status,
     importedAt: row.imported_at.toISOString(),
   };
@@ -160,7 +166,7 @@ export async function handleListInvoices(pool: Pool, url: URL): Promise<Response
   const { page, pageSize } = parsed.data;
 
   const { rows } = await pool.query<InvoiceListRow>(
-    `SELECT id, invoice_number, period_start, period_end, grand_total_usd, status, imported_at
+    `SELECT id, invoice_number, period_start, period_end, currency, grand_total, status, imported_at
      FROM invoices
      ORDER BY imported_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
@@ -205,7 +211,7 @@ export interface InvoiceDetail extends InvoiceListItem {
  */
 export async function handleGetInvoice(pool: Pool, id: string, url: URL): Promise<Response> {
   const { rows } = await pool.query<InvoiceListRow>(
-    `SELECT id, invoice_number, period_start, period_end, grand_total_usd, status, imported_at
+    `SELECT id, invoice_number, period_start, period_end, currency, grand_total, status, imported_at
      FROM invoices
      WHERE id = $1`,
     [id],

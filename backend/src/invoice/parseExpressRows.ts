@@ -1,3 +1,5 @@
+import type { InvoiceCurrency } from "../db/types.js";
+import { currencyFromCode } from "./currency.js";
 import { DecimalFormatError, toDecimalString } from "./decimal.js";
 
 export class ExpressRowFormatError extends Error {
@@ -30,9 +32,10 @@ interface ColumnMap {
   driverNameRaw: number | null;
   cdlRaw: number | null;
   tripNumberRaw: number | null;
-  amountUsd: number;
-  feeUsd: number;
-  totalUsd: number;
+  amount: number;
+  fee: number;
+  total: number;
+  currency: number;
   payee: number;
   note: number;
 }
@@ -41,12 +44,12 @@ const COLUMNS: Record<ExpressLayout, ColumnMap> = {
   pdf: {
     occurredAt: 0, expressCode: 1, authCodeRef: 2,
     unitRaw: 3, trailerRaw: 4, driverNameRaw: 5, cdlRaw: 6, tripNumberRaw: 7,
-    amountUsd: 8, feeUsd: 9, totalUsd: 10, payee: 12, note: 13,
+    amount: 8, fee: 9, total: 10, currency: 11, payee: 12, note: 13,
   },
   csv: {
     occurredAt: 0, expressCode: 1, authCodeRef: 2,
     unitRaw: null, trailerRaw: null, driverNameRaw: null, cdlRaw: null, tripNumberRaw: null,
-    amountUsd: 3, feeUsd: 4, totalUsd: 5, payee: 7, note: 8,
+    amount: 3, fee: 4, total: 5, currency: 6, payee: 7, note: 8,
   },
 };
 
@@ -71,9 +74,11 @@ export interface ExpressRow {
   driverNameRaw: string | null;
   cdlRaw: string | null;
   tripNumberRaw: string | null;
-  amountUsd: string;
-  feeUsd: string;
-  totalUsd: string;
+  /** Money columns in the row's own currency, as printed (D25). */
+  amount: string;
+  fee: string;
+  total: string;
+  currency: InvoiceCurrency;
   payee: string | null;
   note: string | null;
   /** Not present as a distinct column on any BVD export seen so far — always
@@ -86,7 +91,7 @@ export interface RawExpressRow {
   lineNumber: number;
 }
 
-const EXPECTED_FEE_USD = "3.00";
+const EXPECTED_FEE = "3.00";
 const TIMESTAMP_PATTERN = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/;
 
 function normaliseTimestamp(raw: string, lineNumber: number): string {
@@ -134,13 +139,18 @@ export function parseExpressRows(
 
   return rows.map(({ record, lineNumber }) => {
     const occurredAt = normaliseTimestamp(record[columns.occurredAt] ?? "", lineNumber);
-    const amountUsd = decimalField(record[columns.amountUsd], lineNumber, "amount");
-    const feeUsd = decimalField(record[columns.feeUsd], lineNumber, "fee");
-    const totalUsd = decimalField(record[columns.totalUsd], lineNumber, "total");
+    const amount = decimalField(record[columns.amount], lineNumber, "amount");
+    const fee = decimalField(record[columns.fee], lineNumber, "fee");
+    const total = decimalField(record[columns.total], lineNumber, "total");
+    const rawCurrency = (record[columns.currency] ?? "").trim();
+    const currency = currencyFromCode(rawCurrency);
+    if (!currency) {
+      throw new ExpressRowFormatError(`line ${lineNumber}: unknown currency code: "${rawCurrency}"`);
+    }
 
-    if (feeUsd !== EXPECTED_FEE_USD) {
+    if (fee !== EXPECTED_FEE) {
       throw new ExpressRowFormatError(
-        `line ${lineNumber}: express fee ${feeUsd} != flat fee ${EXPECTED_FEE_USD}`,
+        `line ${lineNumber}: express fee ${fee} != flat fee ${EXPECTED_FEE}`,
       );
     }
 
@@ -154,9 +164,10 @@ export function parseExpressRows(
       driverNameRaw: optionalColumn(record, columns.driverNameRaw),
       cdlRaw: optionalColumn(record, columns.cdlRaw),
       tripNumberRaw: optionalColumn(record, columns.tripNumberRaw),
-      amountUsd,
-      feeUsd,
-      totalUsd,
+      amount,
+      fee,
+      total,
+      currency,
       payee: blankToNull(record[columns.payee]),
       note: blankToNull(record[columns.note]),
       category: null,

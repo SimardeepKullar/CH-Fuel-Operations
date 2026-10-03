@@ -51,6 +51,19 @@ export function toCents(usd: string): number {
   return negative ? -cents : cents;
 }
 
+/**
+ * A decimal-safe 4dp price string ("2.2427") to integer ten-thousandths
+ * (22427) — the price-side counterpart of `toCents`, for exact arithmetic
+ * on per-unit prices and discount rates.
+ */
+export function toTenThousandths(value: string): number {
+  const negative = value.startsWith("-");
+  const unsigned = negative ? value.slice(1) : value;
+  const [whole = "0", frac = "0"] = unsigned.split(".");
+  const units = Number(whole) * 10_000 + Number(frac.padEnd(4, "0").slice(0, 4));
+  return negative ? -units : units;
+}
+
 /** The inverse of `toCents` — integer cents back to a 2dp dollar string. */
 export function fromCents(cents: number): string {
   const negative = cents < 0;

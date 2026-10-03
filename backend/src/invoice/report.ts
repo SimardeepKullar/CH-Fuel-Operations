@@ -1,3 +1,4 @@
+import type { InvoiceCurrency } from "../db/types.js";
 import type { InvoiceLineRejectionCode, PrintedProductTotal } from "./parseInvoiceCsv.js";
 import type { CentsDelta, ReconcileResult } from "./reconcile.js";
 import type { FuelStopGroup } from "./groupByAuthCode.js";
@@ -8,6 +9,12 @@ export type ImportRejectionCode =
   | "AMOUNT_IMBALANCE"
   | "GALLONS_IMBALANCE"
   | "GRAND_TOTAL_IMBALANCE"
+  /** A line's own columns disagree — tax identity, Retail − Billed = Disc
+   * Rate, or QTY × price outside the rounding bound (T-61). */
+  | "LINE_IMBALANCE"
+  /** A printed totals row's tax identity, or the grand-total row's pre-tax
+   * or tax column against the product rows (T-61). */
+  | "TOTALS_TAX_IMBALANCE"
   | "UNKNOWN_CARD"
   | "UNKNOWN_TRUCK_UNIT";
 
@@ -18,6 +25,19 @@ export interface NormalizedRejection {
   message: string;
 }
 
+/**
+ * One printed per-code row as the import preview's API contract names it.
+ * The parser's `PrintedProductTotal` is currency- and unit-neutral (T-61);
+ * this keeps the response's existing field names until T-63 reshapes the
+ * contract — `currency` on the report says what the figures are in.
+ */
+export interface ReportProductTotal {
+  productCode: string;
+  gallons: string | null;
+  amountUsd: string;
+  discountUsd: string | null;
+}
+
 export interface ImportReport {
   invoiceNumber: string;
   fileSha256: string;
@@ -25,6 +45,9 @@ export interface ImportReport {
    * gap report's covered set unions these, never the imported_at clock. */
   periodStart: string;
   periodEnd: string;
+  /** The invoice's currency (D24). Every money figure in this report is in
+   * it, whatever its field is named until T-63. */
+  currency: InvoiceCurrency;
   grandTotalUsd: string;
   /** The invoice's own printed per-product-code rows (T-42's import preview:
    * "TA + DF + S + Express = $50,929.71") — `parsed.printedTotals.products`
@@ -33,7 +56,7 @@ export interface ImportReport {
    * not; on the happy path `reconcile`'s imbalance lists are empty, so this
    * is the only place the per-code figures a "reconciliation passed" screen
    * needs to show are available at all. */
-  productTotals: PrintedProductTotal[];
+  productTotals: ReportProductTotal[];
   reconcile: ReconcileResult;
   parserRejectionCount: number;
   unknownCardNumbers: string[];
@@ -64,6 +87,7 @@ export interface BuildImportReportInput {
   fileSha256: string;
   periodStart: string;
   periodEnd: string;
+  currency: InvoiceCurrency;
   grandTotalUsd: string;
   productTotals: readonly PrintedProductTotal[];
   parserRejections: ReadonlyArray<{
@@ -127,6 +151,18 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
     ),
   ];
 
+  for (const l of reconcileResult.lineImbalances) {
+    rejections.push({ lineNumber: l.lineNumber, authCode: l.authCode, code: "LINE_IMBALANCE", message: `${l.check}: ${l.message}` });
+  }
+  for (const t of reconcileResult.totalsImbalances) {
+    rejections.push({
+      lineNumber: 0,
+      authCode: null,
+      code: "TOTALS_TAX_IMBALANCE",
+      message: `${t.productCode} ${t.check}: expected ${t.expectedCents} cents, printed ${t.printedCents} cents`,
+    });
+  }
+
   if (reconcileResult.grandTotal.deltaCents !== 0) {
     rejections.push({
       lineNumber: 0,
@@ -143,8 +179,14 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
     fileSha256: input.fileSha256,
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
+    currency: input.currency,
     grandTotalUsd: input.grandTotalUsd,
-    productTotals: [...input.productTotals],
+    productTotals: input.productTotals.map((p) => ({
+      productCode: p.productCode,
+      gallons: p.qty,
+      amountUsd: p.amount,
+      discountUsd: p.discount,
+    })),
     reconcile: reconcileResult,
     parserRejectionCount: input.parserRejections.length,
     unknownCardNumbers: cardMisses.map((g) => g.cardNumber),

@@ -36,7 +36,8 @@ interface TruckRosterRow {
 
 async function loadInvoice(pool: Pool, period: string): Promise<{ id: string; periodEnd: string } | null> {
   const { rows } = await pool.query<{ id: string; period_end: string }>(
-    "SELECT id, to_char(period_end, 'YYYY-MM-DD') AS period_end FROM invoices WHERE period_start = $1::date",
+    // US invoices only until T-63's billing weeks (T-61).
+    "SELECT id, to_char(period_end, 'YYYY-MM-DD') AS period_end FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
     [period],
   );
   const row = rows[0];

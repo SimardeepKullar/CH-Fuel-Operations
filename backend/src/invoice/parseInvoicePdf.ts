@@ -18,6 +18,9 @@ const TIME = /^\d{2}:\d{2}:\d{2}$/;
 const NUMERIC = /^-?[\d,]+\.?\d*$/;
 const FUEL_AUTH = /^[A-Z]\d+-[A-Z]{1,2}$/;
 const EXPRESS_AUTH = /^E\d+$/;
+/** A CUR cell's shape: `US`, `CN` — or a code the core will quarantine as
+ * UNKNOWN_CURRENCY rather than this reader guessing at it (T-61). */
+const CURRENCY_CODE = /^[A-Z]{2}$/;
 
 /** The 11 numeric columns closing a fuel line: QTY, Retail, Billed, Pre Tax
  * AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT. */
@@ -42,6 +45,13 @@ function stripGrouping(value: string): string {
  * currency code, a fixed count of numerics, a timestamp) and walking inward,
  * which also absorbs the multi-word driver names and city names that make a
  * naive split ambiguous.
+ *
+ * Site name and city are the one boundary no token shape marks. A US site
+ * name carries the store number ("LOVES #368"), so the `#` token ends it. A
+ * CA site name has none ("BVD MISSISSAUGA - SHAWSON", then "MISSISSAUGA"),
+ * but the layout gap after it is always wide enough to extract as a tab —
+ * on all 60 rows of the real CA invoice — so there the raw line's tab ends
+ * it instead.
  */
 interface FuelLineCells {
   authCode: string;
@@ -54,11 +64,37 @@ interface FuelLineCells {
   state: string;
   prod: string;
   numerics: string[];
+  /** The CUR cell as printed; mapped (or rejected) by the shared core. */
+  currency: string;
 }
 
-function readFuelLine(tokens: readonly string[]): FuelLineCells | null {
+/** Splits the site-name-and-city words of a `#`-less site name at the first
+ * tab after the site number, in the raw line. Null when there is no tab to
+ * split on — the row is then unparseable rather than guessed at. */
+function splitAtTab(rawLine: string, siteRef: string, words: readonly string[]): { siteName: string[]; city: string[] } | null {
+  const segments = rawLine.split("\t").map((seg) => tokenize(seg));
+  // The segment holding the site number, then the site name's words after
+  // it; the site number may close one segment or open the next.
+  for (let s = 0; s < segments.length; s++) {
+    const at = segments[s]!.lastIndexOf(siteRef);
+    if (at === -1) continue;
+    const rest = segments[s]!.slice(at + 1);
+    const nameWords = rest.length > 0 ? rest : (segments[s + 1] ?? []);
+    if (nameWords.length === 0 || nameWords.length >= words.length) {
+      return null;
+    }
+    if (!nameWords.every((w, k) => w === words[k])) {
+      return null;
+    }
+    return { siteName: [...nameWords], city: words.slice(nameWords.length) };
+  }
+  return null;
+}
+
+function readFuelLine(tokens: readonly string[], rawLine: string): FuelLineCells | null {
   let i = tokens.length - 1;
-  if ((tokens[i] ?? "").toUpperCase() !== "US") {
+  const currency = (tokens[i] ?? "").toUpperCase();
+  if (!CURRENCY_CODE.test(currency)) {
     return null;
   }
   i--;
@@ -78,30 +114,44 @@ function readFuelLine(tokens: readonly string[]): FuelLineCells | null {
     return null;
   }
 
-  // City is one or more words; the site name is the token carrying "#" plus
-  // the brand word ahead of it.
-  const cityWords: string[] = [];
-  while (i >= 0 && !tokens[i]!.includes("#")) {
-    cityWords.unshift(tokens[i]!);
-    i--;
-  }
-  const siteNameWords: string[] = [];
-  if (i >= 0) {
-    siteNameWords.unshift(tokens[i]!);
-    i--;
-  }
-  if (i >= 0 && !NUMERIC.test(tokens[i]!)) {
-    siteNameWords.unshift(tokens[i]!);
-    i--;
-  }
-
-  const siteRef = tokens[i--] ?? "";
-  const time = tokens[i--] ?? "";
-  const date = tokens[i--] ?? "";
-  if (!DATE.test(date) || !TIME.test(time)) {
+  // Everything between the timestamp's site number and the state is site
+  // name then city. Locate the timestamp from the left: no driver name,
+  // unit or auth code looks like a date.
+  const dateIndex = tokens.findIndex((t, k) => k > 0 && DATE.test(t));
+  if (dateIndex === -1 || dateIndex + 2 > i) {
     return null;
   }
+  const date = tokens[dateIndex]!;
+  const time = tokens[dateIndex + 1] ?? "";
+  const siteRef = tokens[dateIndex + 2] ?? "";
+  if (!TIME.test(time)) {
+    return null;
+  }
+  const middle = tokens.slice(dateIndex + 3, i + 1);
 
+  let siteNameWords: string[];
+  let cityWords: string[];
+  const hashIndex = middle.findLastIndex((t) => t.includes("#"));
+  if (hashIndex !== -1) {
+    // US: the site name is the token carrying "#" plus the brand word ahead
+    // of it; the city is every word after.
+    const start = hashIndex > 0 && !NUMERIC.test(middle[hashIndex - 1]!) ? hashIndex - 1 : hashIndex;
+    siteNameWords = middle.slice(start, hashIndex + 1);
+    cityWords = middle.slice(hashIndex + 1);
+  } else {
+    const split = splitAtTab(rawLine, siteRef, middle);
+    if (!split) {
+      return null;
+    }
+    siteNameWords = split.siteName;
+    cityWords = split.city;
+  }
+  if (cityWords.length === 0) {
+    return null;
+  }
+  i = dateIndex;
+
+  i--;
   const unit = tokens[i--] ?? "";
   const authCode = tokens[0] ?? "";
   const driverName = tokens.slice(1, i + 1).join(" ");
@@ -120,6 +170,7 @@ function readFuelLine(tokens: readonly string[]): FuelLineCells | null {
     state,
     prod,
     numerics: numerics.map(stripGrouping),
+    currency,
   };
 }
 
@@ -148,7 +199,8 @@ function toTotalsRecord(tokens: readonly string[]): string[] | null {
     return null;
   }
 
-  const currency = values[values.length - 1] === "US" ? "US" : "";
+  const last = values[values.length - 1] ?? "";
+  const currency = CURRENCY_CODE.test(last) ? last : "";
   const figures = (currency ? values.slice(0, -1) : values).map(stripGrouping);
 
   // QTY through FINAL AMOUNT — nine figures between the label and CUR.
@@ -176,8 +228,8 @@ function toTotalsRecord(tokens: readonly string[]): string[] | null {
  * ("lumper fees"), so word boundaries cannot separate them — but they are
  * distinct columns, so the layout gap can. Read from the raw line, splitting
  * only on tabs, rather than from the whitespace tokens. */
-function readTrailingText(rawLine: string): { payee: string; note: string } {
-  const separator = /(?:^|[\t ])US(?=[\t ]|$)/g;
+function readTrailingText(rawLine: string, currency: string): { payee: string; note: string } {
+  const separator = new RegExp(`(?:^|[\\t ])${currency}(?=[\\t ]|$)`, "g");
   let lastEnd = -1;
   for (let m = separator.exec(rawLine); m !== null; m = separator.exec(rawLine)) {
     lastEnd = m.index + m[0].length;
@@ -207,17 +259,19 @@ function readExpressLine(tokens: readonly string[], rawLine: string): string[] |
   const authCodeRef = tokens[authIndex]!;
 
   const rest = tokens.slice(authIndex + 1);
-  const curIndex = rest.findIndex((t) => t.toUpperCase() === "US");
-  if (curIndex < 3) {
+  // CUR is the first two-letter code straight after three money cells — a
+  // two-letter driver name or note word cannot satisfy both.
+  const curIndex = rest.findIndex(
+    (t, k) => k >= 3 && CURRENCY_CODE.test(t) && [1, 2, 3].every((back) => NUMERIC.test(rest[k - back]!)),
+  );
+  if (curIndex === -1) {
     return null;
   }
+  const currency = rest[curIndex]!;
   // The three cells before the currency code are amount, fee and total.
-  const totalUsd = rest[curIndex - 1] ?? "";
-  const feeUsd = rest[curIndex - 2] ?? "";
-  const amountUsd = rest[curIndex - 3] ?? "";
-  if (![amountUsd, feeUsd, totalUsd].every((v) => NUMERIC.test(v))) {
-    return null;
-  }
+  const total = rest[curIndex - 1]!;
+  const fee = rest[curIndex - 2]!;
+  const amount = rest[curIndex - 3]!;
 
   // Anything before the money block is the optional tractor/trailer/driver/
   // CDL/trip text. A tractor is a bare number; a driver is not.
@@ -231,14 +285,14 @@ function readExpressLine(tokens: readonly string[], rawLine: string): string[] |
     driver = optional.join(" ");
   }
 
-  const { payee, note } = readTrailingText(rawLine);
+  const { payee, note } = readTrailingText(rawLine, currency);
 
   // Canonical 14-column express record (EXPRESS_HEADER_PDF order).
   return [
     `${date} ${time}`, expressCode, authCodeRef,
     tractor, "", driver, "", "",
-    stripGrouping(amountUsd), stripGrouping(feeUsd), stripGrouping(totalUsd),
-    "US", payee, note,
+    stripGrouping(amount), stripGrouping(fee), stripGrouping(total),
+    currency, payee, note,
   ];
 }
 
@@ -386,14 +440,14 @@ export async function parseInvoicePdf(
       if (!FUEL_AUTH.test(tokens[0] ?? "")) {
         continue; // SUBTOTAL / Card # / Fuel Total / Sub Total roll-ups
       }
-      const cells = readFuelLine(tokens);
+      const cells = readFuelLine(tokens, line);
       if (!cells) {
         throw new InvoicePdfFormatError(`unparseable fuel line: ${JSON.stringify(line)}`);
       }
       records.push([
         cells.authCode, cells.driverName, cells.unit, cells.occurredAt,
         cells.siteRef, cells.siteName, cells.city, cells.state, cells.prod,
-        ...cells.numerics, "US",
+        ...cells.numerics, cells.currency,
       ]);
       continue;
     }

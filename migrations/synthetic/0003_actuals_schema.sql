@@ -83,6 +83,13 @@ CREATE INDEX truck_assignments_driver ON truck_assignments (driver_id, effective
 -- the same file twice, the number catches a *different* file claiming an
 -- invoice already imported — a corrected re-send, which needs a human
 -- decision rather than a silent second row (A11).
+--
+-- Every quantity and money column on the invoice layer is stored as BVD
+-- printed it, in the invoice's own currency and unit (D25): a CA invoice
+-- is litres, CAD per litre and CAD; a US invoice gallons, USD per gallon and
+-- USD. Hence no unit or currency suffix on any of those columns — currency
+-- and qty_unit here say which, and conversion happens only at the API. An
+-- invoice is single-currency (D24): CUR reads US or CN on every row.
 CREATE TABLE invoices (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_number  text NOT NULL UNIQUE,
@@ -90,7 +97,9 @@ CREATE TABLE invoices (
   period_end      date NOT NULL,
   invoice_date    date NOT NULL,
   due_date        date NOT NULL,
-  grand_total_usd numeric(12,2) NOT NULL,
+  currency        text NOT NULL CHECK (currency IN ('USD','CAD')),
+  qty_unit        text NOT NULL CHECK (qty_unit IN ('gal','L')),
+  grand_total     numeric(12,2) NOT NULL,
   status          text NOT NULL
                     CHECK (status IN ('quarantined','imported')),
   file_sha256     char(64) NOT NULL UNIQUE,
@@ -101,13 +110,22 @@ CREATE TABLE invoices (
 -- product code (A8.2).
 CREATE TABLE invoice_totals (
   invoice_id   uuid NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-  product_code text NOT NULL,
-  gallons      numeric(10,2) NOT NULL,
-  amount_usd   numeric(12,2) NOT NULL,
+  product_code   text NOT NULL,
+  qty            numeric(10,2) NOT NULL,
+  -- Final AMT as printed: tax included.
+  amount         numeric(12,2) NOT NULL,
   -- BVD's own printed Disc AMT for the product code, trusted as given (like
-  -- YOUR PRICE): gallons * (retail - billed) off the 4dp line columns drifts
+  -- YOUR PRICE): qty * (retail - billed) off the 4dp line columns drifts
   -- from it by cents. NULL for the scale row, which prints no discount.
-  discount_usd numeric(12,2),
+  discount       numeric(12,2),
+  -- Pre Tax AMT as printed; NULL where the totals row prints only a final
+  -- amount. The four tax columns are as printed and zero on a US invoice;
+  -- pre_tax_amount + hst + gst + pst + qst = amount (T-28, T-61).
+  pre_tax_amount numeric(12,2),
+  hst            numeric(12,2) NOT NULL DEFAULT 0,
+  gst            numeric(12,2) NOT NULL DEFAULT 0,
+  pst            numeric(12,2) NOT NULL DEFAULT 0,
+  qst            numeric(12,2) NOT NULL DEFAULT 0,
   PRIMARY KEY (invoice_id, product_code)
 );
 
@@ -127,7 +145,7 @@ CREATE TABLE fuel_stops (
   unit_raw        text NOT NULL,
   driver_name_raw text NOT NULL,
   station_id      uuid REFERENCES stations(id),
-  total_usd       numeric(12,2) NOT NULL,
+  total           numeric(12,2) NOT NULL,
   receipt_status  text NOT NULL DEFAULT 'pending'
                     CHECK (receipt_status IN ('pending','confirmed','missing')),
 
@@ -140,17 +158,27 @@ CREATE TABLE fuel_stops (
 -- it is invisible to the drift check in backend/src/db/schema.ts.
 CREATE INDEX fuel_stops_occurred_at_id ON fuel_stops (occurred_at DESC, id);
 
--- billed_usd_per_gal is numeric(9,4): 4dp must survive a round trip
+-- billed_per_unit is numeric(9,4): 4dp must survive a round trip
 -- (5.2395 in, 5.2395 out, never rounded to 5.24). Never derive the stop total
--- by summing only diesel — total_usd on fuel_stops is the printed figure.
+-- by summing only diesel — total on fuel_stops is the printed figure.
+-- qty and the per-unit prices are in the invoice's qty_unit and currency
+-- (D25); the billed price includes any sales tax, so qty * billed = amount.
 CREATE TABLE fuel_stop_lines (
   id                   bigserial PRIMARY KEY,
   fuel_stop_id         uuid NOT NULL REFERENCES fuel_stops(id) ON DELETE CASCADE,
   product_code         text NOT NULL,
-  gallons              numeric(8,2) NOT NULL,
-  retail_usd_per_gal   numeric(9,4) NOT NULL,
-  billed_usd_per_gal   numeric(9,4) NOT NULL,
-  amount_usd           numeric(12,2) NOT NULL,
+  qty                  numeric(8,2) NOT NULL,
+  retail_per_unit      numeric(9,4) NOT NULL,
+  billed_per_unit      numeric(9,4) NOT NULL,
+  -- Final AMT as printed: tax included.
+  amount               numeric(12,2) NOT NULL,
+  -- Pre Tax AMT and the four tax columns, as printed; tax is zero on a US
+  -- invoice. pre_tax_amount + hst + gst + pst + qst = amount (T-61).
+  pre_tax_amount       numeric(12,2),
+  hst                  numeric(12,2) NOT NULL DEFAULT 0,
+  gst                  numeric(12,2) NOT NULL DEFAULT 0,
+  pst                  numeric(12,2) NOT NULL DEFAULT 0,
+  qst                  numeric(12,2) NOT NULL DEFAULT 0,
 
   UNIQUE (fuel_stop_id, product_code)
 );
@@ -179,9 +207,9 @@ CREATE TABLE express_charges (
   trailer_raw     text,
   cdl_raw         text,
   trip_number_raw text,
-  amount_usd      numeric(12,2) NOT NULL,
-  fee_usd         numeric(12,2) NOT NULL DEFAULT 3.00,
-  total_usd       numeric(12,2) NOT NULL,
+  amount          numeric(12,2) NOT NULL,
+  fee             numeric(12,2) NOT NULL DEFAULT 3.00,
+  total           numeric(12,2) NOT NULL,
   payee           text,
   note            text,
   category        text,

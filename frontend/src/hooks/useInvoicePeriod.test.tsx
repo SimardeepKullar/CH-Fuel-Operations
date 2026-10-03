@@ -49,8 +49,8 @@ describe("useInvoicePeriod (T-39 step 39.2)", () => {
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listInvoices.mockResolvedValue({
       rows: [
-        { id: "1", invoiceNumber: "999210", periodStart: "2026-09-03", periodEnd: "2026-09-09", grandTotalUsd: 1, status: "imported", importedAt: "x" },
-        { id: "2", invoiceNumber: "999104", periodStart: "2026-08-27", periodEnd: "2026-09-02", grandTotalUsd: 1, status: "imported", importedAt: "y" },
+        { id: "1", invoiceNumber: "999210", periodStart: "2026-09-03", periodEnd: "2026-09-09", currency: "USD", grandTotalUsd: 1, status: "imported", importedAt: "x" },
+        { id: "2", invoiceNumber: "999104", periodStart: "2026-08-27", periodEnd: "2026-09-02", currency: "USD", grandTotalUsd: 1, status: "imported", importedAt: "y" },
       ],
       page: 1,
       pageSize: 200,
@@ -68,8 +68,8 @@ describe("useInvoicePeriod (T-39 step 39.2)", () => {
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listInvoices.mockResolvedValue({
       rows: [
-        { id: "1", invoiceNumber: "999210", periodStart: "2026-09-03", periodEnd: "2026-09-09", grandTotalUsd: 1, status: "imported", importedAt: "x" },
-        { id: "2", invoiceNumber: "999104", periodStart: "2026-08-27", periodEnd: "2026-09-02", grandTotalUsd: 1, status: "quarantined", importedAt: "y" },
+        { id: "1", invoiceNumber: "999210", periodStart: "2026-09-03", periodEnd: "2026-09-09", currency: "USD", grandTotalUsd: 1, status: "imported", importedAt: "x" },
+        { id: "2", invoiceNumber: "999104", periodStart: "2026-08-27", periodEnd: "2026-09-02", currency: "USD", grandTotalUsd: 1, status: "quarantined", importedAt: "y" },
       ],
       page: 1,
       pageSize: 200,
@@ -79,6 +79,24 @@ describe("useInvoicePeriod (T-39 step 39.2)", () => {
     render(<Probe />);
     await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
     expect(screen.queryByText(/999104/)).toBeNull();
+  });
+
+  it("excludes a CAD invoice from the picker list until T-63 pairs it into a billing week (T-61)", async () => {
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
+    listInvoices.mockResolvedValue({
+      rows: [
+        { id: "1", invoiceNumber: "999210", periodStart: "2026-09-03", periodEnd: "2026-09-09", currency: "USD", grandTotalUsd: 1, status: "imported", importedAt: "x" },
+        { id: "2", invoiceNumber: "700001", periodStart: "2026-08-01", periodEnd: "2026-09-09", currency: "CAD", grandTotalUsd: 1, status: "imported", importedAt: "y" },
+      ],
+      page: 1,
+      pageSize: 200,
+      total: 2,
+    });
+
+    render(<Probe />);
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(screen.getByText("999210 · Sep 3 – 9, 2026")).toBeTruthy();
+    expect(screen.queryByText(/700001/)).toBeNull();
   });
 
   it("an explicit ?period= in the URL overrides the default", async () => {

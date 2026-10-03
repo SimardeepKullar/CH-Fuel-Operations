@@ -1,3 +1,4 @@
+import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
 import type { Pool, PoolClient } from "pg";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "../invoice/productCode.js";
 import { chargesNoFuel, type ChargesNoFuelConfig, type ChargesNoFuelStop } from "./rules/chargesNoFuel.js";
@@ -50,9 +51,11 @@ interface StopRow {
 interface LineRow {
   fuel_stop_id: string;
   product_code: string;
-  gallons: string;
-  amount_usd: string;
-  billed_usd_per_gal: string;
+  qty: string;
+  amount: string;
+  billed_per_unit: string;
+  currency: InvoiceCurrency;
+  qty_unit: InvoiceQtyUnit;
 }
 
 async function loadThresholds(db: Db): Promise<Map<RuleName, unknown>> {
@@ -98,9 +101,11 @@ async function loadStops(db: Db, invoiceId: string): Promise<StopRow[]> {
 
 async function loadLines(db: Db, invoiceId: string): Promise<Map<string, LineRow[]>> {
   const { rows } = await db.query<LineRow>(
-    `SELECT fsl.fuel_stop_id, fsl.product_code, fsl.gallons, fsl.amount_usd, fsl.billed_usd_per_gal
+    `SELECT fsl.fuel_stop_id, fsl.product_code, fsl.qty, fsl.amount, fsl.billed_per_unit,
+            i.currency, i.qty_unit
      FROM fuel_stop_lines fsl
      JOIN fuel_stops fs ON fs.id = fsl.fuel_stop_id
+     JOIN invoices i ON i.id = fs.invoice_id
      WHERE fs.invoice_id = $1`,
     [invoiceId],
   );
@@ -154,7 +159,7 @@ function occurredOnDate(occurredAt: Date): string {
 
 function billedDieselPrice(lines: readonly LineRow[], fuelProductCode: string): string | null {
   const line = lines.find((l) => l.product_code === fuelProductCode);
-  return line ? line.billed_usd_per_gal : null;
+  return line ? line.billed_per_unit : null;
 }
 
 /**
@@ -206,8 +211,10 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
     id: s.id,
     lines: (linesByStop.get(s.id) ?? []).map((l) => ({
       productCode: l.product_code,
-      gallons: l.gallons,
-      amountUsd: l.amount_usd,
+      qty: l.qty,
+      qtyUnit: l.qty_unit,
+      amount: l.amount,
+      currency: l.currency,
     })),
   }));
   for (const finding of subGallon(subGallonStops, thresholds.get("sub_gallon") as SubGallonConfig)) {
@@ -237,8 +244,9 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
     id: s.id,
     lines: (linesByStop.get(s.id) ?? []).map((l) => ({
       productCode: l.product_code,
-      gallons: l.gallons,
-      amountUsd: l.amount_usd,
+      qty: l.qty,
+      amount: l.amount,
+      currency: l.currency,
     })),
   }));
   for (const finding of chargesNoFuel(chargesNoFuelStops, thresholds.get("charges_no_fuel") as ChargesNoFuelConfig)) {
@@ -250,6 +258,7 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
     stationId: s.station_id,
     occurredOn: occurredOnDate(s.occurred_at),
     billedUsdPerGal: billedDieselPrice(linesByStop.get(s.id) ?? [], priceConfig.fuelProductCode),
+    currency: linesByStop.get(s.id)?.[0]?.currency ?? "USD",
   }));
   for (const result of priceAbovePublished(priceStops, publishedPrices, priceConfig)) {
     if (result.status === "not_computable") {

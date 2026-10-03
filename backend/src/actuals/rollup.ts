@@ -5,10 +5,10 @@ import type { Pool } from "pg";
  * spend, diesel gallons, gallons-weighted average billed $/gal, receipt
  * compliance and anomaly count over one invoice's fuel stops.
  *
- * The weighted average is the same `SUM(gallons * billed_usd_per_gal) /
+ * The weighted average is the same `SUM(gallons * billed_per_unit) /
  * SUM(gallons)` over `product_code = 'TA'` that `overview.ts` proved (A6.3/A9)
  * — never a mean of prices — and lines are folded into one row per stop
- * *before* the group-by. Summing `fuel_stops.total_usd` across a join to
+ * *before* the group-by. Summing `fuel_stops.total` across a join to
  * `fuel_stop_lines` would count a stop's total once per line (a stop with a TA
  * and a DF line twice), so the stop is the grain the money is summed at.
  */
@@ -109,7 +109,7 @@ export function toRollup(sums: RollupSums): StopRollup {
 interface GroupRow {
   group_id: string | null;
   stop_count: string;
-  total_usd: string;
+  total: string;
   ta_gallons: string;
   ta_weighted_num: string;
   df_gallons: string;
@@ -131,10 +131,10 @@ export async function loadRollupSums(pool: Pool, invoiceId: string, key: RollupK
 
   const { rows } = await pool.query<GroupRow>(
     `WITH stop_agg AS (
-       SELECT fs.id, fs.${column} AS group_id, fs.total_usd, fs.receipt_status,
-              COALESCE(SUM(fsl.gallons) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_gallons,
-              COALESCE(SUM(fsl.gallons * fsl.billed_usd_per_gal) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_weighted_num,
-              COALESCE(SUM(fsl.gallons) FILTER (WHERE fsl.product_code = 'DF'), 0) AS df_gallons
+       SELECT fs.id, fs.${column} AS group_id, fs.total, fs.receipt_status,
+              COALESCE(SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_gallons,
+              COALESCE(SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_weighted_num,
+              COALESCE(SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'DF'), 0) AS df_gallons
        FROM fuel_stops fs
        LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
        WHERE fs.invoice_id = $1
@@ -148,7 +148,7 @@ export async function loadRollupSums(pool: Pool, invoiceId: string, key: RollupK
      )
      SELECT s.group_id,
             count(*) AS stop_count,
-            SUM(s.total_usd) AS total_usd,
+            SUM(s.total) AS total,
             SUM(s.ta_gallons) AS ta_gallons,
             SUM(s.ta_weighted_num) AS ta_weighted_num,
             SUM(s.df_gallons) AS df_gallons,
@@ -165,7 +165,7 @@ export async function loadRollupSums(pool: Pool, invoiceId: string, key: RollupK
       r.group_id,
       {
         stopCount: Number(r.stop_count),
-        totalUsd: Number(r.total_usd),
+        totalUsd: Number(r.total),
         taGallons: Number(r.ta_gallons),
         taWeightedNum: Number(r.ta_weighted_num),
         defGallons: Number(r.df_gallons),
@@ -213,7 +213,7 @@ interface FavouredRow {
   stop_count: string;
   ta_gallons: string;
   ta_weighted_num: string;
-  total_usd: string;
+  total: string;
 }
 
 /** `key` picks the same whitelisted column as `loadRollupSums`. */
@@ -231,9 +231,9 @@ export async function loadFavouredStations(
 
   const { rows } = await pool.query<FavouredRow>(
     `WITH stop_agg AS (
-       SELECT fs.id, fs.station_id, fs.total_usd,
-              COALESCE(SUM(fsl.gallons) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_gallons,
-              COALESCE(SUM(fsl.gallons * fsl.billed_usd_per_gal) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_weighted_num
+       SELECT fs.id, fs.station_id, fs.total,
+              COALESCE(SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_gallons,
+              COALESCE(SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_weighted_num
        FROM fuel_stops fs
        LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
        WHERE fs.invoice_id = $1 AND fs.${column} = $2
@@ -243,7 +243,7 @@ export async function loadFavouredStations(
             count(*) AS stop_count,
             SUM(s.ta_gallons) AS ta_gallons,
             SUM(s.ta_weighted_num) AS ta_weighted_num,
-            SUM(s.total_usd) AS total_usd
+            SUM(s.total) AS total
      FROM stop_agg s
      LEFT JOIN stations st ON st.id = s.station_id
      GROUP BY s.station_id, st.name_raw, st.city_raw, st.state_usps`,
@@ -267,7 +267,7 @@ export async function loadFavouredStations(
       },
       stopCount: Number(row.stop_count),
       gallons: round(gallons, 2),
-      totalUsd: round(Number(row.total_usd), 2),
+      totalUsd: round(Number(row.total), 2),
       avgBilledUsdPerGal: weightedAverage(Number(row.ta_weighted_num), gallons),
     });
   }
@@ -328,13 +328,14 @@ export async function loadRollupHistory(
     `WITH inv AS (
        SELECT id, period_start FROM invoices
        WHERE period_start <= $1::date
+         AND currency = 'USD' -- US invoices only until T-63's billing weeks (T-61).
        ORDER BY period_start DESC
        LIMIT $2
      ),
      stop_agg AS (
        SELECT fs.id, fs.invoice_id, fs.${column} AS group_id, fs.receipt_status,
-              COALESCE(SUM(fsl.gallons) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_gallons,
-              COALESCE(SUM(fsl.gallons * fsl.billed_usd_per_gal) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_weighted_num
+              COALESCE(SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_gallons,
+              COALESCE(SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_weighted_num
        FROM fuel_stops fs
        JOIN inv ON inv.id = fs.invoice_id
        LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
