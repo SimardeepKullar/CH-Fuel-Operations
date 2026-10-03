@@ -1,12 +1,12 @@
 Fuel Card Transactions
 Transactions for Card # 1000001
 Auth Code, Driver Name, Unit #, Date, Site #, Site Name, Site City, Prov/ST, Prod, QTY, Retail, Billed, Pre Tax AMT, HST, GST, PST, QST, Disc Rate, Disc AMT, Final AMT, CUR
-B100001-TA,DRIVER ONE,101,2026-01-05 10:00:00,90001,SAMPLE #1,SAMPLETON,TX,TA,50.00,5.5000,5.1234,256.17,0,0,0,0,0.375,18.83,256.17,US,
+B100001-TA,DRIVER ONE,101,2026-01-05 10:00:00,90001,SAMPLE #1,SAMPLETON,TX,TA,50.00,5.5000,5.1234,256.17,0,0,0,0,0.3766,18.83,256.17,US,
 B100001-DF,DRIVER ONE,101,2026-01-05 10:00:00,90001,SAMPLE #1,SAMPLETON,TX,DF,5.00,4.5000,4.5000,22.50,0,0,0,0,0,0,22.50,US,
 ,,,,,Transaction Subtotal,,,,55.00,,,278.67,0,0,0,0,,18.83,278.67,,
-,,,,,Card Subtotal,TA,,,50.00,,,256.17,0,0,0,0,0.375,18.83,256.17,US,
+,,,,,Card Subtotal,TA,,,50.00,,,256.17,0,0,0,0,0.3766,18.83,256.17,US,
 ,,,,,,TF,,,0,,,0,0,0,0,0,0,0,0,US,
-,,,,,,Fuel Totals,,,50.00,,,256.17,0,0,0,0,0.375,18.83,256.17,US,
+,,,,,,Fuel Totals,,,50.00,,,256.17,0,0,0,0,0.3766,18.83,256.17,US,
 ,,,,,,DF,,,5.00,,,22.50,0,0,0,0,0,0,22.50,US,
 ,,,,,,Sub Total,,,,,,278.67,0,0,0,0,,18.83,278.67,US,
 Transactions for Card # 1000002
@@ -40,4 +40,4 @@ DF,5.00,22.51,0,0,0,0,0,0,22.51,US,
 S,,,,,,,,,15.00,US,
 Manual Transactions,,,,,,,,,0,US,
 Express Codes,,,,,,,,,131.00,US,
-Grand Total,135.00,709.68,0,0,0,0,0.38,50.83,840.68,US,
+Grand Total,135.00,694.67,0,0,0,0,0.38,50.83,840.68,US,

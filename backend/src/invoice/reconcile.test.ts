@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { groupByAuthCode } from "./groupByAuthCode.js";
 import { parseInvoiceCsv } from "./parseInvoiceCsv.js";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "./productCode.js";
-import { reconcile } from "./reconcile.js";
+import { reconcile, withinRoundingBound } from "./reconcile.js";
 import type { ValidatedInvoiceLine } from "./parseInvoiceCsv.js";
 import type { FuelStopGroup } from "./groupByAuthCode.js";
 import type { ExpressRow } from "./parseExpressRows.js";
@@ -41,6 +41,20 @@ function mkLine(overrides: Partial<ValidatedInvoiceLine>): ValidatedInvoiceLine 
   };
 }
 
+/** A line whose own columns agree, as BVD prints them: Pre Tax = Final (no
+ * tax), Disc Rate = Retail − Billed, Disc AMT = QTY × Disc Rate. */
+function pricedLine(
+  overrides: Partial<ValidatedInvoiceLine> & Pick<ValidatedInvoiceLine, "qty" | "billedPerUnit" | "amount">,
+): ValidatedInvoiceLine {
+  return mkLine({
+    retailPerUnit: overrides.billedPerUnit,
+    discRate: "0.0000",
+    discount: "0.00",
+    preTaxAmount: overrides.amount,
+    ...overrides,
+  });
+}
+
 function mkGroup(lines: ValidatedInvoiceLine[]): FuelStopGroup {
   const first = lines[0]!;
   return {
@@ -65,7 +79,7 @@ function baseGroups(): FuelStopGroup[] {
   return [
     mkGroup([
       mkLine({ lineNumber: 1, rawProductCode: "TA", productType: "highway_diesel", qty: "50.00", amount: "256.17" }),
-      mkLine({ lineNumber: 2, rawProductCode: "DF", productType: "def", qty: "5.00", amount: "22.50" }),
+      pricedLine({ lineNumber: 2, rawProductCode: "DF", productType: "def", qty: "5.00", billedPerUnit: "4.5000", amount: "22.50" }),
     ]),
   ];
 }
@@ -143,8 +157,8 @@ describe("reconcile — pure", () => {
   it("never drifts through floating point: classic 0.1+0.2-style sums land on exact integer cents", () => {
     const groups = [
       mkGroup([
-        mkLine({ lineNumber: 1, rawProductCode: "TA", amount: "0.10", qty: "0.10" }),
-        mkLine({ lineNumber: 2, rawProductCode: "TA", amount: "0.20", qty: "0.20" }),
+        pricedLine({ lineNumber: 1, rawProductCode: "TA", amount: "0.10", qty: "0.10", billedPerUnit: "1.0000" }),
+        pricedLine({ lineNumber: 2, rawProductCode: "TA", amount: "0.20", qty: "0.20", billedPerUnit: "1.0000" }),
       ]),
     ];
     const totals = totalsOf([printedRow("TA", "0.30", "0.30")], "0.30");
@@ -197,5 +211,116 @@ describe.skipIf(!hasRealFixture)("reconcile — real invoice 999210 (local fixtu
     expect(result.gallonImbalances).toEqual([]);
     expect(result.balanced).toBe(true);
     expect(result.grandTotal.parsedCents).toBe(5092971);
+  });
+});
+
+// T-61: every line's own columns, and the printed totals' tax columns. All
+// figures synthetic except D24's worked example, which the scope quotes.
+describe("reconcile — line and totals checks (T-61)", () => {
+  /** A CAD line with 13% HST inside Final AMT, as the CA invoice prints it. */
+  function caLine(overrides: Partial<ValidatedInvoiceLine> = {}): ValidatedInvoiceLine {
+    return mkLine({
+      currency: "CAD",
+      qty: "318.62", retailPerUnit: "2.4990", billedPerUnit: "2.2427",
+      preTaxAmount: "632.36", hst: "82.21", discRate: "0.2563", discount: "81.66", amount: "714.57",
+      ...overrides,
+    });
+  }
+  const caTotals = (lines: ValidatedInvoiceLine[]) => {
+    const sum = (f: (l: ValidatedInvoiceLine) => string) => fromCentsTest(lines.reduce((s, l) => s + Math.round(Number(f(l)) * 100), 0));
+    const ta: PrintedProductTotal = {
+      productCode: "TA", qty: sum((l) => l.qty), amount: sum((l) => l.amount), discount: sum((l) => l.discount),
+      preTaxAmount: sum((l) => l.preTaxAmount), hst: sum((l) => l.hst), gst: "0.00", pst: "0.00", qst: "0.00",
+    };
+    return { products: [ta], grandTotalRow: { ...ta, productCode: "Grand Total" }, grandTotal: ta.amount };
+  };
+  function fromCentsTest(c: number) {
+    return `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}`;
+  }
+
+  it("balances a CAD line: Pre Tax + HST = Final, Retail − Billed = Disc Rate, QTY × Billed = Final (D24's example)", () => {
+    const lines = [caLine()];
+    const result = reconcile([mkGroup(lines)], [], caTotals(lines));
+    expect(result.lineImbalances).toEqual([]);
+    expect(result.totalsImbalances).toEqual([]);
+    expect(result.balanced).toBe(true);
+  });
+
+  it("flags a cent's gap between Pre Tax + taxes and Final AMT — exact, no tolerance", () => {
+    const lines = [caLine({ hst: "82.20" })];
+    const result = reconcile([mkGroup(lines)], [], caTotals([caLine()]));
+    expect(result.lineImbalances.map((l) => l.check)).toContain("TAX_SUM");
+    expect(result.balanced).toBe(false);
+  });
+
+  it("flags Retail − Billed ≠ Disc Rate by a single ten-thousandth", () => {
+    const lines = [caLine({ discRate: "0.2564" })];
+    const result = reconcile([mkGroup(lines)], [], caTotals(lines));
+    expect(result.lineImbalances.map((l) => l.check)).toContain("DISC_RATE");
+  });
+
+  it("accepts QTY × Billed a cent off Final AMT — inside the printed figures' rounding bound", () => {
+    // 300.00 × 2.2427 = 672.81; BVD prints 672.80 from an unrounded quantity.
+    const lines = [caLine({ qty: "300.00", preTaxAmount: "595.40", hst: "77.40", discount: "76.89", amount: "672.80" })];
+    const result = reconcile([mkGroup(lines)], [], caTotals(lines));
+    expect(result.lineImbalances).toEqual([]);
+  });
+
+  it("flags a line whose Final AMT cannot come from its QTY × Billed — a mis-columned row", () => {
+    // Final AMT holding the pre-tax figure: 714.57 − 632.36 is far outside the bound.
+    const lines = [caLine({ amount: "632.36", preTaxAmount: "560.19", hst: "72.17" })];
+    const result = reconcile([mkGroup(lines)], [], caTotals(lines));
+    expect(result.lineImbalances.map((l) => l.check)).toEqual(["QTY_X_BILLED"]);
+  });
+
+  it("flags Disc AMT outside the bound of QTY × Disc Rate", () => {
+    const lines = [caLine({ discount: "80.00" })];
+    const result = reconcile([mkGroup(lines)], [], caTotals(lines));
+    expect(result.lineImbalances.map((l) => l.check)).toEqual(["QTY_X_DISC_RATE"]);
+  });
+
+  it("skips the QTY checks on a zero-QTY Scale line, which still satisfies Pre Tax + HST = Final", () => {
+    const scale = caLine({
+      rawProductCode: "S", productType: "scale", qty: "0.00", retailPerUnit: "0.0000", billedPerUnit: "0.0000",
+      preTaxAmount: "23.01", hst: "2.99", discRate: "0.0000", discount: "0.00", amount: "26.00",
+    });
+    const result = reconcile([mkGroup([scale])], [], {
+      products: [{ productCode: "S", qty: null, amount: "26.00", discount: null, preTaxAmount: null, hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00" }],
+      grandTotalRow: { productCode: "Grand Total", qty: "0.00", amount: "26.00", discount: "0.00", preTaxAmount: "0.00", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00" },
+      grandTotal: "26.00",
+    });
+    expect(result.lineImbalances).toEqual([]);
+    expect(result.totalsImbalances).toEqual([]);
+    expect(result.balanced).toBe(true);
+  });
+
+  it("requires the grand total's Pre Tax and HST to sum the priced rows only, not the final-only Scale row", () => {
+    const lines = [caLine()];
+    const totals = caTotals(lines);
+    // Folding the scale's 23.01 into the grand pre-tax is the error.
+    const wrong = { ...totals, grandTotalRow: { ...totals.grandTotalRow, preTaxAmount: "655.37" } };
+    expect(reconcile([mkGroup(lines)], [], wrong).totalsImbalances).toEqual([
+      { productCode: "Grand Total", check: "GRAND_PRE_TAX", expectedCents: 63236, printedCents: 65537 },
+    ]);
+    const wrongHst = { ...totals, grandTotalRow: { ...totals.grandTotalRow, hst: "85.20" } };
+    expect(reconcile([mkGroup(lines)], [], wrongHst).totalsImbalances.map((t) => t.check)).toEqual(["GRAND_TAX"]);
+  });
+
+  it("flags a printed product row whose Pre Tax + taxes ≠ its Final", () => {
+    const lines = [caLine()];
+    const totals = caTotals(lines);
+    const wrong = { ...totals, products: [{ ...totals.products[0]!, hst: "82.22" }] };
+    expect(reconcile([mkGroup(lines)], [], wrong).totalsImbalances.map((t) => t.check)).toContain("TAX_SUM");
+  });
+});
+
+describe("withinRoundingBound (T-61)", () => {
+  it("is exact integer arithmetic on the half-unit bound", () => {
+    // 0.04 × 5.5000 = 0.22; the bound is ½¢ + 0.0275 + 0.000002 = 0.032502,
+    // so 0.19 to 0.25 inclusive can print and nothing else.
+    expect(withinRoundingBound(4, 55_000, 19)).toBe(true);
+    expect(withinRoundingBound(4, 55_000, 25)).toBe(true);
+    expect(withinRoundingBound(4, 55_000, 18)).toBe(false);
+    expect(withinRoundingBound(4, 55_000, 26)).toBe(false);
   });
 });

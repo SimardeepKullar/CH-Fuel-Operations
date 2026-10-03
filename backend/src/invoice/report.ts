@@ -9,6 +9,12 @@ export type ImportRejectionCode =
   | "AMOUNT_IMBALANCE"
   | "GALLONS_IMBALANCE"
   | "GRAND_TOTAL_IMBALANCE"
+  /** A line's own columns disagree — tax identity, Retail − Billed = Disc
+   * Rate, or QTY × price outside the rounding bound (T-61). */
+  | "LINE_IMBALANCE"
+  /** A printed totals row's tax identity, or the grand-total row's pre-tax
+   * or tax column against the product rows (T-61). */
+  | "TOTALS_TAX_IMBALANCE"
   | "UNKNOWN_CARD"
   | "UNKNOWN_TRUCK_UNIT";
 
@@ -144,6 +150,18 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
       }),
     ),
   ];
+
+  for (const l of reconcileResult.lineImbalances) {
+    rejections.push({ lineNumber: l.lineNumber, authCode: l.authCode, code: "LINE_IMBALANCE", message: `${l.check}: ${l.message}` });
+  }
+  for (const t of reconcileResult.totalsImbalances) {
+    rejections.push({
+      lineNumber: 0,
+      authCode: null,
+      code: "TOTALS_TAX_IMBALANCE",
+      message: `${t.productCode} ${t.check}: expected ${t.expectedCents} cents, printed ${t.printedCents} cents`,
+    });
+  }
 
   if (reconcileResult.grandTotal.deltaCents !== 0) {
     rejections.push({

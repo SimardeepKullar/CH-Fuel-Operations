@@ -1,3 +1,4 @@
+import type { InvoiceCurrency } from "../../db/types.js";
 import type { AnomalyFinding, AnomalySeverity } from "../types.js";
 
 export interface PriceAbovePublishedConfig {
@@ -18,6 +19,10 @@ export interface PriceAbovePublishedStop {
    * scale-only stop has no price to audit and is simply not this rule's
    * business, unlike a genuine "no data for this station+date" gap. */
   billedUsdPerGal: string | null;
+  /** The stop's invoice currency. BVD publishes US prices only, in USD per
+   * gallon; a CAD stop's billed CAD per litre has nothing to compare
+   * against (T-61). */
+  currency: InvoiceCurrency;
 }
 
 /**
@@ -75,6 +80,11 @@ export function priceAbovePublished(
 
   for (const stop of stops) {
     if (stop.billedUsdPerGal === null) {
+      continue;
+    }
+    if (stop.currency !== "USD") {
+      // A18 Q5's path, never a comparison and never "no anomaly".
+      results.push({ status: "not_computable", subjectId: stop.id, reason: "no published price exists for a Canadian stop" });
       continue;
     }
     if (stop.stationId === null) {

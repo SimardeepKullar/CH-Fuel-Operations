@@ -36,7 +36,11 @@ interface DriverRosterRow {
 }
 
 async function loadInvoiceId(pool: Pool, period: string): Promise<string | null> {
-  const { rows } = await pool.query<{ id: string }>("SELECT id FROM invoices WHERE period_start = $1::date", [period]);
+  // US invoices only until T-63's billing weeks (T-61).
+  const { rows } = await pool.query<{ id: string }>(
+    "SELECT id FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
+    [period],
+  );
   return rows[0]?.id ?? null;
 }
 

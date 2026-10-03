@@ -26,6 +26,8 @@ function report(overrides: Partial<ImportReport> = {}): ImportReport {
       amountImbalances: [],
       gallonImbalances: [],
       grandTotal: { expectedCents: 5092971, parsedCents: 5092971, deltaCents: 0 },
+      lineImbalances: [],
+      totalsImbalances: [],
     },
     parserRejectionCount: 0,
     unknownCardNumbers: [],

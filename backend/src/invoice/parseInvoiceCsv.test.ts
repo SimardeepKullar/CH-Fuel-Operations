@@ -280,7 +280,7 @@ describe("parseInvoiceCsv — currency (T-61)", () => {
     const ta = result.lines.find((l) => l.authCode === "B100001-TA")!;
     expect(ta).toMatchObject({
       preTaxAmount: "256.17", hst: "0.00", gst: "0.00", pst: "0.00", qst: "0.00",
-      discRate: "0.3750", discount: "18.83", amount: "256.17",
+      discRate: "0.3766", discount: "18.83", amount: "256.17",
     });
   });
 

@@ -94,7 +94,8 @@ interface InvoiceRow {
 
 async function loadInvoice(pool: Pool, period: string): Promise<InvoiceRow | null> {
   const { rows } = await pool.query<InvoiceRow>(
-    "SELECT id, grand_total FROM invoices WHERE period_start = $1::date",
+    // US invoices only until T-63's billing weeks (T-61).
+    "SELECT id, grand_total FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
     [period],
   );
   return rows[0] ?? null;
@@ -268,6 +269,7 @@ async function loadTrend(pool: Pool, period: string, limit: number): Promise<Ove
      LEFT JOIN fuel_stops fs ON fs.invoice_id = i.id
      LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
      WHERE i.period_start <= $1::date
+       AND i.currency = 'USD' -- US invoices only until T-63's billing weeks (T-61).
      GROUP BY i.id, i.period_start
      ORDER BY i.period_start DESC
      LIMIT $2`,

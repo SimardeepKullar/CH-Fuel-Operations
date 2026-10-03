@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -189,12 +190,18 @@ describe.skipIf(!hasDatabase)("runBackfillInvoicesCli (integration)", () => {
       expect(errorSpy).not.toHaveBeenCalled();
 
       const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
-      expect(printed).toContain("imported:          1");
       expect(printed).toContain("skipped:           1");
       expect(printed).toContain("invoice_999210.csv");
 
-      const invoices = await scopedPool.query("SELECT count(*) FROM invoices");
-      expect(invoices.rows[0]!.count).toBe("1");
+      // Asserted per invoice, not as a directory-wide count: other real
+      // invoices sit beside it (999217, a CA invoice, imports since T-61).
+      const pdfSha = createHash("sha256")
+        .update(readFileSync(path.join(realDataDir, "BVD_invoice_999210.pdf")))
+        .digest("hex");
+      const { rows } = await scopedPool.query<{ file_sha256: string }>(
+        "SELECT file_sha256 FROM invoices WHERE invoice_number = '999210'",
+      );
+      expect(rows).toEqual([{ file_sha256: pdfSha }]);
     });
   });
 });

@@ -36,7 +36,8 @@ interface InvoiceRow {
 
 async function loadInvoice(pool: Pool, period: string): Promise<InvoiceRow | null> {
   const { rows } = await pool.query<InvoiceRow>(
-    `SELECT id, period_start::text, period_end::text FROM invoices WHERE period_start = $1::date`,
+    // Plans are US-only, so Plan vs Actual reads US invoices only (T-61, T-63).
+    `SELECT id, period_start::text, period_end::text FROM invoices WHERE period_start = $1::date AND currency = 'USD'`,
     [period],
   );
   return rows[0] ?? null;

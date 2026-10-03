@@ -136,7 +136,8 @@ function toItem(row: ExpressChargeRowWithJoins): ExpressChargeItem {
  */
 export async function listExpressCharges(pool: Pool, period: string): Promise<ExpressChargesResult> {
   const { rows: invoiceRows } = await pool.query<{ id: string }>(
-    "SELECT id FROM invoices WHERE period_start = $1::date",
+    // US invoices only until T-63's billing weeks (T-61).
+    "SELECT id FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
     [period],
   );
   const invoiceId = invoiceRows[0]?.id ?? null;

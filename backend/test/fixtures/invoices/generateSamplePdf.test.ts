@@ -10,13 +10,13 @@ function units(value: string, dp: number): number {
 
 /**
  * |qty × price − printed| within the rounding bound of a 2dp quantity and a
- * 4dp price (T-61): ½¢ + ½ × 0.01 × price + ½ × 0.0001 × qty. In units of
- * 10^-6 currency, so the comparison is exact.
+ * 4dp price (T-61): ½¢ + 0.005 × price + 0.00005 × qty. qtyH × priceT4 is
+ * in micro-units (10^-6), where that bound is 5,000 + ½ × priceT4 + ½ × qtyH
+ * — compared doubled, so it stays integer.
  */
 function withinBound(qtyH: number, priceT4: number, printedCents: number): boolean {
   const deviation = Math.abs(qtyH * priceT4 - printedCents * 10_000);
-  const bound = 5_000 + 50 * priceT4 + 50 * qtyH;
-  return deviation <= bound;
+  return 2 * deviation <= 10_000 + priceT4 + qtyH;
 }
 
 const caRows = CA_INVOICE.cards.flatMap((c) => c.rows.filter((r) => /^A\d+-[A-Z]+$/.test(r[0]!)));
@@ -111,9 +111,9 @@ describe("sample-ca.pdf's own figures (T-61 step 61.2)", () => {
     expect(CA_INVOICE.cards.every((c) => /^90000\d\d$/.test(c.card))).toBe(true);
   });
 
-  it("regenerates byte-for-byte identical to the committed sample-ca.pdf", async () => {
-    const committed = readFileSync(FIXTURES.ca.file);
-    const regenerated = await renderInvoicePdf(FIXTURES.ca.spec);
+  it.each(["ca", "us"] as const)("regenerates byte-for-byte identical to the committed %s fixture", async (key) => {
+    const committed = readFileSync(FIXTURES[key].file);
+    const regenerated = await renderInvoicePdf(FIXTURES[key].spec);
     expect(regenerated.equals(committed)).toBe(true);
   });
 });

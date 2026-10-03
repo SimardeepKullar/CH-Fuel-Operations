@@ -1,3 +1,4 @@
+import type { InvoiceCurrency } from "../../db/types.js";
 import type { AnomalyFinding } from "../types.js";
 
 export interface ChargesNoFuelConfig {
@@ -5,10 +6,12 @@ export interface ChargesNoFuelConfig {
   fuelProductCodes: readonly string[];
 }
 
+/** A line as printed; any unit, since only "more than zero" matters here. */
 export interface ChargesNoFuelLine {
   productCode: string;
-  gallons: string;
-  amountUsd: string;
+  qty: string;
+  amount: string;
+  currency: InvoiceCurrency;
 }
 
 export interface ChargesNoFuelStop {
@@ -33,24 +36,25 @@ export function chargesNoFuel(
   const findings: AnomalyFinding[] = [];
 
   for (const stop of stops) {
-    const fuelGallons = stop.lines
+    const fuelQty = stop.lines
       .filter((l) => fuelCodes.has(l.productCode))
-      .reduce((sum, l) => sum + Number(l.gallons), 0);
-    if (fuelGallons > 0) {
+      .reduce((sum, l) => sum + Number(l.qty), 0);
+    if (fuelQty > 0) {
       continue;
     }
-    const totalUsd = stop.lines.reduce((sum, l) => sum + Number(l.amountUsd), 0);
-    if (totalUsd <= 0) {
+    const total = stop.lines.reduce((sum, l) => sum + Number(l.amount), 0);
+    if (total <= 0) {
       continue; // no fuel and no charge — nothing to flag
     }
+    const productCodes = stop.lines.map((l) => l.productCode);
+    const currency = stop.lines[0]!.currency;
     findings.push({
       subjectType: "fuel_stop",
       subjectId: stop.id,
       severity: "amber",
-      detail: {
-        totalUsd,
-        productCodes: stop.lines.map((l) => l.productCode),
-      },
+      // A US finding keeps its existing shape; a CA one names its currency
+      // rather than filing CAD under a USD key.
+      detail: currency === "USD" ? { totalUsd: total, productCodes } : { total, currency, productCodes },
     });
   }
 

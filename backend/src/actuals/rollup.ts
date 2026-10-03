@@ -328,6 +328,7 @@ export async function loadRollupHistory(
     `WITH inv AS (
        SELECT id, period_start FROM invoices
        WHERE period_start <= $1::date
+         AND currency = 'USD' -- US invoices only until T-63's billing weeks (T-61).
        ORDER BY period_start DESC
        LIMIT $2
      ),

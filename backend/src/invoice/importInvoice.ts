@@ -249,9 +249,13 @@ async function insertInvoiceTotals(
       continue; // no printed figure for this code — nothing to record
     }
     await client.query(
-      `INSERT INTO invoice_totals (invoice_id, product_code, qty, amount, discount)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [invoiceId, rawCode, printedRow.qty ?? "0.00", printedRow.amount, printedRow.discount],
+      `INSERT INTO invoice_totals
+         (invoice_id, product_code, qty, amount, discount, pre_tax_amount, hst, gst, pst, qst)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        invoiceId, rawCode, printedRow.qty ?? "0.00", printedRow.amount, printedRow.discount,
+        printedRow.preTaxAmount, printedRow.hst, printedRow.gst, printedRow.pst, printedRow.qst,
+      ],
     );
   }
 }
@@ -289,9 +293,13 @@ async function insertFuelStop(
   for (const line of group.lines) {
     await client.query(
       `INSERT INTO fuel_stop_lines
-         (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [fuelStopId, line.rawProductCode, line.qty, line.retailPerUnit, line.billedPerUnit, line.amount],
+         (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount,
+          pre_tax_amount, hst, gst, pst, qst)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        fuelStopId, line.rawProductCode, line.qty, line.retailPerUnit, line.billedPerUnit, line.amount,
+        line.preTaxAmount, line.hst, line.gst, line.pst, line.qst,
+      ],
     );
   }
 }

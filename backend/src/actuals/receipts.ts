@@ -110,8 +110,9 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
 
 async function loadProgress(pool: Pool): Promise<ReceiptQueueProgress> {
   const { rows } = await pool.query<{ done: string; total: string }>(
-    `SELECT count(*) FILTER (WHERE receipt_status = 'confirmed') AS done, count(*) AS total
-     FROM fuel_stops`,
+    `SELECT count(*) FILTER (WHERE fs.receipt_status = 'confirmed') AS done, count(*) AS total
+     FROM fuel_stops fs
+     JOIN invoices i ON i.id = fs.invoice_id AND i.currency = 'USD' -- US invoices only until T-63's billing weeks (T-61).`,
   );
   return { done: Number(rows[0]!.done), total: Number(rows[0]!.total) };
 }
@@ -144,6 +145,8 @@ export async function listReceiptQueue(
                 WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL
               ) AS has_exception
        FROM fuel_stops fs
+       -- US invoices only until T-63's billing weeks (T-61). T-63 gives this screen a ?currency=.
+       JOIN invoices i ON i.id = fs.invoice_id AND i.currency = 'USD'
        LEFT JOIN trucks t ON t.id = fs.truck_id
        LEFT JOIN drivers d ON d.id = fs.driver_id
        LEFT JOIN stations s ON s.id = fs.station_id

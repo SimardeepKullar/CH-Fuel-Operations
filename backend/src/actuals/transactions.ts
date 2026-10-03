@@ -268,7 +268,11 @@ interface InvoiceIdRow {
  * rows rather than falling back to the unfiltered set.
  */
 export async function resolveInvoiceIdForPeriod(pool: Pool, period: string): Promise<string | null> {
-  const { rows } = await pool.query<InvoiceIdRow>("SELECT id FROM invoices WHERE period_start = $1::date", [period]);
+  // US invoices only until T-63's billing weeks (T-61).
+  const { rows } = await pool.query<InvoiceIdRow>(
+    "SELECT id FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
+    [period],
+  );
   return rows[0]?.id ?? null;
 }
 

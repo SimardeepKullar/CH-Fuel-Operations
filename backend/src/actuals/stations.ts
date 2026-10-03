@@ -94,6 +94,9 @@ export async function getStationBilledPrices(pool: Pool, id: string): Promise<St
               array_agg(DISTINCT fsl.billed_per_unit ORDER BY fsl.billed_per_unit) AS prices
        FROM fuel_stops fs
        JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id AND fsl.product_code = $2
+       -- US invoices only until T-63: a CA stop's CAD per litre must not
+       -- average into a series read as USD per gallon (T-61).
+       JOIN invoices i ON i.id = fs.invoice_id AND i.currency = 'USD'
        WHERE fs.station_id = $1
        GROUP BY day
        ORDER BY day ASC`,
@@ -112,7 +115,7 @@ export async function getStationBilledPrices(pool: Pool, id: string): Promise<St
     // One audit "stop" per distinct price: the rule flags a price, so the day is
     // a billing error if any price it was billed at crosses the threshold.
     const verdicts = priceAbovePublished(
-      row.prices.map((price) => ({ id: price, stationId: id, occurredOn: row.day, billedUsdPerGal: price })),
+      row.prices.map((price) => ({ id: price, stationId: id, occurredOn: row.day, billedUsdPerGal: price, currency: "USD" as const })),
       published,
       config,
     );
