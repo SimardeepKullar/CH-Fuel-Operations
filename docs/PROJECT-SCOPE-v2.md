@@ -317,8 +317,8 @@ Versioned under `/api/v1`, RFC 9457 errors, `?units=` honoured, numbers not stri
 
 | Method & path | Notes |
 |---|---|
-| `POST /invoices/import` | multipart. Returns `imported` with a write preview, or **`quarantined` with the imbalance report and offending rows** — a 200 with a status, not a 4xx: quarantine is an answer, not an error. Duplicate `file_sha256` → 409 problem+json. |
-| `GET /invoices` | List with period, total, status, imported-at. Paginated. |
+| `POST /invoices/import` | multipart. Returns `imported` with a write preview, or **`quarantined` with the imbalance report and offending rows** — a 200 with a status, not a 4xx: quarantine is an answer, not an error. The report carries the invoice's `currency` (T-61); until T-63 its money fields keep their `Usd` names whatever the currency. Duplicate `file_sha256` → 409 problem+json. |
+| `GET /invoices` | List with period, total, status, imported-at, and the invoice's `currency` (T-61). Paginated. |
 | `GET /invoices/{id}` | Header, printed totals, reconciliation result. |
 | `GET /transactions` | Filters (date range, driver, truck, card, state, product, receipt status, anomaly-only), sort, pagination. One row per stop; `lines[]` included on request. |
 | `GET /transactions/{id}` | A8.4's payload, including `rawValues` and `resolvedFrom`. |
@@ -444,7 +444,7 @@ Flagged, not solved. Each names what it blocks.
 | **Q3** | Does Samsara's API expose driver receipt uploads? If yes the Receipt Queue becomes an exceptions queue. | A8.5 scope (D17 hedges it) |
 | **Q4** | Does a future unified operations dashboard (TransPlus, Samsara, BorderConnect, Motive) absorb this app as a section? | Shell's tolerance for a larger nav (A7) |
 | **Q5** | Is BVD's published price file obtainable as a file, or only as the invoice? Decides whether the A6.5 price audit is real or aspirational. | A10's "billed above published" rule |
-| **Q6** | Ten years of Gmail invoices — do older years differ in shape? **Partly answered:** 21 invoices across 2026 (`961112`…`999217`) are all the same shape in both exports, and both are now parsed. (Same column shape, but `999217` is a CA invoice — `CN`, litres, CAD — which the parsers do not yet accept; D24, T-61.) Whether invoices from earlier years hold that shape is still open, and T-48's backfill is what will find out — it reports a parse rejection per file rather than stopping the run. | T-48 sizing |
+| **Q6** | Ten years of Gmail invoices — do older years differ in shape? **Partly answered:** 21 invoices across 2026 (`961112`…`999217`) are all the same shape in both exports, and both are now parsed. (Same column shape; `999217` is a CA invoice — `CN`, litres, CAD — which the PDF parser accepts since T-61, D24. The CSV parser refuses a CA invoice until a real CA portal CSV is seen, D30.) Whether invoices from earlier years hold that shape is still open, and T-48's backfill is what will find out — it reports a parse rejection per file rather than stopping the run. | T-48 sizing |
 
 ---
 

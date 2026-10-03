@@ -104,7 +104,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-58** | **Real data out of the working tree — synthetic fleet roster, before the repo goes public** | T-25, T-51 | **10** | **in progress — history rewrite (T-50's original scope) still open** |
 | **T-59** | **"Show all sheet stations" dots vanish on a re-plan** | T-23 | **5** | **done — PR pending** |
 | **T-60** | **Canadian stations from BVD's travel-centre directory** | T-08 | **11** | **done — merged (`13e7c88`, PR #14)** |
-| **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **new** |
+| **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **done — merged (`22496c8`, PR #16)** |
 | **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **done — merged (`043eee2`, PR #15)** |
 | **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **new** |
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **new** |
@@ -1269,13 +1269,13 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Dependencies.** T-31, T-62 (the real 999217 cannot resolve its cards until the roster has them).
 
 **Definition of done.**
-- [ ] `sample-ca.pdf` imports in CI: `currency = 'CAD'`, `qty_unit = 'L'`, every tax column stored, every reconciliation check passes (integer cents and ten-thousandths, never `toBeCloseTo` — the rounding bound is itself integer arithmetic).
-- [ ] The real 999217 imports locally with no quarantine: 60 lines, 59 fuel stops, 34 cards, 9 stations resolved (with T-60), grand total CAD 46,837.33 = pre-tax 41,356.89 + HST 5,376.44 + Scale 104.00 (final-only row); TA 21,318.77 L.
-- [ ] The real 999210 still imports exactly as before (`currency = 'USD'`, `qty_unit = 'gal'`, tax columns zero), and its gated assertions are unchanged.
-- [ ] A `CN` CSV is rejected with `CA_CSV_UNVERIFIED`; an unknown `CUR` is a quarantined row with `UNKNOWN_CURRENCY`; a mixed-currency invoice is rejected whole.
-- [ ] The sub-gallon rule judges litres in gallons: a 3 L diesel line (0.79 gal) is flagged; a 0.01 L DEF line is still exempt (T-40F).
-- [ ] No US screen shows a CA figure before T-63 (asserted on `/overview` and `/transactions`).
-- [ ] `git grep` finds no `_usd` invoice column left in `migrations/` or `backend/src/`.
+- [x] `sample-ca.pdf` imports in CI: `currency = 'CAD'`, `qty_unit = 'L'`, every tax column stored, every reconciliation check passes (integer cents and ten-thousandths, never `toBeCloseTo` — the rounding bound is itself integer arithmetic).
+- [x] The real 999217 imports locally with no quarantine: 60 lines, 59 fuel stops, 34 cards, 9 stations resolved (with T-60), grand total CAD 46,837.33 = pre-tax 41,356.89 + HST 5,376.44 + Scale 104.00 (final-only row); TA 21,318.77 L.
+- [x] The real 999210 still imports exactly as before (`currency = 'USD'`, `qty_unit = 'gal'`, tax columns zero), and its gated assertions are unchanged.
+- [x] A `CN` CSV is rejected with `CA_CSV_UNVERIFIED`; an unknown `CUR` is a quarantined row with `UNKNOWN_CURRENCY`; a mixed-currency invoice is rejected whole.
+- [x] The sub-gallon rule judges litres in gallons: a 3 L diesel line (0.79 gal) is flagged; a 0.01 L DEF line is still exempt (T-40F).
+- [x] No US screen shows a CA figure before T-63 (asserted on `/overview` and `/transactions`).
+- [x] `git grep` finds no `_usd` invoice column left in `migrations/` or `backend/src/`.
 
 ---
 
@@ -1300,7 +1300,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Definition of done.**
 - [x] Both sets apply cleanly and produce identical counts: 21 more cards and drivers than today, the 20 new trucks, 16 new assignments.
 - [x] Against `migrations/real`, every card on 999217 resolves to a driver (gated test).
-- [ ] Against `migrations/synthetic`, `sample-ca.pdf` (T-61) resolves every card, and the five unassigned drivers' stops resolve a driver and no truck. *(Roster half asserted in `referenceLayer.test.ts`; the `sample-ca.pdf` half lands with T-61.)*
+- [x] Against `migrations/synthetic`, `sample-ca.pdf` (T-61) resolves every card, and the five unassigned drivers' stops resolve a driver and no truck. *(Roster half asserted in `referenceLayer.test.ts`; the `sample-ca.pdf` half in `importInvoiceCa.test.ts`, landed with T-61.)*
 - [x] `git grep` across the tracked tree finds none of the 21 real names or card numbers.
 
 ---
