@@ -88,28 +88,28 @@ export default function OverviewPage() {
       <div className="kpi-grid">
         <KpiCard
           label="Average billed price"
-          value={kpis.avgBilledUsdPerGal === null ? "—" : formatPricePerGal(kpis.avgBilledUsdPerGal)}
+          value={kpis.avgBilledPerUnit === null ? "—" : formatPricePerGal(kpis.avgBilledPerUnit)}
           unit="USD/gal"
-          sub={`discount captured ${formatMoneyUsd(kpis.discount.totalUsd)}`}
+          sub={`discount captured ${formatMoneyUsd(kpis.discount.total)}`}
           dominant
           testId="kpi-avg-billed"
         />
-        <KpiCard label="Total spend" value={formatMoneyUsd(kpis.total.amountUsd)} unit="USD" testId="kpi-total" />
+        <KpiCard label="Total spend" value={formatMoneyUsd(kpis.total.amount)} unit="USD" testId="kpi-total" />
         <KpiCard
           label="Diesel"
-          value={formatMoneyUsd(kpis.diesel.amountUsd)}
+          value={formatMoneyUsd(kpis.diesel.amount)}
           unit="USD"
-          sub={`${formatGallons2dp(kpis.diesel.gallons)} gal`}
+          sub={`${formatGallons2dp(kpis.diesel.qty)} gal`}
           testId="kpi-diesel"
         />
         <KpiCard
           label="DEF"
-          value={formatMoneyUsd(kpis.def.amountUsd)}
+          value={formatMoneyUsd(kpis.def.amount)}
           unit="USD"
-          sub={`${formatGallons2dp(kpis.def.gallons)} gal`}
+          sub={`${formatGallons2dp(kpis.def.qty)} gal`}
           testId="kpi-def"
         />
-        <KpiCard label="Other charges" value={formatMoneyUsd(kpis.otherCharges.totalUsd)} unit="USD" testId="kpi-other" />
+        <KpiCard label="Other charges" value={formatMoneyUsd(kpis.otherCharges.total)} unit="USD" testId="kpi-other" />
         <KpiCard
           label="Receipt compliance"
           value={receiptPct === null ? "—" : `${receiptPct}%`}

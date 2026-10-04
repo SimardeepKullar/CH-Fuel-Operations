@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { PersonCardStatus } from "../db/types.js";
+import type { InvoiceCurrency, InvoiceQtyUnit, PersonCardStatus } from "../db/types.js";
 import { resolveTruckAtInstant, type TruckAssignmentForMatch } from "../catalog/assignments.js";
 import { isUuid } from "./ids.js";
 import {
@@ -13,13 +13,19 @@ import {
   type RollupHistoryPoint,
   type StopRollup,
 } from "./rollup.js";
+import { loadWeekInvoice, qtyConverter, qtyUnitFor, type WeekQuery } from "./units.js";
 
 export interface TruckListRow extends StopRollup {
   truck: { id: string; unitNumber: string };
 }
 
 export interface TrucksResult {
-  period: string;
+  /** The billing week's end, as asked. */
+  week: string;
+  /** The side of the week shown: every money field below is in it. */
+  currency: InvoiceCurrency;
+  /** The unit every `qty` below is in — the invoice's own, unless `?units=` said otherwise. */
+  qtyUnit: InvoiceQtyUnit;
   invoiceId: string | null;
   /** Every truck on the roster, spend descending; zeros for a truck with no stops. */
   rows: TruckListRow[];
@@ -34,26 +40,20 @@ interface TruckRosterRow {
   unit_number: string;
 }
 
-async function loadInvoice(pool: Pool, period: string): Promise<{ id: string; periodEnd: string } | null> {
-  const { rows } = await pool.query<{ id: string; period_end: string }>(
-    // US invoices only until T-63's billing weeks (T-61).
-    "SELECT id, to_char(period_end, 'YYYY-MM-DD') AS period_end FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
-    [period],
-  );
-  const row = rows[0];
-  return row ? { id: row.id, periodEnd: row.period_end } : null;
-}
-
 /**
- * `GET /trucks?period=` (A8.8, A13). Grouped by `fuel_stops.truck_id` — the
- * truck resolved at import from the assignment in force *then* — so a stop
- * dated before a reassignment stays with the old truck.
+ * `GET /trucks?week=&currency=` (A8.8, A13). Grouped by `fuel_stops.truck_id` —
+ * the truck resolved at import from the assignment in force *then* — so a stop
+ * dated before a reassignment stays with the old truck. One side of one
+ * billing week, like `GET /drivers` (D26).
  */
-export async function listTrucks(pool: Pool, period: string): Promise<TrucksResult> {
-  const invoice = await loadInvoice(pool, period);
+export async function listTrucks(pool: Pool, query: WeekQuery): Promise<TrucksResult> {
+  const { week, currency } = query;
+  const invoice = await loadWeekInvoice(pool, week, currency);
+  const conv = qtyConverter(invoice?.qtyUnit ?? qtyUnitFor(currency), query.units);
+  const header = { week, currency, qtyUnit: conv.qtyUnit };
   if (invoice === null) {
-    const zero = toRollup(EMPTY_SUMS);
-    return { period, invoiceId: null, rows: [], unresolved: zero, fleet: zero };
+    const zero = toRollup(EMPTY_SUMS, conv);
+    return { ...header, invoiceId: null, rows: [], unresolved: zero, fleet: zero };
   }
 
   const [groups, { rows: roster }] = await Promise.all([
@@ -62,20 +62,20 @@ export async function listTrucks(pool: Pool, period: string): Promise<TrucksResu
   ]);
 
   const rows = roster
-    .map((t) => ({ truck: { id: t.id, unitNumber: t.unit_number }, ...toRollup(groups.get(t.id) ?? EMPTY_SUMS) }))
+    .map((t) => ({ truck: { id: t.id, unitNumber: t.unit_number }, ...toRollup(groups.get(t.id) ?? EMPTY_SUMS, conv) }))
     .sort(
       (a, b) =>
-        b.totalUsd - a.totalUsd ||
+        b.total - a.total ||
         a.truck.unitNumber.localeCompare(b.truck.unitNumber) ||
         a.truck.id.localeCompare(b.truck.id),
     );
 
   return {
-    period,
+    ...header,
     invoiceId: invoice.id,
     rows,
-    unresolved: toRollup(groups.get(null) ?? EMPTY_SUMS),
-    fleet: toRollup(fleetSums(groups)),
+    unresolved: toRollup(groups.get(null) ?? EMPTY_SUMS, conv),
+    fleet: toRollup(fleetSums(groups), conv),
   };
 }
 
@@ -138,11 +138,13 @@ export interface TruckAssignmentHistoryItem {
 }
 
 export interface TruckDetail {
-  period: string;
+  week: string;
+  currency: InvoiceCurrency;
+  qtyUnit: InvoiceQtyUnit;
   invoiceId: string | null;
   truck: { id: string; unitNumber: string };
-  /** The date `inForce`/`assignedCard` are evaluated at: the invoice's `period_end`,
-   * or `period` itself when there is no invoice. */
+  /** The date `inForce`/`assignedCard` are evaluated at: the invoice's printed
+   * `period_end`, or `week` itself when there is no invoice. */
   asOf: string;
   /** The card of the assignment in force on `asOf`; `null` if none is. If the
    * schema's per-driver overlap guard allowed two drivers in the truck at once,
@@ -151,8 +153,8 @@ export interface TruckDetail {
   /** Every assignment of this truck, oldest to newest. */
   assignments: TruckAssignmentHistoryItem[];
   summary: StopRollup;
-  fleet: { avgBilledUsdPerGal: number | null; gallons: number; stopCount: number };
-  avgVsFleetUsdPerGal: number | null;
+  fleet: { avgBilledPerUnit: number | null; qty: number; stopCount: number };
+  avgVsFleetPerUnit: number | null;
   favouredStations: FavouredStations;
   history: RollupHistoryPoint[];
 }
@@ -202,7 +204,7 @@ async function loadAssignments(pool: Pool, truckId: string): Promise<AssignmentQ
 }
 
 /**
- * `GET /trucks/{id}?period=`. `null` when the id doesn't name a truck (→ 404).
+ * `GET /trucks/{id}?week=&currency=`. `null` when the id doesn't name a truck (→ 404).
  *
  * The stop figures read the stored `fuel_stops.truck_id`, never today's
  * assignment. The assignment history is the separate, complete record of who
@@ -210,7 +212,7 @@ async function loadAssignments(pool: Pool, truckId: string): Promise<AssignmentQ
  * inclusive-boundary rule — run over this truck's own assignment rows, where a
  * hit for a driver means that driver's assignment *to this truck* covered the date.
  */
-export async function getTruckDetail(pool: Pool, id: string, period: string): Promise<TruckDetail | null> {
+export async function getTruckDetail(pool: Pool, id: string, query: WeekQuery): Promise<TruckDetail | null> {
   if (!isUuid(id)) {
     return null;
   }
@@ -220,10 +222,16 @@ export async function getTruckDetail(pool: Pool, id: string, period: string): Pr
     return null;
   }
 
-  const invoice = await loadInvoice(pool, period);
-  const asOf = invoice?.periodEnd ?? period;
+  const { week, currency } = query;
+  const invoice = await loadWeekInvoice(pool, week, currency);
+  const conv = qtyConverter(invoice?.qtyUnit ?? qtyUnitFor(currency), query.units);
+  const header = { week, currency, qtyUnit: conv.qtyUnit };
+  const asOf = invoice?.periodEnd ?? week;
 
-  const [assignmentRows, history] = await Promise.all([loadAssignments(pool, id), loadRollupHistory(pool, period, "truck", id)]);
+  const [assignmentRows, history] = await Promise.all([
+    loadAssignments(pool, id),
+    loadRollupHistory(pool, week, currency, "truck", id, conv),
+  ]);
 
   const forMatch: TruckAssignmentForMatch[] = assignmentRows.map((a) => ({
     driverId: a.driver_id,
@@ -252,15 +260,15 @@ export async function getTruckDetail(pool: Pool, id: string, period: string): Pr
   const truckRef = { id: truck.id, unitNumber: truck.unit_number };
   if (invoice === null) {
     return {
-      period,
+      ...header,
       invoiceId: null,
       truck: truckRef,
       asOf,
       assignedCard,
       assignments,
-      summary: toRollup(EMPTY_SUMS),
-      fleet: { avgBilledUsdPerGal: null, gallons: 0, stopCount: 0 },
-      avgVsFleetUsdPerGal: null,
+      summary: toRollup(EMPTY_SUMS, conv),
+      fleet: { avgBilledPerUnit: null, qty: 0, stopCount: 0 },
+      avgVsFleetPerUnit: null,
       favouredStations: { stations: [], unresolvedStationStops: 0 },
       history,
     };
@@ -268,23 +276,23 @@ export async function getTruckDetail(pool: Pool, id: string, period: string): Pr
 
   const [groups, favouredStations] = await Promise.all([
     loadRollupSums(pool, invoice.id, "truck"),
-    loadFavouredStations(pool, invoice.id, "truck", id),
+    loadFavouredStations(pool, invoice.id, "truck", id, conv),
   ]);
-  const summary = toRollup(groups.get(id) ?? EMPTY_SUMS);
-  const fleet = toRollup(fleetSums(groups));
+  const summary = toRollup(groups.get(id) ?? EMPTY_SUMS, conv);
+  const fleet = toRollup(fleetSums(groups), conv);
 
   return {
-    period,
+    ...header,
     invoiceId: invoice.id,
     truck: truckRef,
     asOf,
     assignedCard,
     assignments,
     summary,
-    fleet: { avgBilledUsdPerGal: fleet.avgBilledUsdPerGal, gallons: fleet.gallons, stopCount: fleet.stopCount },
-    avgVsFleetUsdPerGal:
-      summary.avgBilledUsdPerGal !== null && fleet.avgBilledUsdPerGal !== null
-        ? summary.avgBilledUsdPerGal - fleet.avgBilledUsdPerGal
+    fleet: { avgBilledPerUnit: fleet.avgBilledPerUnit, qty: fleet.qty, stopCount: fleet.stopCount },
+    avgVsFleetPerUnit:
+      summary.avgBilledPerUnit !== null && fleet.avgBilledPerUnit !== null
+        ? summary.avgBilledPerUnit - fleet.avgBilledPerUnit
         : null,
     favouredStations,
     history,

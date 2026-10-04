@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
-import type { ExpressMatchStatus } from "../db/types.js";
+import type { ExpressMatchStatus, InvoiceCurrency } from "../db/types.js";
+import { loadWeekInvoice, type WeekQuery } from "./units.js";
 
 export interface ExpressChargeDriver {
   id: string;
@@ -37,11 +38,12 @@ export interface ExpressChargeItem {
   trailerRaw: string | null;
   cdlRaw: string | null;
   tripNumberRaw: string | null;
-  amountUsd: number;
-  /** BVD's flat per-code fee, carried per row and never folded into `amountUsd`. */
-  feeUsd: number;
-  totalUsd: number;
-  currency: "USD";
+  /** In the invoice's currency, as billed. */
+  amount: number;
+  /** BVD's flat per-code fee, carried per row and never folded into `amount`. */
+  fee: number;
+  total: number;
+  currency: InvoiceCurrency;
   payee: string | null;
   /** Verbatim — no trimming, casing or categorisation. */
   note: string | null;
@@ -50,17 +52,20 @@ export interface ExpressChargeItem {
 
 export interface ExpressChargeTotals {
   count: number;
-  amountUsd: number;
-  /** Separate from `amountUsd` (A8.6: "surface the $3.00 fee total separately"). */
-  feeUsd: number;
-  /** `amountUsd + feeUsd`, summed in SQL — the figure that ties to the invoice's printed express total. */
-  totalUsd: number;
-  currency: "USD";
+  amount: number;
+  /** Separate from `amount` (A8.6: "surface the $3.00 fee total separately"). */
+  fee: number;
+  /** `amount + fee`, summed in SQL — the figure that ties to the invoice's printed express total. */
+  total: number;
+  currency: InvoiceCurrency;
 }
 
 export interface ExpressChargesResult {
-  period: string;
-  /** `null` when no invoice has this `period_start` — an empty result, not an error. */
+  /** The billing week's end, as asked. */
+  week: string;
+  /** The side of the week shown: every money field below is in it. */
+  currency: InvoiceCurrency;
+  /** `null` when that side has no invoice in this week — an empty result, not an error. */
   invoiceId: string | null;
   rows: ExpressChargeItem[];
   totals: ExpressChargeTotals;
@@ -95,7 +100,7 @@ interface TotalsRow {
   total: string;
 }
 
-function toItem(row: ExpressChargeRowWithJoins): ExpressChargeItem {
+function toItem(row: ExpressChargeRowWithJoins, currency: InvoiceCurrency): ExpressChargeItem {
   return {
     id: row.id,
     expressCode: row.express_code,
@@ -114,10 +119,10 @@ function toItem(row: ExpressChargeRowWithJoins): ExpressChargeItem {
     trailerRaw: row.trailer_raw,
     cdlRaw: row.cdl_raw,
     tripNumberRaw: row.trip_number_raw,
-    amountUsd: Number(row.amount),
-    feeUsd: Number(row.fee),
-    totalUsd: Number(row.total),
-    currency: "USD",
+    amount: Number(row.amount),
+    fee: Number(row.fee),
+    total: Number(row.total),
+    currency,
     payee: row.payee,
     note: row.note,
     category: row.category,
@@ -125,31 +130,30 @@ function toItem(row: ExpressChargeRowWithJoins): ExpressChargeItem {
 }
 
 /**
- * `GET /express-charges?period=` (A8.6, A13). `period` is
- * `invoices.period_start` as `YYYY-MM-DD`, the same key `GET /overview` takes,
- * since that is what the frontend's period selector holds (A7).
+ * `GET /express-charges?week=&currency=` (A8.6, A13). `week` is a billing
+ * week's end (D26), the key every period-scoped route takes; the invoice read
+ * is the one of that currency in it. Express charges are money only, so
+ * `?units=` has nothing to convert here.
  *
  * A read, not a resolution: `driver_id` and `match_status` are the columns
  * `importInvoice()` wrote via `resolveExpressDriver()`, and nothing here
- * re-resolves. A period with no invoice comes back empty with zero totals.
- * Unpaginated — a real invoice carries about six of these.
+ * re-resolves. A week with no invoice on that side comes back empty with zero
+ * totals. Unpaginated — a real invoice carries about six of these.
  */
-export async function listExpressCharges(pool: Pool, period: string): Promise<ExpressChargesResult> {
-  const { rows: invoiceRows } = await pool.query<{ id: string }>(
-    // US invoices only until T-63's billing weeks (T-61).
-    "SELECT id FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
-    [period],
-  );
-  const invoiceId = invoiceRows[0]?.id ?? null;
+export async function listExpressCharges(pool: Pool, query: WeekQuery): Promise<ExpressChargesResult> {
+  const { week, currency } = query;
+  const invoice = await loadWeekInvoice(pool, week, currency);
 
-  if (invoiceId === null) {
+  if (invoice === null) {
     return {
-      period,
+      week,
+      currency,
       invoiceId: null,
       rows: [],
-      totals: { count: 0, amountUsd: 0, feeUsd: 0, totalUsd: 0, currency: "USD" },
+      totals: { count: 0, amount: 0, fee: 0, total: 0, currency },
     };
   }
+  const invoiceId = invoice.id;
 
   const [{ rows }, { rows: totalsRows }] = await Promise.all([
     pool.query<ExpressChargeRowWithJoins>(
@@ -178,15 +182,16 @@ export async function listExpressCharges(pool: Pool, period: string): Promise<Ex
 
   const totals = totalsRows[0]!;
   return {
-    period,
+    week,
+    currency,
     invoiceId,
-    rows: rows.map(toItem),
+    rows: rows.map((row) => toItem(row, currency)),
     totals: {
       count: Number(totals.count),
-      amountUsd: Number(totals.amount),
-      feeUsd: Number(totals.fee),
-      totalUsd: Number(totals.total),
-      currency: "USD",
+      amount: Number(totals.amount),
+      fee: Number(totals.fee),
+      total: Number(totals.total),
+      currency,
     },
   };
 }

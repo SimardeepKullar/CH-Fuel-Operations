@@ -17,16 +17,17 @@ const A900000001: TransactionListItem = {
   driver: { resolved: "JORDAN", raw: "JORDAN", agrees: true },
   truck: { resolved: "072", raw: "072", agrees: true },
   station: { id: "st-1", loveNumber: 294, city: "Dallas", state: "TX" },
-  gallons: 40.0,
-  retailUsdPerGal: 5.799,
-  billedUsdPerGal: 5.499,
-  totalUsd: 238.26,
+  qty: 40.0,
+  qtyUnit: "gal",
+  retailPerUnit: 5.799,
+  billedPerUnit: 5.499,
+  total: 238.26,
   currency: "USD",
   receiptStatus: "confirmed",
   flags: [],
   lines: [
-    { productCode: "TA", gallons: 40.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 219.96, currency: "USD" },
-    { productCode: "DF", gallons: 3.0, retailUsdPerGal: 6.2, billedUsdPerGal: 6.1, amountUsd: 18.3, currency: "USD" },
+    { productCode: "TA", qty: 40.0, retailPerUnit: 5.799, billedPerUnit: 5.499, amount: 219.96, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
+    { productCode: "DF", qty: 3.0, retailPerUnit: 6.2, billedPerUnit: 6.1, amount: 18.3, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
   ],
 };
 
@@ -41,7 +42,7 @@ describe("StopExpansion", () => {
   it("the stop total is the stored total, not a client re-sum of the lines", () => {
     // Deliberately inconsistent lines vs. totalUsd to prove the component
     // trusts the stored figure rather than adding lines itself.
-    const stop: TransactionListItem = { ...A900000001, totalUsd: 999.99 };
+    const stop: TransactionListItem = { ...A900000001, total: 999.99 };
     render(<StopExpansion stop={stop} />);
     expect(screen.getByTestId("stop-total").textContent).toBe("$999.99");
   });
@@ -60,7 +61,7 @@ describe("StopExpansion", () => {
   });
 
   it("gallons render em-dash, never 0, when the stop carries no TA line", () => {
-    const stop: TransactionListItem = { ...A900000001, gallons: null, lines: [] };
+    const stop: TransactionListItem = { ...A900000001, qty: null, lines: [] };
     render(<StopExpansion stop={stop} />);
     const total = screen.getByTestId("stop-total").closest(".stop-expansion-total")!;
     expect(total.textContent).toContain("—");

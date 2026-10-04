@@ -38,8 +38,8 @@ async function teardown(adminPool: Pool, scopedPool: Pool, schema: string): Prom
   await adminPool.end();
 }
 
-async function getExpressCharges(app: App, period: string): Promise<ExpressChargesResult> {
-  const response = await app.handle(new Request(`http://localhost/api/v1/express-charges?period=${period}`));
+async function getExpressCharges(app: App, week: string): Promise<ExpressChargesResult> {
+  const response = await app.handle(new Request(`http://localhost/api/v1/express-charges?week=${week}`));
   expect(response.status).toBe(200);
   return (await response.json()) as ExpressChargesResult;
 }
@@ -93,9 +93,10 @@ describe.skipIf(!hasDatabase)("GET /express-charges (integration)", () => {
   });
 
   it("returns rows oldest-first with the driver resolved on a matched row", async () => {
-    const result = await getExpressCharges(app, "2026-03-01");
+    const result = await getExpressCharges(app, "2026-03-07");
 
-    expect(result.period).toBe("2026-03-01");
+    expect(result.week).toBe("2026-03-07");
+    expect(result.currency).toBe("USD");
     expect(result.rows.map((r) => r.expressCode)).toEqual(["X1", "X2"]);
     expect(result.rows[0]).toMatchObject({
       matchStatus: "matched",
@@ -106,7 +107,7 @@ describe.skipIf(!hasDatabase)("GET /express-charges (integration)", () => {
   });
 
   it("a blank driver is a null driver and null raw name, unmatched — never a guess", async () => {
-    const blank = (await getExpressCharges(app, "2026-03-01")).rows[1]!;
+    const blank = (await getExpressCharges(app, "2026-03-07")).rows[1]!;
 
     expect(blank.driver).toBeNull();
     expect(blank.driverNameRaw).toBeNull();
@@ -114,46 +115,47 @@ describe.skipIf(!hasDatabase)("GET /express-charges (integration)", () => {
   });
 
   it("a null truck is passed through as null — a CSV import's property, not an error", async () => {
-    const blank = (await getExpressCharges(app, "2026-03-01")).rows[1]!;
+    const blank = (await getExpressCharges(app, "2026-03-07")).rows[1]!;
 
     expect(blank.truck).toBeNull();
     expect(blank.unitRaw).toBeNull();
   });
 
   it("keeps the fee separate: per row, and as its own total beside the amount total", async () => {
-    const result = await getExpressCharges(app, "2026-03-01");
+    const result = await getExpressCharges(app, "2026-03-07");
 
-    expect(result.rows[1]).toMatchObject({ amountUsd: 200, feeUsd: 3, totalUsd: 203 });
-    expect(result.totals).toEqual({ count: 2, amountUsd: 310, feeUsd: 6, totalUsd: 316, currency: "USD" });
+    expect(result.rows[1]).toMatchObject({ amount: 200, fee: 3, total: 203 });
+    expect(result.totals).toEqual({ count: 2, amount: 310, fee: 6, total: 316, currency: "USD" });
   });
 
   it("returns note, category and payee verbatim — including surrounding whitespace, and null category", async () => {
-    const [x1, x2] = (await getExpressCharges(app, "2026-03-01")).rows;
+    const [x1, x2] = (await getExpressCharges(app, "2026-03-07")).rows;
 
     expect(x1).toMatchObject({ note: "repair", category: "Repairs", payee: null });
     expect(x2).toMatchObject({ note: "  Lumper ", category: null, payee: "lumper fees" });
   });
 
   it("surfaces trailer, CDL and trip number rather than dropping the columns", async () => {
-    const [x1, x2] = (await getExpressCharges(app, "2026-03-01")).rows;
+    const [x1, x2] = (await getExpressCharges(app, "2026-03-07")).rows;
 
     expect(x1).toMatchObject({ trailerRaw: "TR-9", cdlRaw: "CDL-1", tripNumberRaw: "4455" });
     expect(x2).toMatchObject({ trailerRaw: null, cdlRaw: null, tripNumberRaw: null });
   });
 
   it("a period with no invoice is empty with zero totals, not an error", async () => {
-    const result = await getExpressCharges(app, "2026-04-01");
+    const result = await getExpressCharges(app, "2026-04-07");
 
     expect(result).toEqual({
-      period: "2026-04-01",
+      week: "2026-04-07",
+      currency: "USD",
       invoiceId: null,
       rows: [],
-      totals: { count: 0, amountUsd: 0, feeUsd: 0, totalUsd: 0, currency: "USD" },
+      totals: { count: 0, amount: 0, fee: 0, total: 0, currency: "USD" },
     });
   });
 
   it("400s a malformed period through the app", async () => {
-    const response = await app.handle(new Request("http://localhost/api/v1/express-charges?period=nope"));
+    const response = await app.handle(new Request("http://localhost/api/v1/express-charges?week=nope"));
     expect(response.status).toBe(400);
   });
 });
@@ -190,10 +192,10 @@ describe.skipIf(!hasDatabase || !hasRealFixtures)("GET /express-charges on 99921
   }
 
   async function importedPeriod(): Promise<string> {
-    const { rows } = await scopedPool.query<{ period: string }>(
-      "SELECT to_char(period_start, 'YYYY-MM-DD') AS period FROM invoices",
+    const { rows } = await scopedPool.query<{ week: string }>(
+      "SELECT to_char(billing_week_end, 'YYYY-MM-DD') AS week FROM invoices",
     );
-    return rows[0]!.period;
+    return rows[0]!.week;
   }
 
   it("six rows summing to $1,543.13 — the invoice's printed express total — with $18.00 of fees held apart", async () => {
@@ -202,14 +204,14 @@ describe.skipIf(!hasDatabase || !hasRealFixtures)("GET /express-charges on 99921
     expect(result.rows).toHaveLength(6);
     expect(result.totals).toEqual({
       count: 6,
-      amountUsd: 1525.13,
-      feeUsd: 18,
-      totalUsd: 1543.13,
+      amount: 1525.13,
+      fee: 18,
+      total: 1543.13,
       currency: "USD",
     });
     for (const row of result.rows) {
-      expect(row.feeUsd).toBe(3);
-      expect(row.totalUsd).toBeCloseTo(row.amountUsd + row.feeUsd, 2);
+      expect(row.fee).toBe(3);
+      expect(row.total).toBeCloseTo(row.amount + row.fee, 2);
     }
   });
 
@@ -222,9 +224,9 @@ describe.skipIf(!hasDatabase || !hasRealFixtures)("GET /express-charges on 99921
       driver: null,
       matchStatus: "unmatched",
       unitRaw: "073",
-      amountUsd: 200,
-      feeUsd: 3,
-      totalUsd: 203,
+      amount: 200,
+      fee: 3,
+      total: 203,
     });
     // On the real PDF, "lumper" / "repair" arrive in the Payee column: `note`
     // and `category` are null on all six rows. The endpoint returns each
@@ -268,7 +270,7 @@ describe.skipIf(!hasDatabase || !hasRealFixtures)("GET /express-charges on 99921
 
     const result = await getExpressCharges(app, await importedPeriod());
 
-    expect(result.totals.totalUsd).toBe(1543.13);
+    expect(result.totals.total).toBe(1543.13);
     expect(result.rows).toHaveLength(6);
     for (const row of result.rows) {
       expect(row.truck).toBeNull();

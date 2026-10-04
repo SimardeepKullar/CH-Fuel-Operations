@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
-import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
+import type { InvoiceCurrency } from "../db/types.js";
 import { runAnomalies } from "../anomaly/runAnomalies.js";
 import { getCardByNumber } from "../catalog/cards.js";
 import { getTruckByUnitNumber } from "../catalog/trucks.js";
+import { qtyUnitFor } from "../actuals/units.js";
 import { resolveExpressDriver, type ExpressDriverResolution } from "../resolve/resolveDriver.js";
 import { resolveStation } from "../resolve/resolveStation.js";
 import { resolveTruckForStop } from "../resolve/resolveTruck.js";
@@ -214,12 +215,6 @@ async function resolveExpressChargeDrivers(
     resolutions.push(await resolveExpressDriver(pool, row.driverNameRaw));
   }
   return resolutions;
-}
-
-/** Quantity unit follows currency (D25): BVD bills Canadian fuel in litres
- * and US fuel in gallons — measured on 999217 and 999210, one each. */
-export function qtyUnitFor(currency: InvoiceCurrency): InvoiceQtyUnit {
-  return currency === "CAD" ? "L" : "gal";
 }
 
 export interface ActualRange {
@@ -475,7 +470,8 @@ export async function importInvoice(
     periodStart: parsed.header.periodStart,
     periodEnd: parsed.header.periodEnd,
     currency: parsed.header.currency,
-    grandTotalUsd: parsed.printedTotals.grandTotal,
+    qtyUnit: qtyUnitFor(parsed.header.currency),
+    grandTotal: parsed.printedTotals.grandTotal,
     productTotals: parsed.printedTotals.products,
     parserRejections: parsed.rejections,
     reconcileResult,

@@ -8,7 +8,7 @@ import TopSpendByDriver, { toTopSpendChartData } from "./TopSpendByDriver";
 afterEach(cleanup);
 
 function driver(overrides: Partial<OverviewTopSpendDriver> = {}): OverviewTopSpendDriver {
-  return { driverId: "driver-1", driverName: "JORDAN", totalUsd: 500, gallons: 90, avgBilledUsdPerGal: 5.5, ...overrides };
+  return { driverId: "driver-1", driverName: "JORDAN", total: 500, qty: 90, avgBilledPerUnit: 5.5, ...overrides };
 }
 
 describe("toTopSpendChartData", () => {
@@ -19,7 +19,7 @@ describe("toTopSpendChartData", () => {
   });
 
   it("carries spend, gallons and avg billed price through unchanged", () => {
-    const data = toTopSpendChartData([driver({ totalUsd: 1234.56, gallons: 200.5, avgBilledUsdPerGal: 5.2395 })]);
+    const data = toTopSpendChartData([driver({ total: 1234.56, qty: 200.5, avgBilledPerUnit: 5.2395 })]);
     expect(data[0]).toMatchObject({ totalUsd: 1234.56, gallons: 200.5, avgBilledUsdPerGal: 5.2395 });
   });
 });

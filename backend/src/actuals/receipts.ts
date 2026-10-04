@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { ReceiptOutcome, ReceiptStatus } from "../db/types.js";
+import type { InvoiceCurrency, ReceiptOutcome, ReceiptStatus } from "../db/types.js";
 import {
   driverRawResolved,
   stationSummary,
@@ -60,8 +60,9 @@ export interface ReceiptQueueItem {
   driver: RawResolvedString;
   truck: RawResolvedString;
   station: TransactionStationSummary | null;
-  totalUsd: number;
-  currency: "USD";
+  /** In `currency`, as billed. */
+  total: number;
+  currency: InvoiceCurrency;
   receiptStatus: ReceiptStatus;
   /** Whether this stop carries an undismissed anomaly — the field
    * `EXCEPTIONS_FIRST_QUEUE_ORDER` sorts on (D17). */
@@ -82,6 +83,7 @@ interface QueueRow {
   id: string;
   occurred_at: Date;
   total: string;
+  currency: InvoiceCurrency;
   receipt_status: ReceiptStatus;
   unit_raw: string;
   driver_name_raw: string;
@@ -101,18 +103,44 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
     driver: driverRawResolved(row),
     truck: truckRawResolved(row),
     station: stationSummary(row),
-    totalUsd: Number(row.total),
-    currency: "USD",
+    total: Number(row.total),
+    currency: row.currency,
     receiptStatus: row.receipt_status,
     hasException: row.has_exception,
   };
 }
 
-async function loadProgress(pool: Pool): Promise<ReceiptQueueProgress> {
+/** The queue's optional narrowing (T-63): a billing week, a side of it, or both.
+ * Neither is required — the queue is a standing worklist across every week
+ * (D17), and the sidebar badge counts all of it. */
+export interface ReceiptQueueScope {
+  /** A billing week's end, `YYYY-MM-DD`. */
+  week?: string;
+  currency?: InvoiceCurrency;
+}
+
+/** Parameterised `AND` conditions over `invoices i`, shared by the queue and its progress. */
+function scopeClause(scope: ReceiptQueueScope): { sql: string; params: unknown[] } {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (scope.week !== undefined) {
+    params.push(scope.week);
+    conditions.push(`i.billing_week_end = $${params.length}::date`);
+  }
+  if (scope.currency !== undefined) {
+    params.push(scope.currency);
+    conditions.push(`i.currency = $${params.length}`);
+  }
+  return { sql: conditions.map((c) => ` AND ${c}`).join(""), params };
+}
+
+async function loadProgress(pool: Pool, scope: ReceiptQueueScope): Promise<ReceiptQueueProgress> {
+  const { sql, params } = scopeClause(scope);
   const { rows } = await pool.query<{ done: string; total: string }>(
     `SELECT count(*) FILTER (WHERE fs.receipt_status = 'confirmed') AS done, count(*) AS total
      FROM fuel_stops fs
-     JOIN invoices i ON i.id = fs.invoice_id AND i.currency = 'USD' -- US invoices only until T-63's billing weeks (T-61).`,
+     JOIN invoices i ON i.id = fs.invoice_id${sql}`,
+    params,
   );
   return { done: Number(rows[0]!.done), total: Number(rows[0]!.total) };
 }
@@ -120,21 +148,25 @@ async function loadProgress(pool: Pool): Promise<ReceiptQueueProgress> {
 /**
  * `GET /receipt-queue` (A8.5). Unconfirmed stops (`receipt_status <>
  * 'confirmed'` — `'pending'` and `'missing'` both still need a human look)
- * with enough context to search Samsara, plus `progress` over every stop
- * system-wide so the dispatcher sees overall completion, not just what's
- * left. A confirmed stop is excluded at the WHERE clause, not filtered
+ * with enough context to search Samsara, plus `progress` over every stop in
+ * the same scope so the dispatcher sees overall completion, not just what's
+ * left. `scope` narrows both to a week and/or one side of it (T-63); with none,
+ * both are system-wide and both currencies are in the queue, each item carrying
+ * its own `currency`. A confirmed stop is excluded at the WHERE clause, not filtered
  * client-side, so it can never reappear once `POST /receipt-checks` confirms
  * it (T-35's own DoD).
  */
 export async function listReceiptQueue(
   pool: Pool,
   orderSpec: QueueOrderSpec = DEFAULT_QUEUE_ORDER,
+  scope: ReceiptQueueScope = {},
 ): Promise<ReceiptQueueResult> {
   const orderClause = buildQueueOrderClause(orderSpec);
+  const { sql: scopeSql, params: scopeParams } = scopeClause(scope);
 
   const [{ rows }, progress] = await Promise.all([
     pool.query<QueueRow>(
-      `SELECT fs.id, fs.occurred_at, fs.total, fs.receipt_status,
+      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, fs.receipt_status,
               fs.unit_raw, fs.driver_name_raw,
               t.unit_number AS truck_unit_number,
               d.display_name AS driver_display_name,
@@ -145,15 +177,15 @@ export async function listReceiptQueue(
                 WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL
               ) AS has_exception
        FROM fuel_stops fs
-       -- US invoices only until T-63's billing weeks (T-61). T-63 gives this screen a ?currency=.
-       JOIN invoices i ON i.id = fs.invoice_id AND i.currency = 'USD'
+       JOIN invoices i ON i.id = fs.invoice_id
        LEFT JOIN trucks t ON t.id = fs.truck_id
        LEFT JOIN drivers d ON d.id = fs.driver_id
        LEFT JOIN stations s ON s.id = fs.station_id
-       WHERE fs.receipt_status <> 'confirmed'
+       WHERE fs.receipt_status <> 'confirmed'${scopeSql}
        ${orderClause}`,
+      scopeParams,
     ),
-    loadProgress(pool),
+    loadProgress(pool, scope),
   ]);
 
   return { items: rows.map(toQueueItem), progress };

@@ -22,16 +22,22 @@ describe("buildTransactionFilterClause", () => {
     expect(clause.params).toEqual([dateTo]);
   });
 
-  it("invoiceId alone", () => {
-    const clause = buildTransactionFilterClause({ invoiceId: "invoice-1" });
-    expect(clause.whereSql).toBe("WHERE fs.invoice_id = $1");
-    expect(clause.params).toEqual(["invoice-1"]);
+  it("week alone filters on the invoice's billing week, parameterised", () => {
+    const clause = buildTransactionFilterClause({ week: "2026-09-09" });
+    expect(clause.whereSql).toBe("WHERE i.billing_week_end = $1::date");
+    expect(clause.params).toEqual(["2026-09-09"]);
   });
 
-  it("invoiceId: null (a period that matched no invoice) still adds the condition, not a no-op", () => {
-    const clause = buildTransactionFilterClause({ invoiceId: null });
-    expect(clause.whereSql).toBe("WHERE fs.invoice_id = $1");
-    expect(clause.params).toEqual([null]);
+  it("week and currency together pick one side of the week", () => {
+    const clause = buildTransactionFilterClause({ week: "2026-09-09", currency: "CAD" });
+    expect(clause.whereSql).toBe("WHERE i.billing_week_end = $1::date AND i.currency = $2");
+    expect(clause.params).toEqual(["2026-09-09", "CAD"]);
+  });
+
+  it("currency alone, with no week, filters both weeks' one side", () => {
+    const clause = buildTransactionFilterClause({ currency: "USD" });
+    expect(clause.whereSql).toBe("WHERE i.currency = $1");
+    expect(clause.params).toEqual(["USD"]);
   });
 
   it("driverId alone", () => {
@@ -108,7 +114,8 @@ describe("buildTransactionFilterClause", () => {
     const clause = buildTransactionFilterClause({
       dateFrom,
       dateTo,
-      invoiceId: "invoice-1",
+      week: "2026-09-09",
+      currency: "USD",
       driverId: "driver-1",
       truckId: "truck-1",
       cardId: "card-1",
@@ -120,7 +127,8 @@ describe("buildTransactionFilterClause", () => {
     expect(clause.params).toEqual([
       dateFrom,
       dateTo,
-      "invoice-1",
+      "2026-09-09",
+      "USD",
       "driver-1",
       "truck-1",
       "card-1",

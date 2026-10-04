@@ -23,9 +23,9 @@ export function toTopSpendChartData(drivers: readonly OverviewTopSpendDriver[]):
   return drivers.map((d, index) => ({
     key: d.driverId ?? `unresolved-${index}`,
     label: d.driverName ?? "Unresolved",
-    totalUsd: d.totalUsd,
-    gallons: d.gallons,
-    avgBilledUsdPerGal: d.avgBilledUsdPerGal,
+    totalUsd: d.total,
+    gallons: d.qty,
+    avgBilledUsdPerGal: d.avgBilledPerUnit,
   }));
 }
 

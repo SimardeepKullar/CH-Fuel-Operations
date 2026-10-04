@@ -7,6 +7,7 @@ import {
   recordReceiptCheck,
 } from "../../actuals/receipts.js";
 import { problemResponse } from "../problem.js";
+import { badRequest, currencySchema, isoDateSchema } from "../query.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -15,12 +16,26 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+const queueScopeSchema = z.object({
+  week: isoDateSchema.optional(),
+  currency: currencySchema.optional(),
+});
+
 /** `GET /receipt-queue` — A8.5's work queue, ordered `DEFAULT_QUEUE_ORDER`
  * (D17: the caller never sees a strategy name, only the resulting order —
  * swapping to `EXCEPTIONS_FIRST_QUEUE_ORDER` is a code change here, not a
- * migration). */
-export async function handleGetReceiptQueue(pool: Pool, _url: URL): Promise<Response> {
-  const result = await listReceiptQueue(pool, DEFAULT_QUEUE_ORDER);
+ * migration). `week` and `currency` are both optional here (T-63): the queue
+ * is a standing worklist across every week and both sides, and either narrows
+ * it. Malformed is still a 400. */
+export async function handleGetReceiptQueue(pool: Pool, url: URL): Promise<Response> {
+  const parsed = queueScopeSchema.safeParse({
+    week: url.searchParams.get("week") ?? undefined,
+    currency: url.searchParams.get("currency") ?? undefined,
+  });
+  if (!parsed.success) {
+    return badRequest(url, parsed.error.message);
+  }
+  const result = await listReceiptQueue(pool, DEFAULT_QUEUE_ORDER, parsed.data);
   return jsonResponse(result);
 }
 

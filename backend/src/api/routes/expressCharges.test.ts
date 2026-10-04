@@ -19,14 +19,14 @@ async function get(query: string): Promise<Response> {
 }
 
 describe("handleListExpressCharges", () => {
-  it("400s a missing period without touching the database", async () => {
+  it("400s a missing week without touching the database", async () => {
     const response = await get("");
     expect(response.status).toBe(400);
     expect(response.headers.get("content-type")).toBe("application/problem+json");
   });
 
-  it("400s a period that is not a YYYY-MM-DD date", async () => {
-    expect((await get("?period=2026-09")).status).toBe(400);
-    expect((await get("?period=last-week")).status).toBe(400);
+  it("400s a week that is not a YYYY-MM-DD date", async () => {
+    expect((await get("?week=2026-09")).status).toBe(400);
+    expect((await get("?week=last-week")).status).toBe(400);
   });
 });

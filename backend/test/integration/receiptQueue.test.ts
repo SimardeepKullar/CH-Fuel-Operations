@@ -143,7 +143,7 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
         driver: { resolved: string | null; raw: string; agrees: boolean | null };
         truck: { resolved: string | null; raw: string; agrees: boolean | null };
         station: unknown;
-        totalUsd: number;
+        total: number;
         receiptStatus: string;
       }>;
       progress: { done: number; total: number };
@@ -157,7 +157,7 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     const item = body.items.find((i) => i.id === ids.stopA1)!;
     expect(item.driver.resolved).toBe("DRIVER A");
     expect(item.truck.resolved).toBe("201");
-    expect(item.totalUsd).toBe(100);
+    expect(item.total).toBe(100);
     expect(item.receiptStatus).toBe("pending");
 
     expect(body.progress).toEqual({ done: 1, total: 5 }); // stopBConfirmed is the one "done" stop

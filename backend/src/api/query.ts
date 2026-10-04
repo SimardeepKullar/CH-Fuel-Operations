@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { InvoiceCurrency } from "../db/types.js";
+import type { RequestedUnits, WeekQuery } from "../actuals/units.js";
+import { problemResponse } from "./problem.js";
 
 /** A real calendar date as `YYYY-MM-DD` — the shape alone would let
  * `2026-13-45` through to Postgres, which answers `22008` and a 500. */
@@ -19,9 +20,41 @@ export const unitsSchema = z.enum(["imperial", "metric"]);
 
 export type ActualsUnits = z.infer<typeof unitsSchema>;
 
-/** The week/currency/units a period-scoped Actuals route was asked for (T-63). */
-export interface WeekScope {
-  week: string;
-  currency: InvoiceCurrency | null;
-  units: ActualsUnits | null;
+const weekQuerySchema = z.object({
+  week: isoDateSchema,
+  currency: currencySchema.default("USD"),
+  units: unitsSchema.optional(),
+});
+
+function paramsOf(url: URL, keys: readonly string[]): Record<string, string | undefined> {
+  return Object.fromEntries(keys.map((key) => [key, url.searchParams.get(key) ?? undefined]));
 }
+
+function badRequest(url: URL, detail: string): Response {
+  return problemResponse({ title: "Bad Request", status: 400, detail, instance: url.pathname });
+}
+
+/**
+ * The `?week=&currency=&units=` every period-scoped Actuals read takes (T-63).
+ * `week` is required and a real `YYYY-MM-DD` date; `currency` is `USD` or `CAD`
+ * and defaults to `USD` when absent — one-sided screens cannot sum gallons and
+ * litres, and the response says which side it served; `units` is `imperial` or
+ * `metric`, absent meaning as printed. Anything else is a 400 problem+json,
+ * returned for the caller to pass straight back.
+ */
+export function parseWeekQuery(url: URL): WeekQuery | Response {
+  const parsed = weekQuerySchema.safeParse(paramsOf(url, ["week", "currency", "units"]));
+  if (!parsed.success) {
+    return badRequest(url, parsed.error.message);
+  }
+  return { week: parsed.data.week, currency: parsed.data.currency, units: parsed.data.units ?? null };
+}
+
+/** `?units=` alone, for the routes with no week (a transaction by id, a
+ * station's whole price series). */
+export function parseUnits(url: URL): RequestedUnits | Response {
+  const parsed = unitsSchema.optional().safeParse(url.searchParams.get("units") ?? undefined);
+  return parsed.success ? (parsed.data ?? null) : badRequest(url, parsed.error.message);
+}
+
+export { badRequest };

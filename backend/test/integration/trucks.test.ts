@@ -113,7 +113,7 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
 
   describe("detail: assignment history", () => {
     it("returns every assignment of the truck, oldest to newest, each with its driver and card", async () => {
-      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-01`);
+      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-10`);
 
       expect(detail.truck).toEqual({ id: ids.t1, unitNumber: "T37-T1" });
       expect(detail.assignments.map((a) => [a.driver.displayName, a.effectiveFrom, a.effectiveTo])).toEqual([
@@ -127,13 +127,13 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
 
     it("assigned card: in force on the effective_to day itself (inclusive), gone the day after", async () => {
       // P1 ends 03-10 — the last day of Ann's assignment to T1.
-      const onLastDay = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-01`);
+      const onLastDay = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-10`);
       expect(onLastDay.asOf).toBe("2026-03-10");
       expect(onLastDay.assignedCard).toMatchObject({ cardNumber: "T37-ANN" });
       expect(onLastDay.assignments.map((a) => a.inForce)).toEqual([false, true]);
 
       // P2 ends 03-17: Ann has left T1, so it has no card in force, but the history is unchanged.
-      const dayAfter = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-11`);
+      const dayAfter = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-17`);
       expect(dayAfter.asOf).toBe("2026-03-17");
       expect(dayAfter.assignedCard).toBeNull();
       expect(dayAfter.assignments).toHaveLength(2);
@@ -141,13 +141,13 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
     });
 
     it("the new truck's assignment is in force from its effective_from day, and not before", async () => {
-      const inP2 = await get<TruckDetail>(`/trucks/${ids.t2}?period=2026-03-11`);
+      const inP2 = await get<TruckDetail>(`/trucks/${ids.t2}?week=2026-03-17`);
       expect(inP2.assignedCard).toMatchObject({ cardNumber: "T37-ANN" });
       expect(inP2.assignments).toHaveLength(1);
       expect(inP2.assignments[0]).toMatchObject({ effectiveFrom: "2026-03-11", effectiveTo: null, inForce: true });
 
       // In P1 (ends 03-10) T2's assignment has not started.
-      const inP1 = await get<TruckDetail>(`/trucks/${ids.t2}?period=2026-03-01`);
+      const inP1 = await get<TruckDetail>(`/trucks/${ids.t2}?week=2026-03-10`);
       expect(inP1.assignedCard).toBeNull();
       expect(inP1.assignments[0]!.inForce).toBe(false);
     });
@@ -155,7 +155,7 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
     it("a truck with no assignments has an empty history and no assigned card — not an error", async () => {
       const lonely = await insertTruck(scopedPool, "T37-LONELY");
 
-      const detail = await get<TruckDetail>(`/trucks/${lonely}?period=2026-03-01`);
+      const detail = await get<TruckDetail>(`/trucks/${lonely}?week=2026-03-10`);
 
       expect(detail.assignments).toEqual([]);
       expect(detail.assignedCard).toBeNull();
@@ -164,18 +164,18 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
 
   describe("detail: stops resolve against the assignment in force then", () => {
     it("a stop dated before the reassignment still belongs to the OLD truck; the day after belongs to the new one", async () => {
-      const oldTruck = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-01`);
-      const newTruck = await get<TruckDetail>(`/trucks/${ids.t2}?period=2026-03-11`);
+      const oldTruck = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-10`);
+      const newTruck = await get<TruckDetail>(`/trucks/${ids.t2}?week=2026-03-17`);
 
       // 03-10 is Ann's last day on T1 (effective_to, inclusive): T1's stop.
-      expect(oldTruck.summary).toMatchObject({ stopCount: 1, totalUsd: 516, gallons: 100, defGallons: 4 });
+      expect(oldTruck.summary).toMatchObject({ stopCount: 1, total: 516, qty: 100, defQty: 4 });
       // 03-11 is her first day on T2: T2's stop.
-      expect(newTruck.summary).toMatchObject({ stopCount: 1, totalUsd: 300, gallons: 50 });
+      expect(newTruck.summary).toMatchObject({ stopCount: 1, total: 300, qty: 50 });
     });
 
     it("neither truck shows the other's stop in the other's period", async () => {
-      const t1InP2 = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-11`);
-      const t2InP1 = await get<TruckDetail>(`/trucks/${ids.t2}?period=2026-03-01`);
+      const t1InP2 = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-17`);
+      const t2InP1 = await get<TruckDetail>(`/trucks/${ids.t2}?week=2026-03-10`);
 
       expect(t1InP2.summary.stopCount).toBe(0);
       expect(t2InP1.summary.stopCount).toBe(0);
@@ -186,45 +186,45 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
       await scopedPool.query("DELETE FROM truck_assignments WHERE driver_id = $1", [ids.ann]);
       await insertAssignment(scopedPool, { driverId: ids.ann, truckId: ids.t2, effectiveFrom: "2026-03-01", effectiveTo: null });
 
-      const t1 = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-01`);
-      const t2 = await get<TruckDetail>(`/trucks/${ids.t2}?period=2026-03-01`);
+      const t1 = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-10`);
+      const t2 = await get<TruckDetail>(`/trucks/${ids.t2}?week=2026-03-10`);
 
       expect(t1.summary.stopCount).toBe(1);
       expect(t2.summary.stopCount).toBe(0);
     });
 
     it("carries the same rollup as a driver: weighted average against the fleet, DEF ratio, favoured stations", async () => {
-      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-01`);
+      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-10`);
 
-      expect(detail.summary.avgBilledUsdPerGal).toBeCloseTo(5, 10);
+      expect(detail.summary.avgBilledPerUnit).toBeCloseTo(5, 10);
       expect(detail.summary.defRatio).toBeCloseTo(0.04, 10);
       expect(detail.summary.receiptCompliance).toEqual({ confirmed: 1, total: 1, pct: 100 });
-      expect(detail.fleet.avgBilledUsdPerGal).toBeCloseTo(5, 10);
-      expect(detail.avgVsFleetUsdPerGal).toBeCloseTo(0, 10);
+      expect(detail.fleet.avgBilledPerUnit).toBeCloseTo(5, 10);
+      expect(detail.avgVsFleetPerUnit).toBeCloseTo(0, 10);
       expect(detail.favouredStations.stations.map((s) => [s.station.nameRaw, s.stopCount])).toEqual([["LOVES #9", 1]]);
     });
 
     it("a truck with no stops in the period returns zeros — not a 404", async () => {
-      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?period=2026-03-11`);
+      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-17`);
 
-      expect(detail.summary).toMatchObject({ stopCount: 0, totalUsd: 0, gallons: 0, anomalyCount: 0 });
-      expect(detail.summary.avgBilledUsdPerGal).toBeNull();
+      expect(detail.summary).toMatchObject({ stopCount: 0, total: 0, qty: 0, anomalyCount: 0 });
+      expect(detail.summary.avgBilledPerUnit).toBeNull();
       expect(detail.summary.defRatio).toBeNull();
-      expect(detail.avgVsFleetUsdPerGal).toBeNull();
+      expect(detail.avgVsFleetPerUnit).toBeNull();
     });
 
     it("a period with no invoice returns zeros for a real truck, and still the full assignment history", async () => {
-      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?period=2027-01-01`);
+      const detail = await get<TruckDetail>(`/trucks/${ids.t1}?week=2027-01-07`);
 
       expect(detail.invoiceId).toBeNull();
-      expect(detail.asOf).toBe("2027-01-01");
+      expect(detail.asOf).toBe("2027-01-07");
       expect(detail.summary.stopCount).toBe(0);
       expect(detail.assignments).toHaveLength(2);
     });
 
     it("404s a well-formed id that names no truck, and a malformed one, as problem+json", async () => {
       for (const id of [UNKNOWN_UUID, "072"]) {
-        const response = await app.handle(new Request(`http://localhost/api/v1/trucks/${id}?period=2026-03-01`));
+        const response = await app.handle(new Request(`http://localhost/api/v1/trucks/${id}?week=2026-03-10`));
         expect(response.status).toBe(404);
         expect(response.headers.get("content-type")).toBe("application/problem+json");
       }
@@ -237,36 +237,36 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
 
   describe("list", () => {
     it("groups by the stored truck_id: one row per truck with its own stops, and the truckless stop held apart", async () => {
-      const result = await get<TrucksResult>("/trucks?period=2026-03-11");
+      const result = await get<TrucksResult>("/trucks?week=2026-03-17");
       const t2 = result.rows.find((r) => r.truck.id === ids.t2)!;
       const t1 = result.rows.find((r) => r.truck.id === ids.t1)!;
 
       expect(result.invoiceId).not.toBeNull();
-      expect(t2).toMatchObject({ truck: { unitNumber: "T37-T2" }, stopCount: 1, totalUsd: 300, gallons: 50 });
+      expect(t2).toMatchObject({ truck: { unitNumber: "T37-T2" }, stopCount: 1, total: 300, qty: 50 });
       expect(t1.stopCount).toBe(0);
-      expect(t1.avgBilledUsdPerGal).toBeNull();
-      expect(result.unresolved).toMatchObject({ stopCount: 1, totalUsd: 400, gallons: 50 });
+      expect(t1.avgBilledPerUnit).toBeNull();
+      expect(result.unresolved).toMatchObject({ stopCount: 1, total: 400, qty: 50 });
       // Nothing vanishes: trucks + the unresolved bucket are the whole invoice.
       expect(result.fleet.stopCount).toBe(2);
-      expect(result.fleet.totalUsd).toBe(700);
-      expect(result.fleet.avgBilledUsdPerGal).toBeCloseTo(700 / 100, 10);
+      expect(result.fleet.total).toBe(700);
+      expect(result.fleet.avgBilledPerUnit).toBeCloseTo(700 / 100, 10);
     });
 
     it("lists rows spend-descending", async () => {
-      const spend = (await get<TrucksResult>("/trucks?period=2026-03-11")).rows.map((r) => r.totalUsd);
+      const spend = (await get<TrucksResult>("/trucks?week=2026-03-17")).rows.map((r) => r.total);
 
       expect(spend).toEqual([...spend].sort((a, b) => b - a));
     });
 
     it("a period with no invoice is empty with zero totals", async () => {
-      const result = await get<TrucksResult>("/trucks?period=2027-01-01");
+      const result = await get<TrucksResult>("/trucks?week=2027-01-07");
 
       expect(result.rows).toEqual([]);
-      expect(result.fleet).toMatchObject({ stopCount: 0, totalUsd: 0, avgBilledUsdPerGal: null });
+      expect(result.fleet).toMatchObject({ stopCount: 0, total: 0, avgBilledPerUnit: null });
     });
 
     it("400s a malformed period through the app", async () => {
-      await get("/trucks?period=nope", 400);
+      await get("/trucks?week=nope", 400);
     });
   });
 

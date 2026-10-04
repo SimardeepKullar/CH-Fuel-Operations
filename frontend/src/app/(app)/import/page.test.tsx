@@ -28,12 +28,13 @@ function report(overrides: Partial<ImportReport> = {}): ImportReport {
     periodStart: "2026-08-01",
     periodEnd: "2026-08-31",
     currency: "USD",
-    grandTotalUsd: "50929.71",
+    qtyUnit: "gal",
+    grandTotal: "50929.71",
     productTotals: [
-      { productCode: "TA", gallons: "9000.00", amountUsd: "47000.00", discountUsd: "500.00" },
-      { productCode: "DF", gallons: "120.00", amountUsd: "500.00", discountUsd: "10.00" },
-      { productCode: "S", gallons: null, amountUsd: "1786.58", discountUsd: null },
-      { productCode: "Express Codes", gallons: null, amountUsd: "1643.13", discountUsd: null },
+      { productCode: "TA", qty: "9000.00", amount: "47000.00", discount: "500.00" },
+      { productCode: "DF", qty: "120.00", amount: "500.00", discount: "10.00" },
+      { productCode: "S", qty: null, amount: "1786.58", discount: null },
+      { productCode: "Express Codes", qty: null, amount: "1643.13", discount: null },
     ],
     reconcile: {
       balanced: true,

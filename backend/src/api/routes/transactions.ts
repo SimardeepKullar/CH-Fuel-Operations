@@ -3,15 +3,15 @@ import { z } from "zod";
 import {
   getTransactionById,
   listTransactions,
-  resolveInvoiceIdForPeriod,
   type ListTransactionsOptions,
   type TransactionSort,
   type TransactionSortField,
 } from "../../actuals/transactions.js";
 import type { TransactionFilters } from "../../actuals/transactionQuery.js";
 import { problemResponse } from "../problem.js";
+import { currencySchema, isoDateSchema, parseUnits, unitsSchema } from "../query.js";
 
-const SORT_FIELDS = ["occurred_at", "total_usd"] as const satisfies readonly TransactionSortField[];
+const SORT_FIELDS = ["occurred_at", "total"] as const satisfies readonly TransactionSortField[];
 const RECEIPT_STATUSES = ["pending", "confirmed", "missing"] as const;
 
 const querySchema = z.object({
@@ -21,7 +21,11 @@ const querySchema = z.object({
   sortDirection: z.enum(["asc", "desc"]).default("desc"),
   includeLines: z.boolean().default(false),
   anomalyOnly: z.boolean().default(false),
-  period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "period must be a YYYY-MM-DD date").optional(),
+  /** Optional here, unlike every other period-scoped route: a driver's or a
+   * truck's transaction history (A13) spans weeks. Malformed is still a 400. */
+  week: isoDateSchema.optional(),
+  currency: currencySchema.optional(),
+  units: unitsSchema.optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
   driverId: z.string().optional(),
@@ -45,7 +49,9 @@ function parseQueryParams(searchParams: URLSearchParams): z.infer<typeof querySc
     "pageSize",
     "sortField",
     "sortDirection",
-    "period",
+    "week",
+    "currency",
+    "units",
     "dateFrom",
     "dateTo",
     "driverId",
@@ -95,7 +101,8 @@ export async function handleListTransactions(pool: Pool, url: URL): Promise<Resp
   const filters: TransactionFilters = {
     dateFrom: query.dateFrom,
     dateTo: query.dateTo,
-    invoiceId: query.period === undefined ? undefined : await resolveInvoiceIdForPeriod(pool, query.period),
+    week: query.week,
+    currency: query.currency,
     driverId: query.driverId,
     truckId: query.truckId,
     cardId: query.cardId,
@@ -105,7 +112,7 @@ export async function handleListTransactions(pool: Pool, url: URL): Promise<Resp
     anomalyOnly: query.anomalyOnly,
   };
   const sort: TransactionSort = { field: query.sortField, direction: query.sortDirection };
-  const options: ListTransactionsOptions = { includeLines: query.includeLines };
+  const options: ListTransactionsOptions = { includeLines: query.includeLines, units: query.units ?? null };
 
   const result = await listTransactions(
     pool,
@@ -119,7 +126,11 @@ export async function handleListTransactions(pool: Pool, url: URL): Promise<Resp
 
 /** `GET /transactions/{id}` — A8.4's full record. */
 export async function handleGetTransaction(pool: Pool, id: string, url: URL): Promise<Response> {
-  const detail = await getTransactionById(pool, id);
+  const units = parseUnits(url);
+  if (units instanceof Response) {
+    return units;
+  }
+  const detail = await getTransactionById(pool, id, units);
   if (!detail) {
     return problemResponse({
       title: "Not Found",

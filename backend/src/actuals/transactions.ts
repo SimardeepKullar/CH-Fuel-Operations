@@ -1,10 +1,11 @@
 import type { Pool } from "pg";
 import { normalizeName } from "../resolve/normalizeName.js";
 import { parseStoreName } from "../resolution/storeNumber.js";
-import type { AnomalySeverity, ReceiptStatus } from "../db/types.js";
+import type { AnomalySeverity, InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "../db/types.js";
 import { buildTransactionFilterClause, type TransactionFilters } from "./transactionQuery.js";
+import { convertNullable, qtyConverter, type RequestedUnits } from "./units.js";
 
-export type TransactionSortField = "occurred_at" | "total_usd";
+export type TransactionSortField = "occurred_at" | "total";
 export interface TransactionSort {
   field: TransactionSortField;
   direction: "asc" | "desc";
@@ -39,13 +40,23 @@ export interface AnomalyFlag {
   severity: AnomalySeverity;
 }
 
+/** One product line, as BVD printed it: `qty` in `qtyUnit`, per-unit prices in
+ * `currency` per `qtyUnit`, `amount` the Final AMT (tax included) and the five
+ * tax columns beside it (zero on a US invoice, D28). Money is never converted. */
 export interface TransactionLine {
   productCode: string;
-  gallons: number;
-  retailUsdPerGal: number;
-  billedUsdPerGal: number;
-  amountUsd: number;
-  currency: "USD";
+  qty: number;
+  qtyUnit: InvoiceQtyUnit;
+  retailPerUnit: number;
+  billedPerUnit: number;
+  amount: number;
+  /** Pre Tax AMT; `null` where the invoice printed none. */
+  preTaxAmount: number | null;
+  hst: number;
+  gst: number;
+  pst: number;
+  qst: number;
+  currency: InvoiceCurrency;
 }
 
 export interface TransactionListItem {
@@ -58,11 +69,14 @@ export interface TransactionListItem {
   station: TransactionStationSummary | null;
   /** The diesel (TA) line's figures — `null` when the stop carries no TA
    * line (e.g. a card-with-no-fuel charge, A10's `charges_no_fuel` case). */
-  gallons: number | null;
-  retailUsdPerGal: number | null;
-  billedUsdPerGal: number | null;
-  totalUsd: number;
-  currency: "USD";
+  qty: number | null;
+  /** The unit `qty` and the per-unit prices are in: the invoice's own, unless `?units=` said otherwise. */
+  qtyUnit: InvoiceQtyUnit;
+  retailPerUnit: number | null;
+  billedPerUnit: number | null;
+  total: number;
+  /** The invoice's currency; a week's two sides can both be on one page. */
+  currency: InvoiceCurrency;
   receiptStatus: ReceiptStatus;
   flags: AnomalyFlag[];
   lines?: TransactionLine[];
@@ -77,6 +91,8 @@ export interface ListTransactionsResult {
 
 export interface ListTransactionsOptions {
   includeLines?: boolean;
+  /** `?units=`; absent means as printed. */
+  units?: RequestedUnits;
 }
 
 interface TransactionRow {
@@ -95,15 +111,16 @@ interface TransactionRow {
   station_name_raw: string | null;
   station_city_raw: string | null;
   station_state_usps: string | null;
-  ta_gallons: string | null;
+  ta_qty: string | null;
   ta_retail: string | null;
   ta_billed: string | null;
+  currency: InvoiceCurrency;
+  qty_unit: InvoiceQtyUnit;
 }
 
 const SORT_COLUMNS: Record<TransactionSortField, string> = {
   occurred_at: "fs.occurred_at",
-  // The API sort value keeps its name until T-63 reshapes the contract.
-  total_usd: "fs.total",
+  total: "fs.total",
 };
 
 const BASE_SELECT = `
@@ -114,8 +131,10 @@ const BASE_SELECT = `
          d.display_name AS driver_display_name,
          s.id AS station_id, s.name_raw AS station_name_raw,
          s.city_raw AS station_city_raw, s.state_usps AS station_state_usps,
-         ta.qty AS ta_gallons, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed
+         ta.qty AS ta_qty, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed,
+         i.currency, i.qty_unit
   FROM fuel_stops fs
+  JOIN invoices i ON i.id = fs.invoice_id
   JOIN fuel_cards fc ON fc.id = fs.card_id
   LEFT JOIN trucks t ON t.id = fs.truck_id
   LEFT JOIN drivers d ON d.id = fs.driver_id
@@ -169,7 +188,12 @@ export function stationSummary(
   };
 }
 
-function toListItem(row: TransactionRow, flagsByStop: ReadonlyMap<string, AnomalyFlag[]>): TransactionListItem {
+function toListItem(
+  row: TransactionRow,
+  flagsByStop: ReadonlyMap<string, AnomalyFlag[]>,
+  units: RequestedUnits,
+): TransactionListItem {
+  const conv = qtyConverter(row.qty_unit, units);
   return {
     id: row.id,
     baseAuthCode: row.base_auth_code,
@@ -178,11 +202,12 @@ function toListItem(row: TransactionRow, flagsByStop: ReadonlyMap<string, Anomal
     driver: driverRawResolved(row),
     truck: truckRawResolved(row),
     station: stationSummary(row),
-    gallons: row.ta_gallons === null ? null : Number(row.ta_gallons),
-    retailUsdPerGal: row.ta_retail === null ? null : Number(row.ta_retail),
-    billedUsdPerGal: row.ta_billed === null ? null : Number(row.ta_billed),
-    totalUsd: Number(row.total),
-    currency: "USD",
+    qty: convertNullable(conv.qty, row.ta_qty === null ? null : Number(row.ta_qty)),
+    qtyUnit: conv.qtyUnit,
+    retailPerUnit: convertNullable(conv.perUnit, row.ta_retail === null ? null : Number(row.ta_retail)),
+    billedPerUnit: convertNullable(conv.perUnit, row.ta_billed === null ? null : Number(row.ta_billed)),
+    total: Number(row.total),
+    currency: row.currency,
     receiptStatus: row.receipt_status,
     flags: flagsByStop.get(row.id) ?? [],
   };
@@ -223,28 +248,49 @@ interface FuelStopLineRow {
   retail_per_unit: string;
   billed_per_unit: string;
   amount: string;
+  pre_tax_amount: string | null;
+  hst: string;
+  gst: string;
+  pst: string;
+  qst: string;
+  currency: InvoiceCurrency;
+  qty_unit: InvoiceQtyUnit;
 }
 
-async function loadLines(pool: Pool, stopIds: readonly string[]): Promise<Map<string, TransactionLine[]>> {
+async function loadLines(
+  pool: Pool,
+  stopIds: readonly string[],
+  units: RequestedUnits,
+): Promise<Map<string, TransactionLine[]>> {
   const byStop = new Map<string, TransactionLine[]>();
   if (stopIds.length === 0) {
     return byStop;
   }
   const { rows } = await pool.query<FuelStopLineRow>(
-    `SELECT fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount
-     FROM fuel_stop_lines
-     WHERE fuel_stop_id = ANY($1)
-     ORDER BY fuel_stop_id, product_code`,
+    `SELECT fsl.fuel_stop_id, fsl.product_code, fsl.qty, fsl.retail_per_unit, fsl.billed_per_unit, fsl.amount,
+            fsl.pre_tax_amount, fsl.hst, fsl.gst, fsl.pst, fsl.qst, i.currency, i.qty_unit
+     FROM fuel_stop_lines fsl
+     JOIN fuel_stops fs ON fs.id = fsl.fuel_stop_id
+     JOIN invoices i ON i.id = fs.invoice_id
+     WHERE fsl.fuel_stop_id = ANY($1)
+     ORDER BY fsl.fuel_stop_id, fsl.product_code`,
     [stopIds],
   );
   for (const row of rows) {
+    const conv = qtyConverter(row.qty_unit, units);
     const line: TransactionLine = {
       productCode: row.product_code,
-      gallons: Number(row.qty),
-      retailUsdPerGal: Number(row.retail_per_unit),
-      billedUsdPerGal: Number(row.billed_per_unit),
-      amountUsd: Number(row.amount),
-      currency: "USD",
+      qty: conv.qty(Number(row.qty)),
+      qtyUnit: conv.qtyUnit,
+      retailPerUnit: conv.perUnit(Number(row.retail_per_unit)),
+      billedPerUnit: conv.perUnit(Number(row.billed_per_unit)),
+      amount: Number(row.amount),
+      preTaxAmount: row.pre_tax_amount === null ? null : Number(row.pre_tax_amount),
+      hst: Number(row.hst),
+      gst: Number(row.gst),
+      pst: Number(row.pst),
+      qst: Number(row.qst),
+      currency: row.currency,
     };
     const existing = byStop.get(row.fuel_stop_id);
     if (existing) {
@@ -254,26 +300,6 @@ async function loadLines(pool: Pool, stopIds: readonly string[]): Promise<Map<st
     }
   }
   return byStop;
-}
-
-interface InvoiceIdRow {
-  id: string;
-}
-
-/**
- * `?period=` -> `fuel_stops.invoice_id` (T-40, A7). `period` is
- * `invoices.period_start`, the same key `GET /overview`/`GET /drivers` take.
- * `null` when no invoice has that `period_start` — the caller passes that
- * straight through to `TransactionFilters.invoiceId`, which filters to zero
- * rows rather than falling back to the unfiltered set.
- */
-export async function resolveInvoiceIdForPeriod(pool: Pool, period: string): Promise<string | null> {
-  // US invoices only until T-63's billing weeks (T-61).
-  const { rows } = await pool.query<InvoiceIdRow>(
-    "SELECT id FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
-    [period],
-  );
-  return rows[0]?.id ?? null;
 }
 
 /**
@@ -291,6 +317,7 @@ export async function listTransactions(
   pagination: TransactionPagination,
   options: ListTransactionsOptions = {},
 ): Promise<ListTransactionsResult> {
+  const units = options.units ?? null;
   const { whereSql, params } = buildTransactionFilterClause(filters);
   const sortColumn = SORT_COLUMNS[sort.field];
   const direction = sort.direction === "asc" ? "ASC" : "DESC";
@@ -308,18 +335,18 @@ export async function listTransactions(
   );
 
   const { rows: countRows } = await pool.query<{ count: string }>(
-    `SELECT count(*) FROM fuel_stops fs ${whereSql}`,
+    `SELECT count(*) FROM fuel_stops fs JOIN invoices i ON i.id = fs.invoice_id ${whereSql}`,
     params,
   );
   const total = Number(countRows[0]?.count ?? "0");
 
   const stopIds = rows.map((r) => r.id);
   const flagsByStop = await loadFlags(pool, stopIds);
-  const linesByStop = options.includeLines ? await loadLines(pool, stopIds) : undefined;
+  const linesByStop = options.includeLines ? await loadLines(pool, stopIds, units) : undefined;
 
   return {
     rows: rows.map((row) => {
-      const item = toListItem(row, flagsByStop);
+      const item = toListItem(row, flagsByStop, units);
       if (linesByStop) {
         item.lines = linesByStop.get(row.id) ?? [];
       }
@@ -411,7 +438,11 @@ async function findDispatchedPlanId(pool: Pool, truckId: string | null, occurred
  * `GET /transactions/{id}` (A8.4). `null` when the id doesn't resolve to a
  * fuel stop — the route maps that to a 404 problem+json.
  */
-export async function getTransactionById(pool: Pool, id: string): Promise<TransactionDetail | null> {
+export async function getTransactionById(
+  pool: Pool,
+  id: string,
+  units: RequestedUnits = null,
+): Promise<TransactionDetail | null> {
   const { rows } = await pool.query<DetailRow>(
     `SELECT fs.id, fs.invoice_id, fs.base_auth_code, fs.occurred_at, fs.total, fs.receipt_status,
             fs.unit_raw, fs.driver_name_raw, fs.truck_id,
@@ -421,8 +452,10 @@ export async function getTransactionById(pool: Pool, id: string): Promise<Transa
             s.id AS station_id, s.name_raw AS station_name_raw,
             s.city_raw AS station_city_raw, s.state_usps AS station_state_usps,
             s.resolution AS station_resolution, s.resolution_source AS station_resolution_source,
-            ta.qty AS ta_gallons, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed
+            ta.qty AS ta_qty, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed,
+            i.currency, i.qty_unit
      FROM fuel_stops fs
+     JOIN invoices i ON i.id = fs.invoice_id
      JOIN fuel_cards fc ON fc.id = fs.card_id
      LEFT JOIN trucks t ON t.id = fs.truck_id
      LEFT JOIN drivers d ON d.id = fs.driver_id
@@ -443,12 +476,12 @@ export async function getTransactionById(pool: Pool, id: string): Promise<Transa
 
   const [flagsByStop, linesByStop, receiptCheck, planId] = await Promise.all([
     loadFlags(pool, [row.id]),
-    loadLines(pool, [row.id]),
+    loadLines(pool, [row.id], units),
     loadLatestReceiptCheck(pool, row.id),
     findDispatchedPlanId(pool, row.truck_id, row.occurred_at),
   ]);
 
-  const base = toListItem(row, flagsByStop);
+  const base = toListItem(row, flagsByStop, units);
   const station =
     base.station === null
       ? null

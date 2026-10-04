@@ -66,20 +66,20 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
           <div className="stop-expansion-line-row stop-expansion-line" key={line.productCode}>
             <span className="mono">{line.productCode}</span>
             <span className="stop-expansion-line-label">{productLabel(line.productCode)}</span>
-            <span className="num">{formatGallons2dp(line.gallons)}</span>
-            <span className="num muted">{formatPricePerGal(line.retailUsdPerGal)}</span>
-            <span className="num stop-expansion-line-billed">{formatPricePerGal(line.billedUsdPerGal)}</span>
-            <span className="num">{formatMoneyUsd(line.amountUsd)}</span>
+            <span className="num">{formatGallons2dp(line.qty)}</span>
+            <span className="num muted">{formatPricePerGal(line.retailPerUnit)}</span>
+            <span className="num stop-expansion-line-billed">{formatPricePerGal(line.billedPerUnit)}</span>
+            <span className="num">{formatMoneyUsd(line.amount)}</span>
           </div>
         ))}
         <div className="stop-expansion-line-row stop-expansion-total">
           <span />
           <span className="stop-expansion-total-label">Stop total</span>
-          <span className="num muted">{stop.gallons === null ? "—" : formatGallons2dp(stop.gallons)}</span>
+          <span className="num muted">{stop.qty === null ? "—" : formatGallons2dp(stop.qty)}</span>
           <span />
           <span />
           <span className="num stop-expansion-total-value" data-testid="stop-total">
-            {formatMoneyUsd(stop.totalUsd)}
+            {formatMoneyUsd(stop.total)}
           </span>
         </div>
       </div>

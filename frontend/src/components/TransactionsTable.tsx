@@ -100,14 +100,14 @@ const columns: ColumnDef<TransactionListItem, any>[] = [
     id: "gallons",
     header: "Gallons",
     cell: ({ row }) => (
-      <span className="tx-gal">{row.original.gallons === null ? "—" : formatGallons2dp(row.original.gallons)}</span>
+      <span className="tx-gal">{row.original.qty === null ? "—" : formatGallons2dp(row.original.qty)}</span>
     ),
   }),
   columnHelper.display({
     id: "billed",
     header: "Billed $/gal",
     cell: ({ row }) => (
-      <BilledPrice billedUsdPerGal={row.original.billedUsdPerGal} retailUsdPerGal={row.original.retailUsdPerGal} />
+      <BilledPrice billedUsdPerGal={row.original.billedPerUnit} retailUsdPerGal={row.original.retailPerUnit} />
     ),
   }),
   columnHelper.display({
@@ -115,11 +115,11 @@ const columns: ColumnDef<TransactionListItem, any>[] = [
     header: "Retail",
     cell: ({ row }) => (
       <span className="muted">
-        {row.original.retailUsdPerGal === null ? "—" : formatPricePerGal(row.original.retailUsdPerGal)}
+        {row.original.retailPerUnit === null ? "—" : formatPricePerGal(row.original.retailPerUnit)}
       </span>
     ),
   }),
-  columnHelper.accessor("totalUsd", {
+  columnHelper.accessor("total", {
     header: "Total USD",
     cell: ({ getValue }) => <span className="tx-total">{formatMoneyUsd(getValue())}</span>,
   }),
@@ -286,12 +286,12 @@ export default function TransactionsTable({
     let weightedRetail = 0;
     let totalUsd = 0;
     for (const row of rows) {
-      totalUsd += row.totalUsd;
-      if (row.gallons !== null && row.billedUsdPerGal !== null && row.retailUsdPerGal !== null) {
+      totalUsd += row.total;
+      if (row.qty !== null && row.billedPerUnit !== null && row.retailPerUnit !== null) {
         hasGallons = true;
-        gallons += row.gallons;
-        weightedBilled += row.gallons * row.billedUsdPerGal;
-        weightedRetail += row.gallons * row.retailUsdPerGal;
+        gallons += row.qty;
+        weightedBilled += row.qty * row.billedPerUnit;
+        weightedRetail += row.qty * row.retailPerUnit;
       }
     }
     return {
@@ -445,7 +445,7 @@ export default function TransactionsTable({
               {table.getHeaderGroups()[0]!.headers.map((header) => (
                 <span
                   key={header.id}
-                  className={`tx-head-cell${["gallons", "billed", "retail", "totalUsd"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
+                  className={`tx-head-cell${["gallons", "billed", "retail", "total"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
                 >
                   {flexRender(header.column.columnDef.header, header.getContext())}
                 </span>
@@ -489,7 +489,7 @@ export default function TransactionsTable({
                         ) : (
                           <span
                             key={cell.id}
-                            className={`tx-cell${["gallons", "billed", "retail", "totalUsd"].includes(cell.column.id) ? " num" : ""}`}
+                            className={`tx-cell${["gallons", "billed", "retail", "total"].includes(cell.column.id) ? " num" : ""}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </span>
