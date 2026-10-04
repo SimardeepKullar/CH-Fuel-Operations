@@ -51,7 +51,7 @@ export interface OverviewKpis {
   def: ProductRollup;
   /** Headline metric (A6.3/A9): quantity-weighted, never a mean of prices. `null` with no TA quantity this week. */
   avgBilledPerUnit: number | null;
-  /** Subordinate to `avgBilledUsdPerGal` everywhere it's rendered (A9.1). */
+  /** Subordinate to `avgBilledPerUnit` everywhere it's rendered (A9.1). */
   discount: DiscountRollup;
   otherCharges: OtherChargesRollup;
   receiptCompliance: ReceiptCompliance;

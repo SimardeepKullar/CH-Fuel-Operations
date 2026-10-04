@@ -44,6 +44,12 @@ export interface ImportReport {
    * gap report's covered set unions these, never the imported_at clock. */
   periodStart: string;
   periodEnd: string;
+  /** D26: the week this invoice belongs to — `periodEnd` at import. */
+  billingWeekEnd: string;
+  /** First and last transaction's UTC date, or `null` for a file with none. The
+   * gap report's covered set unions these, not the printed range (T-63). */
+  actualStart: string | null;
+  actualEnd: string | null;
   /** The invoice's currency (D24). Every money figure in this report is in it. */
   currency: InvoiceCurrency;
   /** What every quantity in this report is in — litres on a CAD invoice (D25). */
@@ -87,6 +93,8 @@ export interface BuildImportReportInput {
   fileSha256: string;
   periodStart: string;
   periodEnd: string;
+  actualStart: string | null;
+  actualEnd: string | null;
   currency: InvoiceCurrency;
   qtyUnit: InvoiceQtyUnit;
   grandTotal: string;
@@ -180,6 +188,9 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
     fileSha256: input.fileSha256,
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
+    billingWeekEnd: input.periodEnd,
+    actualStart: input.actualStart,
+    actualEnd: input.actualEnd,
     currency: input.currency,
     qtyUnit: input.qtyUnit,
     grandTotal: input.grandTotal,

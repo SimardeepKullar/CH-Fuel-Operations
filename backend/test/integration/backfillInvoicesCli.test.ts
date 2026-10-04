@@ -12,6 +12,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(dirname, "../../../migrations/synthetic");
 const realMigrationsDir = path.join(dirname, "../../../migrations/real");
 const realDataDir = path.join(dirname, "../../../data/bvd-invoices");
+const fixturesDir = path.join(dirname, "../fixtures/invoices");
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const hasRealCorpus =
   existsSync(path.join(realDataDir, "invoice_999210.csv")) && existsSync(path.join(realDataDir, "BVD_invoice_999210.pdf"));
@@ -116,15 +117,15 @@ describe.skipIf(!hasDatabase)("runBackfillInvoicesCli (integration)", () => {
     const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
     expect(printed).toContain("files:             3");
     expect(printed).toContain("imported:          3");
-    expect(printed).toContain("period range:      2026-02-01 .. 2026-02-20");
-    expect(printed).toContain("gaps:");
+    expect(printed).toContain("period range (USD): 2026-02-01 .. 2026-02-20");
+    expect(printed).toContain("gaps (USD):");
     // The two gap blocks: 02-02..02-09 and 02-11..02-19.
     expect(printed).toContain("2026-02-02");
     expect(printed).toContain("2026-02-09");
     expect(printed).toContain("2026-02-11");
     expect(printed).toContain("2026-02-19");
     // Covered dates never appear as gaps.
-    expect(printed).not.toContain("gaps:              2026-02-01,");
+    expect(printed).not.toContain("gaps (USD):         2026-02-01,");
   });
 
   it("reports no gaps for a contiguous range of periods", async () => {
@@ -138,8 +139,30 @@ describe.skipIf(!hasDatabase)("runBackfillInvoicesCli (integration)", () => {
     expect(exitCode).toBe(0);
 
     const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
-    expect(printed).toContain("period range:      2026-03-01 .. 2026-03-03");
-    expect(printed).toContain("gaps:              none");
+    expect(printed).toContain("period range (USD): 2026-03-01 .. 2026-03-03");
+    expect(printed).toContain("gaps (USD):         none");
+  });
+
+  it("reports each currency on its own, over the invoice's actual range rather than the printed one (T-63)", async () => {
+    // sample-ca.pdf prints 2026-08-01 .. 2026-09-09; its transactions run 09-03 .. 09-10.
+    const dir = writeTempDir([
+      { name: "invoice_300001.csv", contents: makeMinimalInvoiceCsv("2026-03-01") },
+      { name: "invoice_300002.csv", contents: makeMinimalInvoiceCsv("2026-03-04") },
+      { name: "BVD_invoice_700001.pdf", contents: readFileSync(path.join(fixturesDir, "sample-ca.pdf")) },
+    ]);
+
+    const exitCode = await runBackfillInvoicesCli([dir], scopedPool);
+    expect(exitCode).toBe(0);
+
+    const printed = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(printed).toContain("period range (USD): 2026-03-01 .. 2026-03-04");
+    expect(printed).toContain("gaps (USD):         2026-03-02, 2026-03-03");
+    // The CA side starts at its first transaction, not at the printed Aug 1.
+    expect(printed).toContain("period range (CAD): 2026-09-03 .. 2026-09-10");
+    expect(printed).toContain("gaps (CAD):         none");
+    expect(printed).not.toContain("2026-08-01");
+    // A US gap is not closed by (and does not leak into) the CA side.
+    expect(printed.indexOf("gaps (USD)")).toBeLessThan(printed.indexOf("period range (CAD)"));
   });
 
   it("reports a shape-shifted older-year file as a per-file parse failure naming the year, without failing the run", async () => {

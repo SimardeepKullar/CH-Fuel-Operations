@@ -1247,7 +1247,7 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 
 **Logic.** `billing_week_end` ← printed `period_end`; `actual_start`/`actual_end` ← min/max transaction date (per 61.4's `occurred_at` rule); `UNIQUE (billing_week_end, currency)`.
 
-**Tests.** 999210 and 999217 (gated) share `2026-09-09`; the fixtures likewise. Importing a second USD invoice into an occupied week fails with a named reason.
+**Tests.** 999210 and 999217 (gated) share `2026-09-09`. The synthetic fixtures do not (`sample-redacted` ends 2026-01-07, `sample-ca` 2026-09-09) and are not edited: the US one is re-dated in the test (`support/billingWeekFixtures.ts`, the way `backfillInvoices.test.ts` composes its multi-day cases). Importing a second USD invoice into an occupied week fails with a named reason (`conflict`, reason `billing_week`).
 **Pass:** all.
 
 ### Step 63.2 — `/periods` and the override

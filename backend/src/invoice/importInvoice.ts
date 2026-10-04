@@ -451,6 +451,7 @@ export async function importInvoice(
   }
 
   const groups = groupByAuthCode(parsed.lines);
+  const actual = actualRangeOf(parsed.lines, parsed.expressRows);
   const reconcileResult = reconcile(groups, parsed.expressRows, parsed.printedTotals);
   const { cardIds, misses: cardMisses } = await resolveCardMisses(pool, groups);
   const { truckIds, misses: truckUnitMisses } = await resolveTruckUnitMisses(pool, parsed.expressRows);
@@ -469,6 +470,8 @@ export async function importInvoice(
     fileSha256,
     periodStart: parsed.header.periodStart,
     periodEnd: parsed.header.periodEnd,
+    actualStart: actual.start,
+    actualEnd: actual.end,
     currency: parsed.header.currency,
     qtyUnit: qtyUnitFor(parsed.header.currency),
     grandTotal: parsed.printedTotals.grandTotal,
@@ -510,7 +513,7 @@ export async function importInvoice(
       parsed,
       fileSha256,
       promote ? "imported" : "quarantined",
-      actualRangeOf(parsed.lines, parsed.expressRows),
+      actual,
     );
 
     if (promote) {
