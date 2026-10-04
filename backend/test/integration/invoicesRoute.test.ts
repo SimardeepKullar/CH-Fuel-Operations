@@ -139,7 +139,7 @@ describe.skipIf(!hasDatabase)("invoices routes (integration)", () => {
         invoiceNumber: string;
         periodStart: string;
         periodEnd: string;
-        grandTotalUsd: number;
+        grandTotal: number;
         status: string;
         importedAt: string;
       }>;
@@ -155,7 +155,7 @@ describe.skipIf(!hasDatabase)("invoices routes (integration)", () => {
     expect(imbalancedRow.periodStart).toBe("2026-01-05");
     expect(imbalancedRow.periodEnd).toBe("2026-01-07");
     expect(imbalancedRow.status).toBe("quarantined");
-    expect(typeof imbalancedRow.grandTotalUsd).toBe("number");
+    expect(typeof imbalancedRow.grandTotal).toBe("number");
     expect(typeof imbalancedRow.importedAt).toBe("string");
   });
 

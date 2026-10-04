@@ -1,10 +1,12 @@
 import type { Pool } from "pg";
 import { z } from "zod";
+import { isUuid } from "../../actuals/ids.js";
 import type { InvoiceCurrency } from "../../db/types.js";
 import { detectInvoiceFormat } from "../../invoice/detectFormat.js";
 import { importInvoice, type ImportInvoiceMeta, type ImportInvoiceResult } from "../../invoice/importInvoice.js";
 import { parseInvoicePdf } from "../../invoice/parseInvoicePdf.js";
 import { problemResponse } from "../problem.js";
+import { isoDateSchema } from "../query.js";
 
 /** `ImportInvoiceResult`'s own `report` type, read structurally off its
  * "imported" variant rather than imported directly from `invoice/report.js`
@@ -39,9 +41,10 @@ function importResultResponse(result: ImportInvoiceResult, url: URL): Response {
     case "duplicate":
       return jsonResponse({ status: result.status, invoiceId: result.invoiceId, report: result.report });
     case "conflict":
-      // D12/D-whatever: a byte-different file under an already-used invoice
-      // number is the one case that's a real HTTP error — distinct from the
-      // 200-with-status:"quarantined" imbalance case, which is never a 4xx.
+      // A byte-different file under an already-used invoice number, or a
+      // second imported invoice of one currency in an occupied billing week
+      // (D26), is a real HTTP error — distinct from the 200-with-
+      // status:"quarantined" imbalance case, which is never a 4xx.
       return problemResponse({
         title: "Conflict",
         status: 409,
@@ -107,8 +110,11 @@ const listQuerySchema = z.object({
 interface InvoiceListRow {
   id: string;
   invoice_number: string;
-  period_start: Date;
-  period_end: Date;
+  period_start: string;
+  period_end: string;
+  billing_week_end: string;
+  actual_start: string | null;
+  actual_end: string | null;
   currency: InvoiceCurrency;
   grand_total: string;
   status: "imported" | "quarantined";
@@ -118,12 +124,19 @@ interface InvoiceListRow {
 export interface InvoiceListItem {
   id: string;
   invoiceNumber: string;
+  /** The range BVD printed. */
   periodStart: string;
   periodEnd: string;
-  /** The invoice's currency (D24); `grandTotalUsd` is in it, whatever its
-   * name, until T-63 reshapes the contract. */
+  /** D26: the week this invoice belongs to — `periodEnd` unless moved. */
+  billingWeekEnd: string;
+  /** First and last transaction date (UTC); `null` for a file with none. */
+  actualStart: string | null;
+  actualEnd: string | null;
+  /** The printed range is not the actual one — an amber note, never a block. */
+  datesDiffer: boolean;
+  /** The invoice's currency (D24); `grandTotal` is in it. */
   currency: InvoiceCurrency;
-  grandTotalUsd: number;
+  grandTotal: number;
   status: "imported" | "quarantined";
   importedAt: string;
 }
@@ -135,14 +148,43 @@ export interface InvoiceListResult {
   total: number;
 }
 
+/** The columns `InvoiceListRow` reads. Dates are formatted in SQL so none of
+ * them passes through a JS `Date` (and a time zone). */
+const INVOICE_COLUMNS = `id, invoice_number,
+       to_char(period_start, 'YYYY-MM-DD') AS period_start,
+       to_char(period_end, 'YYYY-MM-DD') AS period_end,
+       to_char(billing_week_end, 'YYYY-MM-DD') AS billing_week_end,
+       to_char(actual_start, 'YYYY-MM-DD') AS actual_start,
+       to_char(actual_end, 'YYYY-MM-DD') AS actual_end,
+       currency, grand_total, status, imported_at`;
+
+/** `datesDiffer`: printed != actual. An invoice with no transactions has no
+ * actual range to differ from. */
+export function datesDiffer(row: {
+  period_start: string;
+  period_end: string;
+  actual_start: string | null;
+  actual_end: string | null;
+}): boolean {
+  return (
+    row.actual_start !== null &&
+    row.actual_end !== null &&
+    (row.period_start !== row.actual_start || row.period_end !== row.actual_end)
+  );
+}
+
 function toListItem(row: InvoiceListRow): InvoiceListItem {
   return {
     id: row.id,
     invoiceNumber: row.invoice_number,
-    periodStart: row.period_start.toISOString().slice(0, 10),
-    periodEnd: row.period_end.toISOString().slice(0, 10),
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    billingWeekEnd: row.billing_week_end,
+    actualStart: row.actual_start,
+    actualEnd: row.actual_end,
+    datesDiffer: datesDiffer(row),
     currency: row.currency,
-    grandTotalUsd: Number(row.grand_total),
+    grandTotal: Number(row.grand_total),
     status: row.status,
     importedAt: row.imported_at.toISOString(),
   };
@@ -166,7 +208,7 @@ export async function handleListInvoices(pool: Pool, url: URL): Promise<Response
   const { page, pageSize } = parsed.data;
 
   const { rows } = await pool.query<InvoiceListRow>(
-    `SELECT id, invoice_number, period_start, period_end, currency, grand_total, status, imported_at
+    `SELECT ${INVOICE_COLUMNS}
      FROM invoices
      ORDER BY imported_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
@@ -211,7 +253,7 @@ export interface InvoiceDetail extends InvoiceListItem {
  */
 export async function handleGetInvoice(pool: Pool, id: string, url: URL): Promise<Response> {
   const { rows } = await pool.query<InvoiceListRow>(
-    `SELECT id, invoice_number, period_start, period_end, currency, grand_total, status, imported_at
+    `SELECT ${INVOICE_COLUMNS}
      FROM invoices
      WHERE id = $1`,
     [id],
@@ -247,4 +289,62 @@ export async function handleGetInvoice(pool: Pool, id: string, url: URL): Promis
       message: r.message,
     })),
   });
+}
+
+const patchInvoiceSchema = z.object({ billingWeekEnd: isoDateSchema }).strict();
+
+/**
+ * `PATCH /invoices/{id}` `{ billingWeekEnd }` (D26) — moves an invoice to
+ * another billing week: the Import screen's override for a week BVD's printed
+ * period end gets wrong. The printed and actual ranges are untouched. Moving
+ * onto a week another *imported* invoice of the same currency already holds is
+ * a 409, not a silent merge (the unique index decides, so two concurrent moves
+ * cannot both win).
+ */
+export async function handlePatchInvoice(pool: Pool, id: string, request: Request, url: URL): Promise<Response> {
+  if (!isUuid(id)) {
+    return problemResponse({ title: "Not Found", status: 404, detail: `No invoice with id ${id}`, instance: url.pathname });
+  }
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return problemResponse({ title: "Bad Request", status: 400, detail: "expected a JSON body", instance: url.pathname });
+  }
+  const parsed = patchInvoiceSchema.safeParse(body);
+  if (!parsed.success) {
+    return problemResponse({ title: "Bad Request", status: 400, detail: parsed.error.message, instance: url.pathname });
+  }
+
+  try {
+    const result = await pool.query<{ id: string }>(
+      "UPDATE invoices SET billing_week_end = $2::date WHERE id = $1 RETURNING id",
+      [id, parsed.data.billingWeekEnd],
+    );
+    if (result.rows.length === 0) {
+      return problemResponse({ title: "Not Found", status: 404, detail: `No invoice with id ${id}`, instance: url.pathname });
+    }
+  } catch (err) {
+    if ((err as { code?: string }).code !== "23505") {
+      throw err;
+    }
+    const { rows } = await pool.query<{ id: string; invoice_number: string }>(
+      `SELECT h.id, h.invoice_number
+       FROM invoices i
+       JOIN invoices h ON h.billing_week_end = $2::date AND h.currency = i.currency AND h.status = 'imported'
+       WHERE i.id = $1`,
+      [id, parsed.data.billingWeekEnd],
+    );
+    const holder = rows[0];
+    return problemResponse({
+      title: "Conflict",
+      status: 409,
+      detail: holder
+        ? `invoice ${holder.invoice_number} already holds that billing week for this currency (existing invoice id: ${holder.id})`
+        : "another invoice already holds that billing week for this currency",
+      instance: url.pathname,
+    });
+  }
+  const { rows } = await pool.query<InvoiceListRow>(`SELECT ${INVOICE_COLUMNS} FROM invoices WHERE id = $1`, [id]);
+  return jsonResponse(toListItem(rows[0]!));
 }

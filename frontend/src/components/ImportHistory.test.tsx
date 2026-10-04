@@ -13,7 +13,11 @@ function row(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem {
     periodStart: "2026-08-01",
     periodEnd: "2026-08-31",
     currency: "USD",
-    grandTotalUsd: 50929.71,
+    grandTotal: 50929.71,
+    billingWeekEnd: "2026-08-31",
+    actualStart: "2026-08-01",
+    actualEnd: "2026-08-31",
+    datesDiffer: false,
     status: "imported",
     importedAt: "2026-09-01T12:00:00.000Z",
     ...overrides,
@@ -32,7 +36,7 @@ describe("ImportHistory (T-42)", () => {
   });
 
   it("labels each total with its invoice's currency, so a CAD total never reads as USD (T-61)", () => {
-    render(<ImportHistory rows={[row(), row({ id: "inv-ca", invoiceNumber: "700001", currency: "CAD", grandTotalUsd: 3839.54 })]} onReopenQuarantined={vi.fn()} />);
+    render(<ImportHistory rows={[row(), row({ id: "inv-ca", invoiceNumber: "700001", currency: "CAD", grandTotal: 3839.54 })]} onReopenQuarantined={vi.fn()} />);
     expect(screen.getByTestId("import-history-row-inv-1").textContent).toContain("50929.71 USD");
     expect(screen.getByTestId("import-history-row-inv-ca").textContent).toContain("3839.54 CAD");
   });

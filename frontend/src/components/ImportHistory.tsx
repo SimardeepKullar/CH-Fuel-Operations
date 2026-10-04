@@ -69,7 +69,7 @@ export default function ImportHistory({ rows, loading = false, onReopenQuarantin
                   {row.periodStart} – {row.periodEnd}
                 </span>
                 <span className="num">
-                  {formatMoneyUsd(row.grandTotalUsd)} {row.currency}
+                  {formatMoneyUsd(row.grandTotal)} {row.currency}
                 </span>
                 <span className={`import-history-status import-history-status-${row.status}`}>
                   {STATUS_LABELS[row.status]}
