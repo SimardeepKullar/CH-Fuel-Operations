@@ -46,7 +46,14 @@ export type ImportInvoiceResult =
   | { status: "imported"; invoiceId: string; report: ImportReport }
   | { status: "quarantined"; invoiceId: string; report: ImportReport }
   | { status: "duplicate"; invoiceId: string; report: ImportReport }
-  | { status: "conflict"; existingInvoiceId: string; message: string };
+  | {
+      status: "conflict";
+      /** `invoice_number`: same number, different file. `billing_week`: another
+       * imported invoice of this currency already holds the week (D26). */
+      reason: "invoice_number" | "billing_week";
+      existingInvoiceId: string;
+      message: string;
+    };
 
 interface ExistingInvoiceRow {
   id: string;
@@ -76,6 +83,20 @@ async function findExistingByInvoiceNumber(
   const { rows } = await pool.query<ExistingInvoiceRow>(
     "SELECT id, file_sha256 FROM invoices WHERE invoice_number = $1",
     [invoiceNumber],
+  );
+  return rows[0] ?? null;
+}
+
+/** The imported invoice, if any, already holding this currency's billing week. */
+async function findImportedInWeek(
+  pool: Pool,
+  weekEnd: string,
+  currency: InvoiceCurrency,
+): Promise<{ id: string; invoice_number: string } | null> {
+  const { rows } = await pool.query<{ id: string; invoice_number: string }>(
+    `SELECT id, invoice_number FROM invoices
+     WHERE billing_week_end = $1::date AND currency = $2 AND status = 'imported'`,
+    [weekEnd, currency],
   );
   return rows[0] ?? null;
 }
@@ -201,17 +222,44 @@ export function qtyUnitFor(currency: InvoiceCurrency): InvoiceQtyUnit {
   return currency === "CAD" ? "L" : "gal";
 }
 
+export interface ActualRange {
+  start: string | null;
+  end: string | null;
+}
+
+/** First and last transaction date (UTC, `YYYY-MM-DD`) across every parsed
+ * fuel line and express row — the invoice's *actual* range, which the printed
+ * period can disagree with (999217 prints Aug 1 – Sep 9; its transactions run
+ * Sep 3 – Sep 10). Taken from the parse, not the promoted rows, so a
+ * quarantined invoice carries one too. `occurredAt` is the printed wall clock
+ * stored as that instant in UTC, so its first ten characters are the date. */
+export function actualRangeOf(
+  lines: readonly { occurredAt: string }[],
+  expressRows: readonly { occurredAt: string }[],
+): ActualRange {
+  let start: string | null = null;
+  let end: string | null = null;
+  for (const { occurredAt } of [...lines, ...expressRows]) {
+    const day = occurredAt.slice(0, 10);
+    if (start === null || day < start) start = day;
+    if (end === null || day > end) end = day;
+  }
+  return { start, end };
+}
+
 async function insertInvoiceRow(
   client: PoolClient,
   parsed: ParsedInvoice,
   fileSha256: string,
   status: "imported" | "quarantined",
+  actual: ActualRange,
 ): Promise<string> {
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO invoices
        (invoice_number, period_start, period_end, invoice_date, due_date,
-        currency, qty_unit, grand_total, status, file_sha256)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        currency, qty_unit, grand_total, status, file_sha256,
+        billing_week_end, actual_start, actual_end)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING id`,
     [
       parsed.header.invoiceNumber,
@@ -224,6 +272,9 @@ async function insertInvoiceRow(
       parsed.printedTotals.grandTotal,
       status,
       fileSha256,
+      parsed.header.periodEnd,
+      actual.start,
+      actual.end,
     ],
   );
   const id = rows[0]?.id;
@@ -396,6 +447,7 @@ export async function importInvoice(
   if (existingByNumber && existingByNumber.file_sha256 !== fileSha256) {
     return {
       status: "conflict",
+      reason: "invoice_number",
       existingInvoiceId: existingByNumber.id,
       message:
         `invoice ${parsed.header.invoiceNumber} was already imported from a different file ` +
@@ -440,6 +492,20 @@ export async function importInvoice(
 
   const promote = report.rejections.length === 0;
 
+  if (promote) {
+    const holder = await findImportedInWeek(pool, parsed.header.periodEnd, parsed.header.currency);
+    if (holder) {
+      return {
+        status: "conflict",
+        reason: "billing_week",
+        existingInvoiceId: holder.id,
+        message:
+          `invoice ${holder.invoice_number} already holds the ${parsed.header.currency} billing week ` +
+          `ending ${parsed.header.periodEnd}; ${parsed.header.invoiceNumber} cannot share it`,
+      };
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -448,6 +514,7 @@ export async function importInvoice(
       parsed,
       fileSha256,
       promote ? "imported" : "quarantined",
+      actualRangeOf(parsed.lines, parsed.expressRows),
     );
 
     if (promote) {

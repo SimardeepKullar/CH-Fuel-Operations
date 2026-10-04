@@ -210,8 +210,8 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
     }
 
     const { rows: invoiceRows } = await scopedPool.query<{ id: string }>(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ($1, $2::date, $2::date, $2::date, $2::date, 'USD', 'gal', $3, 'imported', $4)
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ($1, $2::date, $2::date, $2::date, $2::date, $2::date, 'USD', 'gal', $3, 'imported', $4)
        RETURNING id`,
       [invoiceNumber, periodStart, taAmount.toFixed(2), sha256Hex(invoiceNumber)],
     );

@@ -102,9 +102,9 @@ describe.skipIf(!hasDatabase)("GET /health (integration, T-18 step 18.2, A16)", 
     expect((await getHealthStatus(pool, ORS_ENV, NOW)).latestInvoicePeriod).toBeNull();
 
     await pool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ('HLT-1', '2026-07-01', '2026-07-07', '2026-07-08', '2026-07-09', 'USD', 'gal', 100, 'imported', repeat('1', 64)),
-              ('HLT-2', '2026-08-01', '2026-08-07', '2026-08-08', '2026-08-09', 'USD', 'gal', 100, 'quarantined', repeat('2', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('HLT-1', '2026-07-01', '2026-07-07', '2026-07-07', '2026-07-08', '2026-07-09', 'USD', 'gal', 100, 'imported', repeat('1', 64)),
+              ('HLT-2', '2026-08-01', '2026-08-07', '2026-08-07', '2026-08-08', '2026-08-09', 'USD', 'gal', 100, 'quarantined', repeat('2', 64))`,
     );
 
     expect((await getHealthStatus(pool, ORS_ENV, NOW)).latestInvoicePeriod).toBe("2026-07-01");

@@ -333,8 +333,8 @@ describe.skipIf(!hasDatabase)("fuel_stops default-sort query plan (integration)"
     await runMigrations(scopedPool, migrationsDir);
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ('EXPLAIN-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('EXPLAIN-TEST', '2020-01-01', '2020-01-07', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
     );
     await scopedPool.query("INSERT INTO fuel_cards (card_number) VALUES ('9999999')");
     await scopedPool.query(
@@ -389,8 +389,8 @@ describe.skipIf(!hasDatabase)("anomalyOnly excludes a charges_no_fuel-only stop 
     await runMigrations(scopedPool, migrationsDir);
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ('T-40I-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('1', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('T-40I-TEST', '2020-01-01', '2020-01-07', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('1', 64))`,
     );
     await scopedPool.query("INSERT INTO fuel_cards (card_number) VALUES ('9999901'), ('9999902')");
 

@@ -35,8 +35,8 @@ interface SeedIds {
  */
 async function seed(pool: Pool): Promise<SeedIds> {
   await pool.query(
-    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-     VALUES ('T35-TEST', '2026-02-01', '2026-02-07', '2026-02-08', '2026-02-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
+    `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ('T35-TEST', '2026-02-01', '2026-02-07', '2026-02-07', '2026-02-08', '2026-02-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
   );
   const invoiceId = (
     await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = 'T35-TEST'")

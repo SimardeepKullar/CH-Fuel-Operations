@@ -62,8 +62,8 @@ describe.skipIf(!hasDatabase)("GET /express-charges (integration)", () => {
     app = createApp({ pool: scopedPool });
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ('T36-TEST', '2026-03-01', '2026-03-07', '2026-03-08', '2026-03-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('T36-TEST', '2026-03-01', '2026-03-07', '2026-03-07', '2026-03-08', '2026-03-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
     );
     const invoiceId = (await scopedPool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = 'T36-TEST'"))
       .rows[0]!.id;

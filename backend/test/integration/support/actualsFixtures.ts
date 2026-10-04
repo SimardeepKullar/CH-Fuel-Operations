@@ -34,13 +34,29 @@ export async function teardown(adminPool: Pool, scopedPool: Pool, schema: string
 
 export async function insertInvoice(
   pool: Pool,
-  invoice: { number: string; periodStart: string; periodEnd: string },
+  invoice: {
+    number: string;
+    periodStart: string;
+    periodEnd: string;
+    /** Defaults to `periodEnd`, as at import (D26). */
+    billingWeekEnd?: string;
+    currency?: "USD" | "CAD";
+  },
 ): Promise<string> {
+  const currency = invoice.currency ?? "USD";
   const { rows } = await pool.query<{ id: string }>(
-    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-     VALUES ($1, $2::date, $3::date, $3::date, $3::date, 'USD', 'gal', 0, 'imported', $4)
+    `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ($1, $2::date, $3::date, $4::date, $3::date, $3::date, $5, $6, 0, 'imported', $7)
      RETURNING id`,
-    [invoice.number, invoice.periodStart, invoice.periodEnd, createHash("sha256").update(invoice.number).digest("hex")],
+    [
+      invoice.number,
+      invoice.periodStart,
+      invoice.periodEnd,
+      invoice.billingWeekEnd ?? invoice.periodEnd,
+      currency,
+      currency === "CAD" ? "L" : "gal",
+      createHash("sha256").update(invoice.number).digest("hex"),
+    ],
   );
   return rows[0]!.id;
 }
