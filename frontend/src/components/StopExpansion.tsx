@@ -27,10 +27,9 @@ interface StopExpansionProps {
    * it to overlap), is the equivalent, deterministic check.
    */
   stacked?: boolean;
-  /** The page's scoping invoice number (`useInvoicePeriod`'s own
-   * `invoiceNumber`, A7) — every row already belongs to the one invoice the
-   * top bar has selected, so this is passed down rather than re-derived per
-   * stop. `null` while loading. */
+  /** The number of the invoice on the side the page is reading (the selected
+   * week's USD or CAD invoice, A7/D28) — every row already belongs to it, so it
+   * is passed down rather than re-derived per stop. `null` while loading. */
   invoiceNumber?: string | null;
 }
 

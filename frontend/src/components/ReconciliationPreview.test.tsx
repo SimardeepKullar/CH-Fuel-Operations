@@ -52,8 +52,8 @@ describe("ReconciliationPreview (T-42 step 42.1)", () => {
     expect(text).toContain("DF");
     expect(text).toContain("S");
     expect(text).toContain("Express Codes");
-    expect(text).toContain("$47000.00");
-    expect(screen.getByTestId("import-balance-total").textContent).toContain("$50929.71");
+    expect(text).toContain("US$47000.00");
+    expect(screen.getByTestId("import-balance-total").textContent).toContain("US$50929.71");
   });
 
   it("leaves an always-zero row (e.g. TF) out of the balance table", () => {
@@ -68,5 +68,25 @@ describe("ReconciliationPreview (T-42 step 42.1)", () => {
 
     fireEvent.click(screen.getByTestId("confirm-button"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("a CA invoice reads Litres and CAD, with CA$ amounts — never a bare dollar sign (T-61, T-64)", () => {
+    render(
+      <ReconciliationPreview
+        report={report({
+          currency: "CAD",
+          qtyUnit: "L",
+          grandTotal: "46837.33",
+          productTotals: [{ productCode: "TA", qty: "21500.50", amount: "41356.89", discount: "10.00" }],
+        })}
+        onConfirm={vi.fn()}
+      />,
+    );
+    const text = screen.getByTestId("reconciliation-preview").textContent!;
+    expect(text).toContain("Litres");
+    expect(text).toContain("Amount CAD");
+    expect(text).toContain("CA$41356.89");
+    expect(screen.getByTestId("import-balance-total").textContent).toContain("CA$46837.33");
+    expect(text).not.toMatch(/(^|[^A-Z])\$\d/);
   });
 });

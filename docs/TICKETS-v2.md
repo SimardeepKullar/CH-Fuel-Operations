@@ -1349,7 +1349,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 - **Native units:** US shows gal and USD/gal, CA shows L and CAD/L, by default; the units toggle overrides either. 4dp per-unit prices, 2dp money, a currency marker on every money header (A6.1 as amended). A CA stop's expanded detail shows Pre-tax, HST, GST, PST, QST and Final separately.
 - **Import screen:** an invoice with `datesDiffer` shows the amber note ("Printed Aug 1 – Sep 9; transactions Sep 3 – Sep 10"); a "Belongs to week ending ___" control calls T-63's `PATCH`.
 
-**Files.** New: `frontend/src/components/WeekSelector.tsx`, `InvoicesInView.tsx`, `CurrencySideSwitch.tsx` (+ tests). Modified: `TopBar.tsx`, the period context hook, `frontend/src/app/(app)/transactions/page.tsx`, `TransactionsTable.tsx`, `StopExpansion`, the Import screens (T-42). Removed: `InvoicePeriodSelector.tsx`.
+**Files.** New: `frontend/src/components/WeekSelector.tsx`, `InvoicesInView.tsx`, `CurrencySideSwitch.tsx` (+ tests). `frontend/src/hooks/useWeek.tsx` (the shell's week context — it replaces `useInvoicePeriod.ts`), `useCurrencySide.ts`, `frontend/src/lib/weeks.ts`. Modified: `TopBar.tsx`, `(app)/layout.tsx` (mounts the context), `frontend/src/app/(app)/transactions/page.tsx`, `TransactionsTable.tsx`, `StopExpansion`, `BilledPrice.tsx`, `lib/formatMoney.ts`, the Import screens (T-42: `ImportHistory.tsx`, `import/page.tsx`, `ReconciliationPreview.tsx`). Removed: `InvoicePeriodSelector.tsx`, `useInvoicePeriod.ts`. The URL key is `week` (was `period`).
 
 **Dependencies.** T-63, T-40, T-42.
 

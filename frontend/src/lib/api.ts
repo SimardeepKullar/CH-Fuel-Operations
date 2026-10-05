@@ -15,7 +15,7 @@ import type { PriceSheetSummary } from "@ch/core/catalog/priceSheets";
 import type { BoundingBox, StationMapResolution, StationsPage } from "@ch/core/catalog/stations";
 import type { PlanListResult } from "@ch/core/planning/planPersistence";
 import type { HealthStatus } from "@ch/core/catalog/health";
-import type { ImportInvoiceResponse, InvoiceDetail, InvoiceListResult } from "@ch/core/api/routes/invoices";
+import type { ImportInvoiceResponse, InvoiceDetail, InvoiceListItem, InvoiceListResult } from "@ch/core/api/routes/invoices";
 import type { PeriodWeek } from "@ch/core/api/routes/periods";
 import type { ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { DriversResult } from "@ch/core/actuals/drivers";
@@ -156,6 +156,16 @@ export function listInvoices(params: { page?: number; pageSize?: number } = {}):
   if (params.pageSize !== undefined) search.set("pageSize", String(params.pageSize));
   const qs = search.toString();
   return request<InvoiceListResult>(`/invoices${qs ? `?${qs}` : ""}`);
+}
+
+/** `PATCH /invoices/{id}` (T-63, D26) — moves an invoice to another billing week, the Import
+ * screen's override. Moving onto a week another imported invoice of the same currency holds is
+ * a 409 whose `detail` names that invoice; `ApiError` carries it. */
+export function patchInvoiceWeek(id: string, billingWeekEnd: string): Promise<InvoiceListItem> {
+  return request<InvoiceListItem>(`/invoices/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ billingWeekEnd }),
+  });
 }
 
 /** `GET /receipt-queue` — T-39's source for the sidebar's pending badge and

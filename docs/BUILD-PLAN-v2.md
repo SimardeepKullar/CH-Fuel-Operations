@@ -1309,7 +1309,7 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 
 ### Step 64.1 — Week selector and context
 
-**Files.** New: `WeekSelector.tsx` (+ test). Modified: `TopBar.tsx`, the period context hook. Removed: `InvoicePeriodSelector.tsx`.
+**Files.** New: `WeekSelector.tsx`, `hooks/useWeek.tsx` (the shell's week context, mounted in the `(app)` layout), `lib/weeks.ts` (+ tests). Modified: `TopBar.tsx`, `(app)/layout.tsx`. Removed: `InvoicePeriodSelector.tsx`, `useInvoicePeriod.ts`.
 
 **Tests.** Options read "Week ending Sep 9, 2026 · 🇺🇸 999210 · 🇨🇦 999217"; a one-sided week shows "🇨🇦 —"; ⚠ on `datesDiffer`; navigation does not refetch `/periods` (T-39's rule).
 **Pass:** all.

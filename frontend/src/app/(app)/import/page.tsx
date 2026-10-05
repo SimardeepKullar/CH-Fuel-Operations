@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ImportInvoiceResponse, InvoiceListItem } from "@ch/core/api/routes/invoices";
-import { ApiError, getInvoice, listInvoices, uploadInvoice } from "../../../lib/api";
+import { useSearchParams } from "next/navigation";
+import { ApiError, getInvoice, listInvoices, patchInvoiceWeek, uploadInvoice } from "../../../lib/api";
+import { useWeek } from "../../../hooks/useWeek";
 import Dropzone from "../../../components/Dropzone";
 import ParsingState from "../../../components/ParsingState";
 import ReconciliationPreview from "../../../components/ReconciliationPreview";
@@ -60,6 +62,9 @@ export default function ImportPage() {
   const [view, setView] = useState<ImportView>({ phase: "idle" });
   const [historyRows, setHistoryRows] = useState<InvoiceListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const { reloadPeriods } = useWeek();
+  // A strip chip opens here with `?invoice=<id>`; that row is highlighted.
+  const selectedId = useSearchParams().get("invoice");
 
   const refreshHistory = useCallback(() => {
     setHistoryLoading(true);
@@ -124,6 +129,18 @@ export default function ImportPage() {
 
   const reset = useCallback(() => setView({ phase: "idle" }), []);
 
+  // Moves an invoice to another billing week, then re-reads both lists so the
+  // history row and the top bar's selector show it without a page reload. A
+  // refusal (a 409 naming the invoice already in that week) rejects up to the
+  // row, which shows its reason.
+  const moveWeek = useCallback(
+    async (id: string, weekEnd: string) => {
+      await patchInvoiceWeek(id, weekEnd);
+      await Promise.all([reloadPeriods(), listInvoices({ pageSize: 50 }).then((result) => setHistoryRows(result.rows))]);
+    },
+    [reloadPeriods],
+  );
+
   return (
     <div className="import-page">
       <div className="import-main">
@@ -155,7 +172,13 @@ export default function ImportPage() {
         )}
       </div>
 
-      <ImportHistory rows={historyRows} loading={historyLoading} onReopenQuarantined={reopenQuarantined} />
+      <ImportHistory
+        rows={historyRows}
+        loading={historyLoading}
+        onReopenQuarantined={reopenQuarantined}
+        selectedId={selectedId}
+        onMoveWeek={moveWeek}
+      />
     </div>
   );
 }

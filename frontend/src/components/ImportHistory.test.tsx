@@ -37,8 +37,8 @@ describe("ImportHistory (T-42)", () => {
 
   it("labels each total with its invoice's currency, so a CAD total never reads as USD (T-61)", () => {
     render(<ImportHistory rows={[row(), row({ id: "inv-ca", invoiceNumber: "700001", currency: "CAD", grandTotal: 3839.54 })]} onReopenQuarantined={vi.fn()} />);
-    expect(screen.getByTestId("import-history-row-inv-1").textContent).toContain("50929.71 USD");
-    expect(screen.getByTestId("import-history-row-inv-ca").textContent).toContain("3839.54 CAD");
+    expect(screen.getByTestId("import-history-row-inv-1").textContent).toContain("US$50929.71");
+    expect(screen.getByTestId("import-history-row-inv-ca").textContent).toContain("CA$3839.54");
   });
 
   it("a quarantined row can be reopened by clicking it", () => {
