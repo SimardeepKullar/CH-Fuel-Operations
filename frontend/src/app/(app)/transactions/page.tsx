@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import { listTransactions } from "../../../lib/api";
-import { useCurrencySide } from "../../../hooks/useCurrencySide";
+import type { InvoiceCurrency } from "@ch/core/db/types";
+import { useInvoiceInView } from "../../../hooks/useInvoiceInView";
 import { useWeek } from "../../../hooks/useWeek";
-import { QTY_UNIT_NAMES, nativeQtyUnit } from "../../../lib/formatMoney";
-import { invoiceOnSide } from "../../../lib/weeks";
-import type { InvoiceQtyUnit } from "@ch/core/db/types";
-import CurrencySideSwitch from "../../../components/CurrencySideSwitch";
+import { choiceCurrency, choiceUnit, conversionParams, nativeChoice, type DisplayChoice } from "../../../lib/conversion";
+import ConversionToggle from "../../../components/ConversionToggle";
 import { useTransactionFilterOptions } from "../../../hooks/useTransactionFilterOptions";
 import { useTransactionFilters } from "../../../hooks/useTransactionFilters";
 import TransactionsTable from "../../../components/TransactionsTable";
@@ -39,26 +38,44 @@ function matchesSearch(row: TransactionListItem, query: string): boolean {
 
 export default function TransactionsPage() {
   const { week: period, loading: periodLoading, weekEntry } = useWeek();
-  // US on every mount, never remembered; the same value the "Invoices in view"
-  // strip highlights and the request below asks for (D28).
-  const { side, setSide } = useCurrencySide();
-  const invoiceNumber = invoiceOnSide(weekEntry, side)?.invoiceNumber ?? null;
-  // `null` is "as BVD printed it": gal for the US side, L for the CA side.
-  const [unitChoice, setUnitChoice] = useState<InvoiceQtyUnit | null>(null);
-  const nativeUnit = nativeQtyUnit(side);
-  // Choosing the side's own unit is the same as choosing nothing — no `?units=`.
-  const unitOverride = unitChoice === nativeUnit ? null : unitChoice;
-  const shownUnit = unitOverride ?? nativeUnit;
+  // One invoice picked from the strip, or all of the week's; the same selection
+  // the strip highlights and the request below asks for (D28).
+  const selection = useInvoiceInView();
+  const selectionKey = selection.kind === "one" ? selection.invoice.id : selection.kind;
+  // `undefined` serves both sides; one invoice is one side, since a week holds
+  // at most one imported invoice per currency (D26).
+  const currency: InvoiceCurrency | undefined = selection.kind === "one" ? selection.invoice.currency : undefined;
+
+  // The conversion belongs to the invoice it was chosen on: picking another
+  // invoice (or All) shows that one as it came in again.
+  const [pick, setPick] = useState<{ key: string; choice: DisplayChoice } | null>(null);
+  // Forget it on leaving, too, so coming back to an invoice shows it as it came in.
+  const [lastKey, setLastKey] = useState(selectionKey);
+  if (lastKey !== selectionKey) {
+    setLastKey(selectionKey);
+    setPick(null);
+  }
+  const native = currency === undefined ? null : nativeChoice(currency);
+  const chosen = pick !== null && pick.key === selectionKey ? pick.choice : null;
+  // Choosing the invoice's own format is the same as choosing nothing — no params.
+  const conversion = chosen === native ? null : chosen;
+  const shown = conversion ?? native;
+  const { units } = conversionParams(conversion);
+
+  const invoiceNumbers = useMemo(
+    () => Object.fromEntries((weekEntry?.invoices ?? []).map((invoice) => [invoice.currency, invoice.invoiceNumber])),
+    [weekEntry],
+  ) as Partial<Record<InvoiceCurrency, string>>;
   const { filters, setFilter, clearFilters } = useTransactionFilters();
-  const filterOptions = useTransactionFilterOptions(period, side);
+  const filterOptions = useTransactionFilterOptions(period, currency ?? null);
 
   const [rows, setRows] = useState<TransactionListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Wait for the week list: until it arrives the side cannot know whether
-    // the week has a US invoice, and asking for the wrong one is a wasted call.
+    // Wait for the week list: until it arrives the selection cannot know which
+    // invoice to default to, and asking for the wrong one is a wasted call.
     if (period === null || periodLoading) {
       setRows([]);
       setLoading(true);
@@ -69,8 +86,8 @@ export default function TransactionsPage() {
     setError(null);
     listTransactions({
       week: period,
-      currency: side,
-      units: unitOverride === null ? undefined : unitOverride === "gal" ? "imperial" : "metric",
+      currency,
+      units,
       pageSize: 200,
       includeLines: true,
       driverId: filters.driverId || undefined,
@@ -98,8 +115,8 @@ export default function TransactionsPage() {
   }, [
     period,
     periodLoading,
-    side,
-    unitOverride,
+    currency,
+    units,
     filters.driverId,
     filters.truckId,
     filters.cardId,
@@ -114,30 +131,17 @@ export default function TransactionsPage() {
   return (
     <div className="tx-page">
       <div className="tx-side-bar">
-        <CurrencySideSwitch side={side} onChange={setSide} />
-        <div className="side-switch" role="group" aria-label="Units">
-          {(["gal", "L"] as const).map((unit) => (
-            <button
-              key={unit}
-              type="button"
-              className={`side-switch-option${shownUnit === unit ? " active" : ""}`}
-              aria-pressed={shownUnit === unit}
-              title={unit === nativeUnit ? `${QTY_UNIT_NAMES[unit]} — as printed` : `Show ${QTY_UNIT_NAMES[unit].toLowerCase()}; money is unchanged`}
-              onClick={() => setUnitChoice(unit)}
-            >
-              {unit}
-            </button>
-          ))}
-        </div>
+        <ConversionToggle shown={shown} onChange={(choice) => setPick({ key: selectionKey, choice })} />
       </div>
       <TransactionsTable
         rows={searched}
         totalBeforeSearch={rows.length}
         loading={loading}
         error={error}
-        invoiceNumber={invoiceNumber}
-        currency={side}
-        qtyUnit={shownUnit}
+        invoiceNumbers={invoiceNumbers}
+        conversion={conversion}
+        currency={shown === null ? "USD" : choiceCurrency(shown)}
+        qtyUnit={shown === null ? "gal" : choiceUnit(shown)}
         filters={filters}
         setFilter={setFilter}
         clearFilters={clearFilters}

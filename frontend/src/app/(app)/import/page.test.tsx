@@ -295,16 +295,6 @@ describe("ImportPage — billing weeks (T-64 step 64.4)", () => {
     expect(screen.queryByTestId("dates-differ-note-inv-us")).toBeNull();
   });
 
-  it("highlights the invoice a strip chip pointed at via ?invoice=", async () => {
-    searchParams = new URLSearchParams({ invoice: "inv-ca" });
-    listInvoices.mockResolvedValue(historyResult([usInvoice, caInvoice()]));
-    render(<ImportPage />);
-
-    await waitFor(() => expect(screen.getByTestId("import-history-row-inv-ca")).toBeTruthy());
-    expect(screen.getByTestId("import-history-row-inv-ca").closest(".import-history-entry")!.getAttribute("aria-current")).toBe("true");
-    expect(screen.getByTestId("import-history-row-inv-us").closest(".import-history-entry")!.getAttribute("aria-current")).toBeNull();
-  });
-
   it("'Belongs to week ending' calls PATCH, and the top bar's selector shows the new week without a reload", async () => {
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
     // Before: 999217 sits in the week ending Sep 9 beside 999210. After: it has moved to the week ending Sep 16.
@@ -318,7 +308,7 @@ describe("ImportPage — billing weeks (T-64 step 64.4)", () => {
 
     render(<ImportPage />);
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
-    expect(screen.getAllByRole("option")[0]!.textContent).toBe("Week ending Sep 9, 2026 · 🇺🇸 999210 · 🇨🇦 999217 ⚠");
+    expect(screen.getAllByRole("option")[0]!.textContent).toBe("Week ending Sep 9, 2026");
 
     const entry = screen.getByTestId("import-history-row-inv-ca").closest(".import-history-entry")! as HTMLElement;
     const input = entry.querySelector("input[type=date]") as HTMLInputElement;
@@ -329,10 +319,7 @@ describe("ImportPage — billing weeks (T-64 step 64.4)", () => {
     await waitFor(() => expect(patchInvoiceWeek).toHaveBeenCalledWith("inv-ca", "2026-09-16"));
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
     const options = screen.getAllByRole("option").map((o) => o.textContent);
-    expect(options).toEqual([
-      "Week ending Sep 16, 2026 · 🇺🇸 — · 🇨🇦 999217 ⚠",
-      "Week ending Sep 9, 2026 · 🇺🇸 999210 · 🇨🇦 —",
-    ]);
+    expect(options).toEqual(["Week ending Sep 16, 2026", "Week ending Sep 9, 2026"]);
     // Only the week list and the history were re-read — no page reload, no /health refetch.
     expect(listPeriods).toHaveBeenCalledTimes(2);
     expect(getHealth).toHaveBeenCalledTimes(1);

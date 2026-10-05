@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { PeriodInvoice, PeriodWeek } from "@ch/core/api/routes/periods";
 import {
-  effectiveSide,
   formatCompactRange,
   formatDatesDifferNote,
   formatDay,
   formatDayYear,
   formatWeekEnding,
   invoiceOnSide,
+  invoiceViewHref,
+  resolveInvoiceSelection,
+  selectionInvoiceIds,
 } from "./weeks";
 
 function invoice(currency: "USD" | "CAD"): PeriodInvoice {
@@ -58,11 +60,20 @@ describe("side lookups", () => {
     expect(invoiceOnSide(null, "USD")).toBeNull();
   });
 
-  it("keeps the requested side when the week has it, falls to the other when it does not, and keeps the request for an unknown week", () => {
-    expect(effectiveSide(paired, "CAD")).toBe("CAD");
-    expect(effectiveSide(usOnly, "CAD")).toBe("USD");
-    expect(effectiveSide(caOnly, "USD")).toBe("CAD");
-    expect(effectiveSide(null, "USD")).toBe("USD");
-    expect(effectiveSide({ weekEnd: "2026-09-23", invoices: [] }, "CAD")).toBe("CAD");
+  it("resolves ?invoice= to one invoice, all of them, or the week's first by default", () => {
+    expect(resolveInvoiceSelection(paired, "CAD")).toMatchObject({ kind: "one", invoice: { invoiceNumber: "999217" } });
+    expect(resolveInvoiceSelection(paired, null)).toMatchObject({ kind: "one", invoice: { invoiceNumber: "999210" } });
+    expect(resolveInvoiceSelection(caOnly, null)).toMatchObject({ kind: "one", invoice: { invoiceNumber: "999217" } });
+    // An id from another week (the selector moved) falls back rather than showing nothing.
+    expect(resolveInvoiceSelection(usOnly, "CAD")).toMatchObject({ kind: "one", invoice: { invoiceNumber: "999210" } });
+    expect(selectionInvoiceIds(resolveInvoiceSelection(paired, "all"))).toEqual(["USD", "CAD"]);
+    expect(resolveInvoiceSelection(null, "all")).toEqual({ kind: "none" });
+    expect(selectionInvoiceIds({ kind: "none" })).toEqual([]);
+  });
+
+  it("builds a chip's link onto Transactions, keeping the page's own params only when already there", () => {
+    const params = new URLSearchParams({ q: "dallas", invoice: "x" });
+    expect(invoiceViewHref("/transactions", params, "2026-09-09", "all")).toBe("/transactions?q=dallas&invoice=all&week=2026-09-09");
+    expect(invoiceViewHref("/overview", params, "2026-09-09", "CAD")).toBe("/transactions?week=2026-09-09&invoice=CAD");
   });
 });

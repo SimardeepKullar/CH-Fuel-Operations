@@ -1340,24 +1340,24 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 **Priority 64. D26, D28.**
 
-**Goal.** The top bar picks a week; a strip under it always shows which invoices are behind the page; Transactions switches between US and CA and shows each in its own units.
+**Goal.** The top bar picks a week; a strip under it lists that week's invoices, shows which are behind the page, and picks which Transactions shows; one conversion control shows every row on screen in USD/gal or CAD/L.
 
-**Design.**
-- **Week selector** (replaces `InvoicePeriodSelector`): options read "Week ending Sep 9, 2026", each followed by 🇺🇸/🇨🇦 and the invoice numbers present; a missing side reads "🇨🇦 —"; a week with `datesDiffer` carries ⚠.
-- **"Invoices in view" strip** (new, shell-level): one chip per invoice in the week — flag, number, actual range (`🇺🇸 999210 · Sep 3–9`). States: *in view* (highlighted), *not in view* (dimmed — the other side of the switch), *not imported* (greyed "🇨🇦 Not imported"), ⚠ with a tooltip giving printed vs actual range. A chip opens that invoice in Import history. The row-level "Source: 999210" in an expanded transaction is unchanged.
-- **US | CA switch** on Transactions: defaults to **US on every visit** (not remembered); the CA side is disabled with "Not imported" when the week has none. Shared through the shell's context so Drivers, Trucks, Stations and Other Charges (T-44, T-45) mount the same switch and strip.
-- **Native units:** US shows gal and USD/gal, CA shows L and CAD/L, by default; the units toggle overrides either. 4dp per-unit prices, 2dp money, a currency marker on every money header (A6.1 as amended). A CA stop's expanded detail shows Pre-tax, HST, GST, PST, QST and Final separately.
+**Design.** (Revised on review, before merge: the strip is the invoice picker, and one two-button conversion replaces the US | CA switch and the gal/L toggle.)
+- **Week selector** (replaces `InvoicePeriodSelector`): options read just "Week ending Sep 9, 2026". The invoices behind a week, and its ⚠, are on the strip.
+- **"Invoices in view" strip** (new, shell-level): one chip per invoice in the week — flag, number, actual range (`🇺🇸 999210 · Sep 3–9`) — plus **"All invoices"** when the week has more than one. A chip opens that invoice on Transactions (`?invoice=<id>`, or `all`); already on Transactions, the filters are kept. States: *in view* (highlighted — the invoices the screen's figures came from), *not in view* (dimmed), *not imported* (greyed "🇨🇦 Not imported", not a link), ⚠ with a tooltip giving printed vs actual range. With no `?invoice=`, Transactions shows the week's first invoice (USD before CAD). The row-level "Source: 999210" in an expanded transaction names that row's own invoice. Shared through the shell's context, so Drivers, Trucks, Stations and Other Charges (T-44, T-45) publish what they show the same way.
+- **Conversion — `USD/gal` | `CAD/L`:** one control on Transactions, applied to every row on screen, one invoice or All. With nothing chosen each invoice shows **as it came in** (US: gal and USD/gal; CA: L and CAD/L), and the pressed button says which. A choice belongs to the invoice it was made on: picking another invoice, or coming back, shows that invoice as it came in again. **Money converts in T-66:** until a CA invoice carries its Bank of Canada rate, a choice converts quantity and per-unit price (`?units=`) and leaves money in its own currency, labelled, with a "rate pending" note — never a 1.0 rate (D27). The request is built in one place (`lib/conversion.ts` `conversionParams`) so T-66 adds `convertTo` there.
+- **Formatting:** 4dp per-unit prices, 2dp money, `US$`/`CA$` on money cells and the currency on money headers (A6.1 as amended); per-unit headers follow the unit shown (`/gal`, `/L`). Under All invoices, totals that would add litres to gallons or CAD to USD are withheld, and each quantity cell names its unit. A CA stop's expanded detail shows Pre-tax, HST, GST, PST, QST and Final separately.
 - **Import screen:** an invoice with `datesDiffer` shows the amber note ("Printed Aug 1 – Sep 9; transactions Sep 3 – Sep 10"); a "Belongs to week ending ___" control calls T-63's `PATCH`.
 
-**Files.** New: `frontend/src/components/WeekSelector.tsx`, `InvoicesInView.tsx`, `CurrencySideSwitch.tsx` (+ tests). `frontend/src/hooks/useWeek.tsx` (the shell's week context — it replaces `useInvoicePeriod.ts`), `useCurrencySide.ts`, `frontend/src/lib/weeks.ts`. Modified: `TopBar.tsx`, `(app)/layout.tsx` (mounts the context), `frontend/src/app/(app)/transactions/page.tsx`, `TransactionsTable.tsx`, `StopExpansion`, `BilledPrice.tsx`, `lib/formatMoney.ts`, the Import screens (T-42: `ImportHistory.tsx`, `import/page.tsx`, `ReconciliationPreview.tsx`). Removed: `InvoicePeriodSelector.tsx`, `useInvoicePeriod.ts`. The URL key is `week` (was `period`).
+**Files.** New: `frontend/src/components/WeekSelector.tsx`, `InvoicesInView.tsx`, `ConversionToggle.tsx`; `frontend/src/hooks/useWeek.tsx` (the shell's week context — it replaces `useInvoicePeriod.ts`), `useInvoiceInView.ts`; `frontend/src/lib/weeks.ts`, `conversion.ts` (+ tests). Modified: `TopBar.tsx`, `(app)/layout.tsx` (mounts the context), `frontend/src/app/(app)/transactions/page.tsx`, `TransactionsTable.tsx`, `StopExpansion`, `BilledPrice.tsx`, `lib/formatMoney.ts`, the Overview page (publishes its US invoice), the Import screens (T-42: `ImportHistory.tsx`, `import/page.tsx`, `ReconciliationPreview.tsx`). Removed: `InvoicePeriodSelector.tsx`, `useInvoicePeriod.ts`. URL keys: `week` (was `period`) and `invoice`.
 
 **Dependencies.** T-63, T-40, T-42.
 
 **Definition of done.**
-- [ ] The selector lists weeks, not invoices, with both flags and numbers; a one-sided week shows "—" for the missing side.
-- [ ] The strip shows exactly the invoices the page's figures came from, with the switch on either side — asserted against the API calls made.
-- [ ] The switch defaults to US on every mount, including after a CA visit.
-- [ ] CA rows render litres and CAD/L by default and gallons after the toggle, with money unchanged; US rows the reverse.
+- [ ] The selector lists weeks, not invoices: each option reads "Week ending …" alone.
+- [ ] The strip lists every invoice in the week (and "All invoices" for two); a chip opens that invoice on Transactions; the highlighted chips are exactly the invoices the page's figures came from — asserted against the API calls made.
+- [ ] Each invoice opens as it came in (US: gal and USD/gal; CA: L and CAD/L); a conversion applies to every row on screen, one invoice or All, and does not carry over to another invoice.
+- [ ] Until T-66, a conversion changes quantity and per-unit price only; money stays in its own currency with "rate pending", never converted at 1.0.
 - [ ] The Import screen's override moves an invoice and the selector reflects it without a reload; a 409 shows its reason.
 
 ---
@@ -1393,7 +1393,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 **Priority 66. D27.**
 
-**Goal.** Each CA invoice carries the Bank of Canada's USD/CAD rate for its invoice date, fetched once at import and kept as a record.
+**Goal.** Each CA invoice carries the Bank of Canada's USD/CAD rate for its invoice date, fetched once at import and kept as a record — and the Transactions conversion (T-64's `USD/gal` | `CAD/L`) uses it to convert money as well as units.
 
 **Design.**
 - Provider adapter `backend/src/fx/bankOfCanada.ts` over the Valet API (`/valet/observations/FXUSDCAD/json?start_date=…&end_date=…`, no key). A pure `pickRate(observations, invoiceDate)` takes the latest observation on or before the invoice date within a 7-day window (weekends, holidays); none in the window → `null`.
@@ -1401,8 +1401,10 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 - `importInvoice` takes the FX provider by injection, as planning takes the routing provider; the service does no HTTP of its own and prints nothing. A failed fetch leaves the rate null and the import succeeds.
 - `POST /invoices/{id}/fx-rate` re-fetches a missing rate; it never overwrites a stored one.
 - Tests run offline from a recorded Valet response in `backend/test/fixtures/boc/`. The Bank's terms of use are checked during the ticket; if they require attribution, it ships in the API response, the same way ORS attribution does.
+- **Display conversion of money (T-64's control).** `GET /transactions` gains `?convertTo=USD|CAD` beside `?units=`. It converts every money field on a row and its lines (amount, pre-tax, HST, GST, PST, QST, stop total) and the per-unit prices at the CA invoice's stored rate — CAD → USD divides by `fx_usd_cad`, USD → CAD multiplies by the rate of the CA invoice in the same billing week — each stored figure converted on its own and rounded once to the cent (prices to 4dp). A converted row's `currency` is the target; it also carries `invoiceCurrency` (what BVD billed, which `StopExpansion`'s Source row keys on) and `fx: { rate, rateDate, source }`. With no stored rate the money fields are `null` and the row has `ratePending: true` — never a 1.0 rate (D27). A row already in the target currency is unchanged. Nothing converted is stored. This amends D25 ("`?units=` … never money"): money converts only through `convertTo`, only at a stored rate.
+- **Frontend.** `frontend/src/lib/conversion.ts` `conversionParams` adds `convertTo: choiceCurrency(choice)` (one line; nothing else builds the request). The table's "rate pending" caption becomes the rate line ("Converted at 1.3712 CAD per USD, Bank of Canada, Sep 9"), shown only when a row was converted; a `ratePending` row shows "rate pending" in its money cells. Under All invoices in one currency, the money totals that T-64 withholds become summable.
 
-**Files.** New: `backend/src/fx/bankOfCanada.ts` (+ test), `backend/test/fixtures/boc/`. Modified: `migrations/{synthetic,real}/0003_actuals_schema.sql`, `backend/src/invoice/importInvoice.ts`, `backend/src/api/routes/invoices.ts`, the import CLI entry point (wires the real provider).
+**Files.** New: `backend/src/fx/bankOfCanada.ts` (+ test), `backend/test/fixtures/boc/`. Modified: `migrations/{synthetic,real}/0003_actuals_schema.sql`, `backend/src/invoice/importInvoice.ts`, `backend/src/api/routes/invoices.ts`, `backend/src/api/routes/transactions.ts` and `backend/src/actuals/transactions.ts` (`convertTo`), the import CLI entry point (wires the real provider), `frontend/src/lib/conversion.ts`, `TransactionsTable.tsx`, `docs/UI-DATA-CONTRACT.md` §9, `PROJECT-SCOPE-v2.md` D25.
 
 **Dependencies.** T-61.
 
@@ -1410,4 +1412,6 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 - [ ] `pickRate` returns the invoice date's rate on a business day, the previous business day's for a Saturday, and `null` with no observation in the window — pure, no network.
 - [ ] A CA import with the recorded fixture stores rate, rate date and source; a USD import stores nulls.
 - [ ] A provider failure imports the invoice with a null rate; `POST …/fx-rate` then fills it; a second call is a no-op.
+- [ ] `GET /transactions?convertTo=USD` on 999217's week returns each CAD money field ÷ the stored rate, rounded once to the cent, with `fx` and `invoiceCurrency` on the row; with no rate, money is `null` and `ratePending: true`; a USD row is unchanged.
+- [ ] On Transactions, `USD/gal` on the CA invoice shows USD money and the rate line; with no rate, "rate pending".
 - [ ] The full suite runs with no network.

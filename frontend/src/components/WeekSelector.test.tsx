@@ -61,18 +61,11 @@ function renderSelector(weeks: PeriodWeek[]) {
 }
 
 describe("WeekSelector (T-64 step 64.1)", () => {
-  it("lists weeks, not invoices — one option per week with both flags and numbers, ⚠ when dates differ", async () => {
+  it("lists weeks, not invoices — each option is just the week ending; the invoices are on the strip", async () => {
     renderSelector([PAIRED, US_ONLY]);
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
     const options = screen.getAllByRole("option").map((o) => o.textContent);
-    expect(options[0]).toBe("Week ending Sep 9, 2026 · 🇺🇸 999210 · 🇨🇦 999217 ⚠");
-    expect(options[1]).toBe("Week ending Sep 2, 2026 · 🇺🇸 999104 · 🇨🇦 —");
-  });
-
-  it("shows — for a missing US side too, and no ⚠ when the dates agree", async () => {
-    renderSelector([{ weekEnd: "2026-09-16", invoices: [invoice({ id: "4", invoiceNumber: "999224", currency: "CAD" })] }]);
-    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
-    expect(screen.getByRole("option").textContent).toBe("Week ending Sep 16, 2026 · 🇺🇸 — · 🇨🇦 999224");
+    expect(options).toEqual(["Week ending Sep 9, 2026", "Week ending Sep 2, 2026"]);
   });
 
   it("selects the newest week and writes a pick into ?week=", async () => {

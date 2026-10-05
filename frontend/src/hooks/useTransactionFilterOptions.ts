@@ -30,9 +30,12 @@ export interface TransactionFilterOptions {
  * This is a separate, unfiltered fetch from the table's own (filtered)
  * fetch, so choosing one filter never shrinks another filter's own options.
  */
-export function useTransactionFilterOptions(period: string | null, currency: "USD" | "CAD"): TransactionFilterOptions {
+/** `currency` is the side on screen, or `null` for both (All invoices). */
+export function useTransactionFilterOptions(period: string | null, currency: "USD" | "CAD" | null): TransactionFilterOptions {
   const driversFetcher = useCallback(
-    () => (period === null ? Promise.resolve(null) : listDrivers(period, currency)),
+    // The driver list is the whole roster whichever side is asked (zero-row
+    // entries included), so both sides at once reads it from the US side.
+    () => (period === null ? Promise.resolve(null) : listDrivers(period, currency ?? "USD")),
     [period, currency],
   );
   const { data: driversResult, loading: driversLoading } = useApiResource(driversFetcher);
@@ -41,7 +44,7 @@ export function useTransactionFilterOptions(period: string | null, currency: "US
   const { data: trucksResult, loading: trucksLoading } = useApiResource(trucksFetcher);
 
   const seedFetcher = useCallback(
-    () => (period === null ? Promise.resolve(null) : listTransactions({ week: period, currency, pageSize: 200 })),
+    () => (period === null ? Promise.resolve(null) : listTransactions({ week: period, currency: currency ?? undefined, pageSize: 200 })),
     [period, currency],
   );
   const { data: seedResult, loading: seedLoading } = useApiResource(seedFetcher);

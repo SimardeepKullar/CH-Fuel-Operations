@@ -2,13 +2,14 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PeriodInvoice, PeriodWeek } from "@ch/core/api/routes/periods";
-import type { CurrencySide } from "../lib/weeks";
 
 const push = vi.fn();
+let pathname = "/transactions";
+let searchParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push }),
-  usePathname: () => "/transactions",
-  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => pathname,
+  useSearchParams: () => searchParams,
 }));
 
 const getHealth = vi.fn();
@@ -18,8 +19,8 @@ vi.mock("../lib/api", () => ({
   listPeriods: (...args: unknown[]) => listPeriods(...args),
 }));
 
-const { WeekProvider, usePublishViewSide } = await import("../hooks/useWeek");
-const { default: InvoicesInView, chipState, invoiceHistoryHref } = await import("./InvoicesInView");
+const { WeekProvider, usePublishInView } = await import("../hooks/useWeek");
+const { default: InvoicesInView, chipState } = await import("./InvoicesInView");
 
 function invoice(overrides: Partial<PeriodInvoice>): PeriodInvoice {
   return {
@@ -53,30 +54,33 @@ afterEach(() => {
   push.mockClear();
   getHealth.mockReset();
   listPeriods.mockReset();
+  pathname = "/transactions";
+  searchParams = new URLSearchParams();
 });
 
-/** A stand-in screen: reads `side` and publishes it, the way `useCurrencySide` does. */
-function Screen({ side }: { side: CurrencySide | null }) {
-  usePublishViewSide(side);
+/** A stand-in screen publishing the invoices its figures come from, as `useInvoiceInView` does. */
+function Screen({ ids }: { ids: string[] | null }) {
+  usePublishInView(ids);
   return null;
 }
 
-function renderStrip(week: PeriodWeek, side: CurrencySide | null) {
+function renderStrip(week: PeriodWeek, ids: string[] | null) {
   getHealth.mockResolvedValue({ latestInvoicePeriod: week.weekEnd, openAnomalyCount: 0 });
   listPeriods.mockResolvedValue({ weeks: [week] });
   return render(
     <WeekProvider>
       <InvoicesInView />
-      <Screen side={side} />
+      <Screen ids={ids} />
     </WeekProvider>,
   );
 }
 
 const chip = (side: string) => document.querySelector(`.invoice-chip[data-side="${side}"]`) as HTMLElement;
+const allChip = () => document.querySelector('.invoice-chip[data-all="true"]') as HTMLElement | null;
 
 describe("InvoicesInView (T-64 step 64.2)", () => {
-  it("renders one chip per side — flag, number, actual range — highlighting the side in view and dimming the other", async () => {
-    renderStrip(PAIRED, "USD");
+  it("lists every invoice in the week — flag, number, actual range — highlighting the one in view", async () => {
+    renderStrip(PAIRED, ["inv-us"]);
     await waitFor(() => expect(chip("USD")).not.toBeNull());
 
     expect(chip("USD").textContent).toBe("🇺🇸 999210 · Sep 3–9");
@@ -84,27 +88,55 @@ describe("InvoicesInView (T-64 step 64.2)", () => {
     // The CA chip shows the range the transactions actually ran (Sep 3–10), not the printed one.
     expect(chip("CAD").textContent).toContain("🇨🇦 999217 · Sep 3–10");
     expect(chip("CAD").dataset.state).toBe("not-in-view");
+    expect(allChip()!.dataset.state).toBe("not-in-view");
   });
 
-  it("flips which chip is in view with the screen's side", async () => {
-    renderStrip(PAIRED, "CAD");
+  it("with All invoices in view, every invoice chip and the All chip are highlighted", async () => {
+    renderStrip(PAIRED, ["inv-us", "inv-ca"]);
     await waitFor(() => expect(chip("CAD")).not.toBeNull());
+    expect(chip("USD").dataset.state).toBe("in-view");
     expect(chip("CAD").dataset.state).toBe("in-view");
-    expect(chip("USD").dataset.state).toBe("not-in-view");
+    expect(allChip()!.dataset.state).toBe("in-view");
   });
 
-  it("a missing side is a greyed 'Not imported' chip, not a link", async () => {
-    renderStrip(US_ONLY, "USD");
+  it("a chip opens that invoice on Transactions; All invoices opens them together", async () => {
+    renderStrip(PAIRED, ["inv-us"]);
+    await waitFor(() => expect(chip("CAD")).not.toBeNull());
+
+    expect(chip("CAD").getAttribute("href")).toBe("/transactions?week=2026-09-09&invoice=inv-ca");
+    fireEvent.click(chip("CAD"));
+    expect(push).toHaveBeenCalledWith("/transactions?week=2026-09-09&invoice=inv-ca");
+
+    fireEvent.click(allChip()!);
+    expect(push).toHaveBeenLastCalledWith("/transactions?week=2026-09-09&invoice=all");
+  });
+
+  it("on Transactions a chip keeps the page's filters; from another screen it starts clean", async () => {
+    searchParams = new URLSearchParams({ driverId: "d1", invoice: "inv-us" });
+    renderStrip(PAIRED, ["inv-us"]);
+    await waitFor(() => expect(chip("CAD")).not.toBeNull());
+    expect(chip("CAD").getAttribute("href")).toBe("/transactions?driverId=d1&invoice=inv-ca&week=2026-09-09");
+
+    cleanup();
+    pathname = "/overview";
+    renderStrip(PAIRED, ["inv-us"]);
+    await waitFor(() => expect(chip("CAD")).not.toBeNull());
+    expect(chip("CAD").getAttribute("href")).toBe("/transactions?week=2026-09-09&invoice=inv-ca");
+  });
+
+  it("a missing side is a greyed 'Not imported' chip, not a link, and a one-invoice week has no All chip", async () => {
+    renderStrip(US_ONLY, ["inv-us"]);
     await waitFor(() => expect(chip("CAD")).not.toBeNull());
 
     expect(chip("CAD").textContent).toBe("🇨🇦 Not imported");
     expect(chip("CAD").dataset.state).toBe("not-imported");
     expect(chip("CAD").tagName).toBe("SPAN");
     expect(chip("USD").tagName).toBe("A");
+    expect(allChip()).toBeNull();
   });
 
   it("⚠ carries printed vs actual range in its tooltip when the dates differ, and only then", async () => {
-    renderStrip(PAIRED, "CAD");
+    renderStrip(PAIRED, ["inv-ca"]);
     await waitFor(() => expect(chip("CAD")).not.toBeNull());
 
     const warn = chip("CAD").querySelector(".invoice-chip-warn")!;
@@ -117,15 +149,7 @@ describe("InvoicesInView (T-64 step 64.2)", () => {
     await waitFor(() => expect(chip("USD")).not.toBeNull());
     expect(chip("USD").dataset.state).toBe("available");
     expect(chip("CAD").dataset.state).toBe("available");
-  });
-
-  it("a chip opens that invoice in Import history", async () => {
-    renderStrip(PAIRED, "USD");
-    await waitFor(() => expect(chip("CAD")).not.toBeNull());
-
-    expect(chip("CAD").getAttribute("href")).toBe("/import?invoice=inv-ca");
-    fireEvent.click(chip("CAD"));
-    expect(push).toHaveBeenCalledWith("/import?invoice=inv-ca");
+    expect(allChip()!.dataset.state).toBe("available");
   });
 
   it("renders nothing until the selected week is known", () => {
@@ -139,11 +163,10 @@ describe("InvoicesInView (T-64 step 64.2)", () => {
     expect(screen.queryByTestId("invoices-in-view")).toBeNull();
   });
 
-  it("chipState and invoiceHistoryHref", () => {
-    expect(chipState(false, "CAD", "USD")).toBe("not-imported");
-    expect(chipState(true, "USD", "USD")).toBe("in-view");
-    expect(chipState(true, "CAD", "USD")).toBe("not-in-view");
-    expect(chipState(true, "CAD", null)).toBe("available");
-    expect(invoiceHistoryHref("a b")).toBe("/import?invoice=a%20b");
+  it("chipState", () => {
+    expect(chipState(null, ["a"])).toBe("not-imported");
+    expect(chipState("a", ["a"])).toBe("in-view");
+    expect(chipState("b", ["a"])).toBe("not-in-view");
+    expect(chipState("b", null)).toBe("available");
   });
 });

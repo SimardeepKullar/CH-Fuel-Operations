@@ -11,6 +11,7 @@ import {
 import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "@ch/core/db/types";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import { QTY_UNIT_NAMES, formatMoney, formatPricePerUnit, formatQty2dp, sumMoney } from "../lib/formatMoney";
+import { moneyConversionPending, type DisplayChoice } from "../lib/conversion";
 import {
   PRODUCT_OPTIONS,
   RECEIPT_STATUS_OPTIONS,
@@ -46,10 +47,18 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 const columnHelper = createColumnHelper<TransactionListItem>();
 
-/** The columns for one currency and unit. The money and per-unit headers carry
- * both (A6.1 as amended): a CA week reads `Litres`, `Billed CAD/L`, `Total CAD`. */
-function buildColumns(currency: InvoiceCurrency, unit: InvoiceQtyUnit): ColumnDef<TransactionListItem, any>[] {
-  const perUnit = unit === "L" ? "/L" : "/gal";
+/** A per-unit header: `Billed CAD/L` when every row agrees; with rows in more than
+ * one currency (All invoices) the cells carry it (`US$`/`CA$`) and the header says
+ * only the unit, and with more than one unit, neither. */
+function perUnitHeader(prefix: string, currency: InvoiceCurrency | null, unit: InvoiceQtyUnit | null): string {
+  if (currency !== null) return `${prefix} ${currency}${unit === null ? " per unit" : `/${unit}`}`;
+  return `${prefix} per ${unit ?? "unit"}`;
+}
+
+/** The columns for the rows' currency and unit — `null` where the rows hold more
+ * than one. The money and per-unit headers carry both when they can (A6.1 as
+ * amended): a CA invoice reads `Litres`, `Billed CAD/L`, `Total CAD`. */
+function buildColumns(currency: InvoiceCurrency | null, unit: InvoiceQtyUnit | null): ColumnDef<TransactionListItem, any>[] {
   return [
     // Rendered specially in the row loop below (it needs the live `expandedId`
     // state, not just the row's own data) — this definition exists so the
@@ -102,14 +111,20 @@ function buildColumns(currency: InvoiceCurrency, unit: InvoiceQtyUnit): ColumnDe
     }),
     columnHelper.display({
       id: "gallons",
-      header: QTY_UNIT_NAMES[unit],
+      header: unit === null ? "Quantity" : QTY_UNIT_NAMES[unit],
       cell: ({ row }) => (
-        <span className="tx-gal">{row.original.qty === null ? "—" : formatQty2dp(row.original.qty)}</span>
+        <span className="tx-gal">
+            {row.original.qty === null
+              ? "—"
+              : unit === null
+                ? `${formatQty2dp(row.original.qty)} ${row.original.qtyUnit}`
+                : formatQty2dp(row.original.qty)}
+          </span>
       ),
     }),
     columnHelper.display({
       id: "billed",
-      header: `Billed ${currency}${perUnit}`,
+      header: perUnitHeader("Billed", currency, unit),
       cell: ({ row }) => (
         <BilledPrice
           billedPerUnit={row.original.billedPerUnit}
@@ -120,7 +135,7 @@ function buildColumns(currency: InvoiceCurrency, unit: InvoiceQtyUnit): ColumnDe
     }),
     columnHelper.display({
       id: "retail",
-      header: `Retail ${currency}${perUnit}`,
+      header: perUnitHeader("Retail", currency, unit),
       cell: ({ row }) => (
         <span className="muted">
           {row.original.retailPerUnit === null ? "—" : formatPricePerUnit(row.original.retailPerUnit, row.original.currency)}
@@ -128,7 +143,7 @@ function buildColumns(currency: InvoiceCurrency, unit: InvoiceQtyUnit): ColumnDe
       ),
     }),
     columnHelper.accessor("total", {
-      header: `Total ${currency}`,
+      header: currency === null ? "Total" : `Total ${currency}`,
       cell: ({ row }) => <span className="tx-total">{formatMoney(row.original.total, row.original.currency)}</span>,
     }),
     columnHelper.display({
@@ -201,10 +216,12 @@ interface TransactionsTableProps {
   totalBeforeSearch: number;
   loading: boolean;
   error: Error | null;
-  /** The page's single scoping invoice — the one side of the week it reads
-   * (A7, D28), `null` while loading. Passed through to `StopExpansion`'s
-   * "Source" row rather than re-derived per row. */
-  invoiceNumber: string | null;
+  /** The week's invoice number per currency (one imported invoice per side, D26) — a row's
+   * own invoice for `StopExpansion`'s "Source" row. A row carries its currency, not its
+   * invoice id (A7); T-66's money conversion must keep the invoice's own currency on the row. */
+  invoiceNumbers: Partial<Record<InvoiceCurrency, string>>;
+  /** The conversion chosen on screen, `null` for as printed — for the "conversion pending" caption. */
+  conversion?: DisplayChoice | null;
   /** What the page asked for — the headers' currency and unit when no row says. */
   currency: InvoiceCurrency;
   qtyUnit: InvoiceQtyUnit;
@@ -230,7 +247,8 @@ export default function TransactionsTable({
   totalBeforeSearch,
   loading,
   error,
-  invoiceNumber,
+  invoiceNumbers,
+  conversion = null,
   currency: requestedCurrency,
   qtyUnit: requestedUnit,
   filters,
@@ -291,20 +309,20 @@ export default function TransactionsTable({
     [rows, activeIndex, toggleRow],
   );
 
-  // The headers follow the rows when there are any. The page reads one side,
-  // so they agree; if a caller ever passed both, `mixed` withholds the totals
-  // below rather than summing litres with gallons or CAD with USD.
-  const kinds = new Set(rows.map((row) => `${row.currency}/${row.qtyUnit}`));
-  const mixed = kinds.size > 1;
-  const currency = rows[0]?.currency ?? requestedCurrency;
-  const unit = rows[0]?.qtyUnit ?? requestedUnit;
+  // The headers follow the rows when there are any. One invoice is one currency
+  // and one unit; All invoices can hold two of either, and then the totals below
+  // that would add them — litres with gallons, CAD with USD — are withheld.
+  const currencies = new Set(rows.map((row) => row.currency));
+  const units = new Set(rows.map((row) => row.qtyUnit));
+  const currency = currencies.size > 1 ? null : (rows[0]?.currency ?? requestedCurrency);
+  const unit = units.size > 1 ? null : (rows[0]?.qtyUnit ?? requestedUnit);
+  const pendingCurrencies = [...currencies].filter((c) => moneyConversionPending(conversion, c));
   const columns = useMemo(() => buildColumns(currency, unit), [currency, unit]);
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
 
   const totals = useMemo(() => {
-    // Quantity, weighted price and money add up only within one currency and
-    // one unit; a mixed set has no total.
-    if (mixed) return { qty: null, avgBilled: null, avgRetail: null, total: null };
+    // Quantity adds up within one unit, money within one currency, and a
+    // weighted price needs both.
     let qty = 0;
     let hasQty = false;
     let weightedBilled = 0;
@@ -317,13 +335,14 @@ export default function TransactionsTable({
         weightedRetail += row.qty * row.retailPerUnit;
       }
     }
+    const priced = currency !== null && unit !== null && hasQty && qty > 0;
     return {
-      qty: hasQty ? qty : null,
-      avgBilled: hasQty && qty > 0 ? weightedBilled / qty : null,
-      avgRetail: hasQty && qty > 0 ? weightedRetail / qty : null,
-      total: sumMoney(rows.map((row) => row.total)),
+      qty: unit !== null && hasQty ? qty : null,
+      avgBilled: priced ? weightedBilled / qty : null,
+      avgRetail: priced ? weightedRetail / qty : null,
+      total: currency !== null ? sumMoney(rows.map((row) => row.total)) : null,
     };
-  }, [rows, mixed]);
+  }, [rows, currency, unit]);
 
   return (
     <>
@@ -519,7 +538,7 @@ export default function TransactionsTable({
                         ),
                       )}
                     </div>
-                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumber} />}
+                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumbers[stop.currency] ?? null} />}
                   </div>
                 );
               })}
@@ -532,12 +551,12 @@ export default function TransactionsTable({
                 </span>
                 <span className="tx-foot-cell">{totals.qty === null ? "—" : formatQty2dp(totals.qty)}</span>
                 <span className="tx-foot-cell tx-foot-billed">
-                  {totals.avgBilled === null ? "—" : formatPricePerUnit(totals.avgBilled, currency)}
+                  {totals.avgBilled === null || currency === null ? "—" : formatPricePerUnit(totals.avgBilled, currency)}
                 </span>
                 <span className="tx-foot-cell muted">
-                  {totals.avgRetail === null ? "—" : formatPricePerUnit(totals.avgRetail, currency)}
+                  {totals.avgRetail === null || currency === null ? "—" : formatPricePerUnit(totals.avgRetail, currency)}
                 </span>
-                <span className="tx-foot-cell">{totals.total === null ? "—" : formatMoney(totals.total, currency)}</span>
+                <span className="tx-foot-cell">{totals.total === null || currency === null ? "—" : formatMoney(totals.total, currency)}</span>
                 <span />
                 <span />
                 <span />
@@ -550,7 +569,17 @@ export default function TransactionsTable({
       <div className="tx-caption">
         <span>
           Rows are one fuel stop, grouped by base auth code — expand to see every product line.{" "}
-          {mixed ? "Mixed currencies and units — totals withheld." : `All amounts ${currency}.`}
+          {currency === null
+            ? "Amounts are in each invoice's own currency — no combined total."
+            : `All amounts ${currency}.`}
+          {pendingCurrencies.length > 0 && (
+            <span className="tx-conversion-pending" data-testid="conversion-pending">
+              {" "}
+              Shown per {unit === "L" ? "litre" : "gallon"}; {pendingCurrencies.join(" and ")} amounts stay in{" "}
+              {pendingCurrencies.length > 1 ? "their own currency" : pendingCurrencies[0]} — converting them needs the
+              Bank of Canada rate (rate pending).
+            </span>
+          )}
         </span>
       </div>
     </>

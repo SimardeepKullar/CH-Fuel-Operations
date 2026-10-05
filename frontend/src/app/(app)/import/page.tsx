@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ImportInvoiceResponse, InvoiceListItem } from "@ch/core/api/routes/invoices";
-import { useSearchParams } from "next/navigation";
 import { ApiError, getInvoice, listInvoices, patchInvoiceWeek, uploadInvoice } from "../../../lib/api";
 import { useWeek } from "../../../hooks/useWeek";
 import Dropzone from "../../../components/Dropzone";
@@ -63,8 +62,6 @@ export default function ImportPage() {
   const [historyRows, setHistoryRows] = useState<InvoiceListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const { reloadPeriods } = useWeek();
-  // A strip chip opens here with `?invoice=<id>`; that row is highlighted.
-  const selectedId = useSearchParams().get("invoice");
 
   const refreshHistory = useCallback(() => {
     setHistoryLoading(true);
@@ -176,7 +173,6 @@ export default function ImportPage() {
         rows={historyRows}
         loading={historyLoading}
         onReopenQuarantined={reopenQuarantined}
-        selectedId={selectedId}
         onMoveWeek={moveWeek}
       />
     </div>

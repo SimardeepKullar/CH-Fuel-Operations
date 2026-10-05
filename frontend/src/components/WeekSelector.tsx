@@ -1,19 +1,13 @@
 "use client";
 
-import type { PeriodWeek } from "@ch/core/api/routes/periods";
 import { useWeek } from "../hooks/useWeek";
-import { SIDES, SIDE_FLAGS, formatWeekEnding, invoiceOnSide } from "../lib/weeks";
-
-/** `Week ending Sep 9, 2026 · 🇺🇸 999210 · 🇨🇦 999217` — a missing side reads `🇨🇦 —`; ⚠ when either invoice's dates differ. */
-export function weekOptionLabel(week: PeriodWeek): string {
-  const sides = SIDES.map((side) => `${SIDE_FLAGS[side]} ${invoiceOnSide(week, side)?.invoiceNumber ?? "—"}`);
-  const warn = week.invoices.some((invoice) => invoice.datesDiffer) ? " ⚠" : "";
-  return `${formatWeekEnding(week.weekEnd)} · ${sides.join(" · ")}${warn}`;
-}
+import { formatWeekEnding } from "../lib/weeks";
 
 /** A7's top-bar week selector — governs Actuals and Analysis. `TopBar` hides
  * it entirely on Plan screens (T-39 DoD) rather than rendering it disabled.
- * Lists weeks, not invoices (T-64, D26); the US | CA choice is each screen's. */
+ * Lists weeks, not invoices (T-64, D26): each option is just "Week ending Sep 9,
+ * 2026" — the invoices behind the week, and any ⚠, are on the "Invoices in view"
+ * strip under the bar. */
 export default function WeekSelector() {
   const { week, setWeek, weeks, loading } = useWeek();
 
@@ -33,7 +27,7 @@ export default function WeekSelector() {
         )}
         {weeks.map((w) => (
           <option key={w.weekEnd} value={w.weekEnd}>
-            {weekOptionLabel(w)}
+            {formatWeekEnding(w.weekEnd)}
           </option>
         ))}
       </select>

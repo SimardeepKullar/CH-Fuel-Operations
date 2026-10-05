@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { OverviewResult } from "@ch/core/actuals/overview";
 import { getOverview } from "../../../lib/api";
-import { usePublishViewSide, useWeek } from "../../../hooks/useWeek";
+import { usePublishInView, useWeek } from "../../../hooks/useWeek";
+import { invoiceOnSide } from "../../../lib/weeks";
 import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../../../lib/formatMoney";
 import KpiCard from "../../../components/KpiCard";
 import BilledPriceTrend from "../../../components/BilledPriceTrend";
@@ -21,11 +22,12 @@ import Corners from "../../../components/Corners";
  * second time for the same week (DoD: exactly one API call).
  *
  * `/overview` serves the US side alone until T-65 shapes the CA and combined
- * panels, so the screen says so to the "Invoices in view" strip.
+ * panels, so the screen tells the "Invoices in view" strip its figures are the US invoice's.
  */
 export default function OverviewPage() {
-  const { week: period, loading: periodLoading } = useWeek();
-  usePublishViewSide("USD");
+  const { week: period, loading: periodLoading, weekEntry } = useWeek();
+  const usInvoiceId = invoiceOnSide(weekEntry, "USD")?.id ?? null;
+  usePublishInView(weekEntry === null ? null : usInvoiceId === null ? [] : [usInvoiceId]);
   const [result, setResult] = useState<OverviewResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

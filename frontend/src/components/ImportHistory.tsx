@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
 import { ApiError } from "../lib/api";
 import { formatMoney } from "../lib/formatMoney";
@@ -12,8 +12,6 @@ interface ImportHistoryProps {
   rows: InvoiceListItem[];
   loading?: boolean;
   onReopenQuarantined: (id: string) => void;
-  /** The invoice a strip chip pointed at (`/import?invoice=`) — highlighted and scrolled to. */
-  selectedId?: string | null;
   /** Moves an invoice to another billing week (`PATCH /invoices/{id}`, D26). Rejects with the API's
    * problem on a refusal — a 409 names the invoice already holding the week. */
   onMoveWeek?: (id: string, weekEnd: string) => Promise<void>;
@@ -48,17 +46,11 @@ export default function ImportHistory({
   rows,
   loading = false,
   onReopenQuarantined,
-  selectedId = null,
   onMoveWeek,
 }: ImportHistoryProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [movingId, setMovingId] = useState<string | null>(null);
-  const selectedRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    selectedRef.current?.scrollIntoView?.({ block: "center" });
-  }, [selectedId, rows]);
 
   const move = (row: InvoiceListItem) => {
     const target = drafts[row.id];
@@ -101,16 +93,10 @@ export default function ImportHistory({
           </div>
           {rows.map((row) => {
             const reopenable = row.status === "quarantined";
-            const selected = row.id === selectedId;
             const draft = drafts[row.id] ?? row.billingWeekEnd;
             const error = errors[row.id];
             return (
-              <div
-                key={row.id}
-                className={`import-history-entry${selected ? " import-history-entry-selected" : ""}`}
-                ref={selected ? selectedRef : undefined}
-                aria-current={selected ? "true" : undefined}
-              >
+              <div key={row.id} className="import-history-entry">
                 <div
                   className={`import-history-row${reopenable ? " import-history-row-clickable" : ""}`}
                   data-testid={`import-history-row-${row.id}`}

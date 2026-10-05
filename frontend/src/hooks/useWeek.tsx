@@ -4,7 +4,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { PeriodInvoice, PeriodWeek } from "@ch/core/api/routes/periods";
 import { getHealth, listPeriods } from "../lib/api";
-import { type CurrencySide } from "../lib/weeks";
 
 /** The URL key holding the selected billing week's end (D26). */
 export const WEEK_PARAM = "week";
@@ -20,10 +19,11 @@ export interface WeekContextValue {
   weekEntry: PeriodWeek | null;
   /** The selected week's imported invoices, USD first. */
   invoices: PeriodInvoice[];
-  /** Which side the mounted screen is actually reading — what the "Invoices in view" strip highlights.
-   * `null` when the screen reads no invoice figures (a stub, a Plan screen), so nothing is dimmed. */
-  viewSide: CurrencySide | null;
-  setViewSide: (side: CurrencySide | null) => void;
+  /** The ids of the invoices the mounted screen's figures come from — what the "Invoices in view"
+   * strip highlights. `null` when the screen reads no invoice figures (a stub, a Plan screen), so
+   * nothing is dimmed. */
+  inViewIds: readonly string[] | null;
+  setInViewIds: (ids: readonly string[] | null) => void;
   /** Re-reads `GET /periods` — after an override moved an invoice. Navigation never calls this. */
   reloadPeriods: () => Promise<void>;
 }
@@ -47,7 +47,7 @@ export function WeekProvider({ children }: { children: ReactNode }) {
   const [latestWeek, setLatestWeek] = useState<string | null>(null);
   const [weeks, setWeeks] = useState<PeriodWeek[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewSide, setViewSide] = useState<CurrencySide | null>(null);
+  const [inViewIds, setInViewIds] = useState<readonly string[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,11 +97,11 @@ export function WeekProvider({ children }: { children: ReactNode }) {
       setWeek,
       weekEntry,
       invoices: weekEntry?.invoices ?? [],
-      viewSide,
-      setViewSide,
+      inViewIds,
+      setInViewIds,
       reloadPeriods,
     }),
-    [weeks, loading, week, setWeek, weekEntry, viewSide, reloadPeriods],
+    [weeks, loading, week, setWeek, weekEntry, inViewIds, reloadPeriods],
   );
 
   return <WeekContext.Provider value={value}>{children}</WeekContext.Provider>;
@@ -114,14 +114,16 @@ export function useWeek(): WeekContextValue {
 }
 
 /**
- * Tells the strip which side a screen with no switch of its own reads (the
- * Overview, until T-65 serves both). A screen with a switch uses
- * `useCurrencySide()`, which publishes the same way.
+ * Tells the strip which invoices a screen's figures come from. Transactions
+ * publishes through `useInvoiceInView()`; the Overview publishes its US invoice
+ * until T-65 serves both. Cleared on unmount, so a screen that publishes nothing
+ * dims nothing. Keyed on the ids' contents, so a fresh array each render is fine.
  */
-export function usePublishViewSide(side: CurrencySide | null): void {
-  const { setViewSide } = useWeek();
+export function usePublishInView(ids: readonly string[] | null): void {
+  const { setInViewIds } = useWeek();
+  const key = ids === null ? null : ids.join(",");
   useEffect(() => {
-    setViewSide(side);
-    return () => setViewSide(null);
-  }, [side, setViewSide]);
+    setInViewIds(key === null ? null : key === "" ? [] : key.split(","));
+    return () => setInViewIds(null);
+  }, [key, setInViewIds]);
 }

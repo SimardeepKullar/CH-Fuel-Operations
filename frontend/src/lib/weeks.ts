@@ -72,14 +72,40 @@ export function invoiceOnSide(week: PeriodWeek | null | undefined, side: Currenc
   return week?.invoices.find((invoice) => invoice.currency === side) ?? null;
 }
 
+/** The URL key naming which of the week's invoices Transactions shows: an invoice id, or `all`. */
+export const INVOICE_PARAM = "invoice";
+export const ALL_INVOICES = "all";
+
+export type InvoiceSelection =
+  | { kind: "none" }
+  | { kind: "one"; invoice: PeriodInvoice }
+  | { kind: "all"; invoices: PeriodInvoice[] };
+
 /**
- * The side a screen should actually read: the one asked for, unless the week
- * has no invoice on it, in which case the other side if that one is imported.
- * A week with neither (or no week) keeps the request, so the screen asks and
- * gets an empty answer instead of guessing.
+ * Which invoices a screen shows for `?invoice=`: one invoice by id, every
+ * invoice in the week for `all`, and otherwise — no param, or an id from another
+ * week after the selector moved — the week's first invoice (USD before CAD).
  */
-export function effectiveSide(week: PeriodWeek | null | undefined, requested: CurrencySide): CurrencySide {
-  if (invoiceOnSide(week, requested)) return requested;
-  const other: CurrencySide = requested === "USD" ? "CAD" : "USD";
-  return invoiceOnSide(week, other) ? other : requested;
+export function resolveInvoiceSelection(week: PeriodWeek | null | undefined, param: string | null): InvoiceSelection {
+  const invoices = week?.invoices ?? [];
+  if (invoices.length === 0) return { kind: "none" };
+  if (param === ALL_INVOICES) return { kind: "all", invoices };
+  return { kind: "one", invoice: invoices.find((invoice) => invoice.id === param) ?? invoices[0]! };
+}
+
+export function selectionInvoiceIds(selection: InvoiceSelection): string[] {
+  if (selection.kind === "one") return [selection.invoice.id];
+  if (selection.kind === "all") return selection.invoices.map((invoice) => invoice.id);
+  return [];
+}
+
+/**
+ * Where a strip chip goes: Transactions, showing `value` (an invoice id or `all`)
+ * for `week`. Already on Transactions, the other params (filters, search) are kept.
+ */
+export function invoiceViewHref(pathname: string, searchParams: { toString(): string }, week: string, value: string): string {
+  const next = pathname === "/transactions" ? new URLSearchParams(searchParams.toString()) : new URLSearchParams();
+  next.set("week", week);
+  next.set(INVOICE_PARAM, value);
+  return `/transactions?${next.toString()}`;
 }

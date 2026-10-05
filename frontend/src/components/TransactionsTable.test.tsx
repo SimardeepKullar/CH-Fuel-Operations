@@ -49,7 +49,7 @@ function baseProps(rows: TransactionListItem[]) {
     totalBeforeSearch: rows.length,
     loading: false,
     error: null,
-    invoiceNumber: "999210",
+    invoiceNumbers: { USD: "999210", CAD: "999217" },
     currency: "USD" as const,
     qtyUnit: "gal" as const,
     filters: EMPTY_FILTERS,
@@ -283,12 +283,40 @@ describe("TransactionsTable", () => {
     expect(document.querySelector(".tx-head-row")!.textContent).toContain("Total CAD");
   });
 
-  it("never sums litres with gallons or CAD with USD: a mixed set has no footer totals", () => {
+  it("All invoices as printed: never sums litres with gallons or CAD with USD, and each cell says its unit", () => {
     render(<TransactionsTable {...baseProps([stop(), caStop()])} />);
     const foot = document.querySelector(".tx-foot-row")!;
     const cells = [...foot.querySelectorAll(".tx-foot-cell")].map((c) => c.textContent);
     expect(cells).toEqual(["—", "—", "—", "—"]);
-    expect(foot.textContent).not.toMatch(/\d{3}\.\d{2}/);
-    expect(document.querySelector(".tx-caption")!.textContent).toContain("Mixed currencies and units");
+    const head = document.querySelector(".tx-head-row")!.textContent!;
+    expect(head).toContain("Quantity");
+    expect(head).toContain("Billed per unit");
+    expect(head).toContain("Total");
+    expect(head).not.toContain("Total USD");
+    const rowsText = [...document.querySelectorAll(".tx-row")].map((r) => r.textContent!);
+    expect(rowsText[0]).toContain("40.00 gal");
+    expect(rowsText[1]).toContain("100.00 L");
+    expect(document.querySelector(".tx-caption")!.textContent).toContain("each invoice's own currency");
+  });
+
+  it("All invoices in one unit (after the toggle): quantity sums, money and the weighted prices stay apart", () => {
+    const rows = [stop(), caStop({ qty: 26.42, qtyUnit: "gal", billedPerUnit: 7.2093, retailPerUnit: 7.5708 })];
+    render(<TransactionsTable {...baseProps(rows)} conversion="USD/gal" />);
+    const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
+    expect(cells).toEqual(["66.42", "—", "—", "—"]);
+    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Gallons");
+    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Billed per gal");
+    expect(screen.getByTestId("conversion-pending").textContent).toContain("CAD amounts stay in CAD");
+  });
+
+  it("the Source row names each row's own invoice", () => {
+    render(<TransactionsTable {...baseProps([caStop()])} />);
+    fireEvent.click(document.querySelector(".tx-row")!);
+    expect(screen.getByText("Invoice 999217")).toBeTruthy();
+  });
+
+  it("no pending note when the conversion matches the rows' currency", () => {
+    render(<TransactionsTable {...baseProps([caStop()])} conversion="CAD/L" />);
+    expect(screen.queryByTestId("conversion-pending")).toBeNull();
   });
 });

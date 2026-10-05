@@ -236,7 +236,7 @@ a.invoice-chip:hover { background: var(--color-accent-100); }
 }
 .invoice-chip-warn { color: var(--color-amber); cursor: help; }
 
-/* — US | CA switch (T-64) — */
+/* — USD/gal | CAD/L conversion toggle (T-64) — */
 .side-switch { display: inline-flex; border: 1px solid var(--color-control-border); border-radius: var(--radius-md); overflow: hidden; }
 .side-switch-option {
   padding: 5px 12px;
@@ -248,8 +248,7 @@ a.invoice-chip:hover { background: var(--color-accent-100); }
 }
 .side-switch-option + .side-switch-option { border-left: 1px solid var(--color-control-border); }
 .side-switch-option.active { background: var(--color-accent-800); color: #fff; }
-.side-switch-option:disabled { cursor: not-allowed; color: var(--color-muted); background: var(--color-bg); }
-.side-switch-missing { font-weight: 400; font-size: 11px; }
+.tx-conversion-pending { color: #8a5a00; }
 
 .topbar-standing {
   display: flex;
@@ -1456,7 +1455,6 @@ select.tx-filter-select {
 
 .import-history-table { display: flex; flex-direction: column; }
 .import-history-entry { border-bottom: 1px solid var(--color-divider); }
-.import-history-entry-selected { background: var(--color-accent-100); box-shadow: inset 3px 0 0 var(--color-accent); }
 .import-history-entry .import-history-row { border-bottom: none; }
 .import-history-sub {
   display: flex;
