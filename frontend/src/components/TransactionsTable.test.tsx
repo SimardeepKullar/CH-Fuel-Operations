@@ -319,4 +319,17 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable {...baseProps([caStop()])} conversion="CAD/L" />);
     expect(screen.queryByTestId("conversion-pending")).toBeNull();
   });
+
+  it("under All invoices each row is tagged with its invoice and country", () => {
+    render(<TransactionsTable {...baseProps([stop(), caStop()])} showInvoice />);
+    const tags = screen.getAllByTestId("tx-invoice-tag");
+    expect(tags.map((t) => t.textContent)).toEqual(["🇺🇸 999210", "🇨🇦 999217"]);
+    expect(tags.map((t) => t.dataset.currency)).toEqual(["USD", "CAD"]);
+    expect(tags[1]!.querySelector('[role="img"]')!.getAttribute("aria-label")).toBe("CA");
+  });
+
+  it("a single invoice's rows carry no tag", () => {
+    render(<TransactionsTable {...baseProps([stop()])} />);
+    expect(screen.queryByTestId("tx-invoice-tag")).toBeNull();
+  });
 });

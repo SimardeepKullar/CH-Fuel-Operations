@@ -12,6 +12,7 @@ import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "@ch/core/db
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import { QTY_UNIT_NAMES, formatMoney, formatPricePerUnit, formatQty2dp, sumMoney } from "../lib/formatMoney";
 import { moneyConversionPending, type DisplayChoice } from "../lib/conversion";
+import { SIDE_FLAGS, SIDE_LABELS } from "../lib/weeks";
 import {
   PRODUCT_OPTIONS,
   RECEIPT_STATUS_OPTIONS,
@@ -55,10 +56,29 @@ function perUnitHeader(prefix: string, currency: InvoiceCurrency | null, unit: I
   return `${prefix} per ${unit ?? "unit"}`;
 }
 
+/** Under All invoices, the tag under a row's date naming the invoice it came
+ * from and its country: `🇨🇦 999217`. A row carries its currency, and a week
+ * holds one imported invoice per currency (D26), so the currency names it. */
+function InvoiceTag({ currency, invoiceNumber }: { currency: InvoiceCurrency; invoiceNumber: string | null }) {
+  return (
+    <span className="tx-invoice-tag" data-currency={currency} data-testid="tx-invoice-tag">
+      <span role="img" aria-label={SIDE_LABELS[currency]}>
+        {SIDE_FLAGS[currency]}
+      </span>{" "}
+      {invoiceNumber ?? SIDE_LABELS[currency]}
+    </span>
+  );
+}
+
 /** The columns for the rows' currency and unit — `null` where the rows hold more
  * than one. The money and per-unit headers carry both when they can (A6.1 as
- * amended): a CA invoice reads `Litres`, `Billed CAD/L`, `Total CAD`. */
-function buildColumns(currency: InvoiceCurrency | null, unit: InvoiceQtyUnit | null): ColumnDef<TransactionListItem, any>[] {
+ * amended): a CA invoice reads `Litres`, `Billed CAD/L`, `Total CAD`. With
+ * `invoiceNumbers`, each row is tagged with its invoice (All invoices). */
+function buildColumns(
+  currency: InvoiceCurrency | null,
+  unit: InvoiceQtyUnit | null,
+  invoiceNumbers: Partial<Record<InvoiceCurrency, string>> | null,
+): ColumnDef<TransactionListItem, any>[] {
   return [
     // Rendered specially in the row loop below (it needs the live `expandedId`
     // state, not just the row's own data) — this definition exists so the
@@ -66,12 +86,15 @@ function buildColumns(currency: InvoiceCurrency | null, unit: InvoiceQtyUnit | n
     columnHelper.display({ id: "chevron", header: "" }),
     columnHelper.accessor("occurredAt", {
       header: "Date · time",
-      cell: ({ getValue }) => {
+      cell: ({ row, getValue }) => {
         const { date, time } = formatDateTime(getValue());
         return (
           <span className="tx-datetime">
             <span className="tx-date">{date}</span>
             <span className="tx-time">{time}</span>
+            {invoiceNumbers !== null && (
+              <InvoiceTag currency={row.original.currency} invoiceNumber={invoiceNumbers[row.original.currency] ?? null} />
+            )}
           </span>
         );
       },
@@ -220,6 +243,8 @@ interface TransactionsTableProps {
    * own invoice for `StopExpansion`'s "Source" row. A row carries its currency, not its
    * invoice id (A7); T-66's money conversion must keep the invoice's own currency on the row. */
   invoiceNumbers: Partial<Record<InvoiceCurrency, string>>;
+  /** Tag each row with the invoice it came from (flag + number) — on under All invoices. */
+  showInvoice?: boolean;
   /** The conversion chosen on screen, `null` for as printed — for the "conversion pending" caption. */
   conversion?: DisplayChoice | null;
   /** What the page asked for — the headers' currency and unit when no row says. */
@@ -248,6 +273,7 @@ export default function TransactionsTable({
   loading,
   error,
   invoiceNumbers,
+  showInvoice = false,
   conversion = null,
   currency: requestedCurrency,
   qtyUnit: requestedUnit,
@@ -317,7 +343,10 @@ export default function TransactionsTable({
   const currency = currencies.size > 1 ? null : (rows[0]?.currency ?? requestedCurrency);
   const unit = units.size > 1 ? null : (rows[0]?.qtyUnit ?? requestedUnit);
   const pendingCurrencies = [...currencies].filter((c) => moneyConversionPending(conversion, c));
-  const columns = useMemo(() => buildColumns(currency, unit), [currency, unit]);
+  const columns = useMemo(
+    () => buildColumns(currency, unit, showInvoice ? invoiceNumbers : null),
+    [currency, unit, showInvoice, invoiceNumbers],
+  );
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
 
   const totals = useMemo(() => {

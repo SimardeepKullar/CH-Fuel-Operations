@@ -139,6 +139,7 @@ export default function TransactionsPage() {
         loading={loading}
         error={error}
         invoiceNumbers={invoiceNumbers}
+        showInvoice={selection.kind === "all"}
         conversion={conversion}
         currency={shown === null ? "USD" : choiceCurrency(shown)}
         qtyUnit={shown === null ? "gal" : choiceUnit(shown)}

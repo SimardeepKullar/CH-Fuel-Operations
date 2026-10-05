@@ -210,6 +210,7 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(lastTableRequest().units).toBeUndefined();
     expect(chipStates()).toEqual({ USD: "in-view", CAD: "not-in-view", all: "not-in-view" });
     expect(pressed()).toBe("USD/gal");
+    expect(screen.queryByTestId("tx-invoice-tag")).toBeNull();
   });
 
   it("?invoice= picks that invoice: currency=CAD, its rows in litres and CAD, the CA chip highlighted", async () => {
@@ -250,6 +251,8 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(chipStates()).toEqual({ USD: "in-view", CAD: "in-view", all: "in-view" });
     // Two invoices as printed: neither button describes everything on screen.
     expect(pressed()).toBeNull();
+    // Each row says which invoice, and which country, it came from.
+    expect(screen.getAllByTestId("tx-invoice-tag").map((t) => t.textContent)).toEqual(["🇺🇸 999210", "🇨🇦 999217"]);
   });
 
   it("USD/gal on the CA invoice asks for gallons and keeps the money in CAD, with the rate pending", async () => {
