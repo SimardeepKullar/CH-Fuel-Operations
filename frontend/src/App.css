@@ -192,6 +192,65 @@
   background: var(--color-control-bg);
   cursor: pointer;
 }
+/* — "Invoices in view" strip (T-64): one chip per side of the selected week — */
+.invoices-in-view {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 22px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+}
+.invoices-in-view-label {
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a4abb9;
+  white-space: nowrap;
+}
+.invoice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font: 600 12px var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent-800);
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.invoice-chip { cursor: pointer; }
+a.invoice-chip:hover { background: var(--color-accent-100); }
+.invoice-chip[data-state="in-view"] {
+  background: var(--color-accent-100);
+  border-color: var(--color-accent);
+}
+.invoice-chip[data-state="not-in-view"] { opacity: 0.5; }
+.invoice-chip[data-state="not-imported"] {
+  color: var(--color-muted);
+  background: var(--color-bg);
+  font-weight: 400;
+}
+.invoice-chip-warn { color: var(--color-amber); cursor: help; }
+
+/* — US | CA switch (T-64) — */
+.side-switch { display: inline-flex; border: 1px solid var(--color-control-border); border-radius: var(--radius-md); overflow: hidden; }
+.side-switch-option {
+  padding: 5px 12px;
+  border: 0;
+  background: var(--color-control-bg);
+  font: 600 12.5px var(--font-body);
+  color: var(--color-control-fg);
+  cursor: pointer;
+}
+.side-switch-option + .side-switch-option { border-left: 1px solid var(--color-control-border); }
+.side-switch-option.active { background: var(--color-accent-800); color: #fff; }
+.side-switch-option:disabled { cursor: not-allowed; color: var(--color-muted); background: var(--color-bg); }
+.side-switch-missing { font-weight: 400; font-size: 11px; }
+
 .topbar-standing {
   display: flex;
   align-items: center;
@@ -982,6 +1041,7 @@ select.input { width: 100%; }
    TRANSACTIONS (T-40, A8.3)
    =========================================================================== */
 .tx-page { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px 22px 26px; }
+.tx-side-bar { display: flex; align-items: center; gap: 12px; }
 .tx-toolbar { background: var(--color-surface); border: 1px solid var(--color-border); border-top: 2px solid var(--color-accent); }
 .tx-toolbar-row {
   display: flex;
@@ -1175,6 +1235,8 @@ select.tx-filter-select {
   grid-template-columns: 34px minmax(60px, 1fr) 86px 86px 86px 100px;
   align-items: center;
 }
+.stop-expansion-line-row-tax { grid-template-columns: 34px minmax(60px, 1fr) 76px 92px 92px 92px 82px 82px 82px 82px 100px; column-gap: 6px; }
+.stop-expansion-lines { overflow-x: auto; }
 .stop-expansion-lines-head {
   font: 600 9.5px var(--font-heading);
   letter-spacing: 0.11em;

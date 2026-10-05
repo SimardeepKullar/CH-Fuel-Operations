@@ -18,22 +18,22 @@ export interface TransactionFilterOptions {
 /**
  * Option lists for the driver/truck/card/state filter dropdowns (A8.3, T-40).
  *
- * Drivers and trucks reuse existing roster endpoints — `GET /drivers?period=`
+ * Drivers and trucks reuse existing roster endpoints — `GET /drivers?week=&currency=`
  * returns every driver on the roster (zero-row entries included, per its own
- * doc comment), and `GET /trucks` (no `period`, D23) is the plain fleet
+ * doc comment), and `GET /trucks` (no `week`, D23) is the plain fleet
  * roster. Neither `GET /cards` nor any state-list endpoint exists anywhere in
  * the API, so cards and states are derived from one unfiltered fetch of the
- * period's own transactions (`pageSize: 200` — the same "get everything, this
- * period is small" convention `useInvoicePeriod` already uses) — the same
+ * week's own transactions on the side in view (`pageSize: 200` — the same "get everything, this
+ * week is small" convention the shell's week context already uses) — the same
  * approach the design file's own mock takes, deriving filter options from
  * already-loaded rows, rather than adding two endpoints for two small lists.
  * This is a separate, unfiltered fetch from the table's own (filtered)
  * fetch, so choosing one filter never shrinks another filter's own options.
  */
-export function useTransactionFilterOptions(period: string | null): TransactionFilterOptions {
+export function useTransactionFilterOptions(period: string | null, currency: "USD" | "CAD"): TransactionFilterOptions {
   const driversFetcher = useCallback(
-    () => (period === null ? Promise.resolve(null) : listDrivers(period)),
-    [period],
+    () => (period === null ? Promise.resolve(null) : listDrivers(period, currency)),
+    [period, currency],
   );
   const { data: driversResult, loading: driversLoading } = useApiResource(driversFetcher);
 
@@ -41,8 +41,8 @@ export function useTransactionFilterOptions(period: string | null): TransactionF
   const { data: trucksResult, loading: trucksLoading } = useApiResource(trucksFetcher);
 
   const seedFetcher = useCallback(
-    () => (period === null ? Promise.resolve(null) : listTransactions({ week: period, currency: "USD", pageSize: 200 })),
-    [period],
+    () => (period === null ? Promise.resolve(null) : listTransactions({ week: period, currency, pageSize: 200 })),
+    [period, currency],
   );
   const { data: seedResult, loading: seedLoading } = useApiResource(seedFetcher);
 

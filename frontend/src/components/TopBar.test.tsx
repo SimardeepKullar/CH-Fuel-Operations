@@ -16,7 +16,16 @@ vi.mock("../lib/api", () => ({
   listPeriods: (...args: unknown[]) => listPeriods(...args),
 }));
 
-const { default: TopBar } = await import("./TopBar");
+const { default: TopBarInner } = await import("./TopBar");
+const { WeekProvider } = await import("../hooks/useWeek");
+
+function TopBar(props: React.ComponentProps<typeof TopBarInner>) {
+  return (
+    <WeekProvider>
+      <TopBarInner {...props} />
+    </WeekProvider>
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -31,23 +40,23 @@ function setup() {
 }
 
 describe("TopBar (T-39 step 39.2, A7)", () => {
-  it("hides the invoice-period selector on Plan screens", () => {
+  it("hides the billing-week selector on Plan screens", () => {
     setup();
     pathname = "/";
     render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-    expect(screen.queryByLabelText("Invoice period")).toBeNull();
+    expect(screen.queryByLabelText("Billing week")).toBeNull();
 
     cleanup();
     pathname = "/plans";
     render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-    expect(screen.queryByLabelText("Invoice period")).toBeNull();
+    expect(screen.queryByLabelText("Billing week")).toBeNull();
   });
 
-  it("shows the invoice-period selector on Actuals/Analysis screens", () => {
+  it("shows the billing-week selector on Actuals/Analysis screens", () => {
     setup();
     pathname = "/transactions";
     render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-    expect(screen.getByLabelText("Invoice period")).toBeTruthy();
+    expect(screen.getByLabelText("Billing week")).toBeTruthy();
   });
 
   it("renders the standing receipts and flags counts from props, not constants", () => {

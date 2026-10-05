@@ -1,11 +1,15 @@
 import type { CSSProperties } from "react";
-import { formatPricePerGal } from "../lib/formatMoney";
+import type { InvoiceCurrency } from "@ch/core/db/types";
+import { formatPricePerUnit } from "../lib/formatMoney";
 
 interface BilledPriceProps {
-  /** `null` when the stop carries no TA line (e.g. a scale-only charge) —
-   * rendered as "—", never 0 or "$0.00" (CLAUDE.md). */
-  billedUsdPerGal: number | null;
-  retailUsdPerGal: number | null;
+  /** Per gallon or per litre, whichever the row is in; the column header names
+   * the unit. `null` when the stop carries no TA line (e.g. a scale-only
+   * charge) — rendered as "—", never 0 or "$0.00" (CLAUDE.md). */
+  billedPerUnit: number | null;
+  retailPerUnit: number | null;
+  /** The row's own currency — a CA row is not dollars of the US kind (D28). */
+  currency: InvoiceCurrency;
 }
 
 // Inline, not a CSS class: BUILD-PLAN-v2 Step 40.1 asserts the size
@@ -31,21 +35,20 @@ const discountStyle: CSSProperties = {
 };
 
 /**
- * A9.1: billed $/gal is the dominant numeral in its row (4dp); retail is
+ * A9.1: billed price per unit is the dominant numeral in its row (4dp); retail is
  * small and muted (rendered by the caller — this component only owns the
  * billed+discount pairing); discount is a subline, never coloured as a win.
  */
-export default function BilledPrice({ billedUsdPerGal, retailUsdPerGal }: BilledPriceProps) {
-  const discountUsdPerGal =
-    billedUsdPerGal === null || retailUsdPerGal === null ? null : retailUsdPerGal - billedUsdPerGal;
+export default function BilledPrice({ billedPerUnit, retailPerUnit, currency }: BilledPriceProps) {
+  const discountPerUnit = billedPerUnit === null || retailPerUnit === null ? null : retailPerUnit - billedPerUnit;
 
   return (
     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
       <span data-testid="billed-price-value" style={valueStyle}>
-        {billedUsdPerGal === null ? "—" : formatPricePerGal(billedUsdPerGal)}
+        {billedPerUnit === null ? "—" : formatPricePerUnit(billedPerUnit, currency)}
       </span>
       <span data-testid="billed-price-discount" style={discountStyle}>
-        disc {discountUsdPerGal === null ? "—" : formatPricePerGal(discountUsdPerGal)}
+        disc {discountPerUnit === null ? "—" : formatPricePerUnit(discountPerUnit, currency)}
       </span>
     </span>
   );

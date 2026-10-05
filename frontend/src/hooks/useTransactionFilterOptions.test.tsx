@@ -13,8 +13,8 @@ vi.mock("../lib/api", () => ({
 
 const { useTransactionFilterOptions } = await import("./useTransactionFilterOptions");
 
-function Probe({ period }: { period: string | null }) {
-  const { drivers, trucks, cards, states, loading } = useTransactionFilterOptions(period);
+function Probe({ period, currency = "USD" }: { period: string | null; currency?: "USD" | "CAD" }) {
+  const { drivers, trucks, cards, states, loading } = useTransactionFilterOptions(period, currency);
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>
@@ -64,7 +64,7 @@ describe("useTransactionFilterOptions (T-40)", () => {
     expect(screen.getByTestId("cards").textContent).toBe("11111119000005");
     expect(screen.getByTestId("states").textContent).toBe("NVTX");
 
-    expect(listDrivers).toHaveBeenCalledWith("2026-09-03");
+    expect(listDrivers).toHaveBeenCalledWith("2026-09-03", "USD");
     expect(listTransactions).toHaveBeenCalledWith(expect.objectContaining({ week: "2026-09-03", currency: "USD", pageSize: 200 }));
   });
 
@@ -73,5 +73,17 @@ describe("useTransactionFilterOptions (T-40)", () => {
     render(<Probe period={null} />);
     expect(listDrivers).not.toHaveBeenCalled();
     expect(listTransactions).not.toHaveBeenCalled();
+  });
+
+  it("passes the side through: a CAD screen reads CAD drivers and CAD transactions", async () => {
+    listDrivers.mockResolvedValue({ week: "2026-09-09", invoiceId: "inv-3", rows: [], unresolved: {}, fleet: {} });
+    listTrucks.mockResolvedValue({ rows: [] });
+    listTransactions.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
+
+    render(<Probe period="2026-09-09" currency="CAD" />);
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(listDrivers).toHaveBeenCalledWith("2026-09-09", "CAD");
+    expect(listTransactions).toHaveBeenCalledWith(expect.objectContaining({ week: "2026-09-09", currency: "CAD" }));
   });
 });

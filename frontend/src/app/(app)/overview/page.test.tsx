@@ -22,7 +22,16 @@ vi.mock("../../../lib/api", () => ({
   getOverview: (...args: unknown[]) => getOverview(...args),
 }));
 
-const { default: OverviewPage } = await import("./page");
+const { default: OverviewPageInner } = await import("./page");
+const { WeekProvider } = await import("../../../hooks/useWeek");
+
+function OverviewPage() {
+  return (
+    <WeekProvider>
+      <OverviewPageInner />
+    </WeekProvider>
+  );
+}
 
 function overviewResult(overrides: Partial<OverviewResult> = {}): OverviewResult {
   return {
@@ -61,7 +70,7 @@ afterEach(() => {
 
 describe("OverviewPage (T-41)", () => {
   it("makes exactly one API call — GET /overview, scoped to the shell's selected period", async () => {
-    searchParams = new URLSearchParams({ period: "2026-09-03" });
+    searchParams = new URLSearchParams({ week: "2026-09-03" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listPeriods.mockResolvedValue({ weeks: [] });
     getOverview.mockResolvedValue(overviewResult());
@@ -74,7 +83,7 @@ describe("OverviewPage (T-41)", () => {
   });
 
   it("average billed price is the headline figure and discount rides as its subline (A9.1)", async () => {
-    searchParams = new URLSearchParams({ period: "2026-09-03" });
+    searchParams = new URLSearchParams({ week: "2026-09-03" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listPeriods.mockResolvedValue({ weeks: [] });
     getOverview.mockResolvedValue(overviewResult());
@@ -90,7 +99,7 @@ describe("OverviewPage (T-41)", () => {
   });
 
   it("shows the designed empty state for a period with no invoice, not an indefinite spinner", async () => {
-    searchParams = new URLSearchParams({ period: "2026-09-10" });
+    searchParams = new URLSearchParams({ week: "2026-09-10" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listPeriods.mockResolvedValue({ weeks: [] });
     getOverview.mockResolvedValue(
@@ -130,7 +139,7 @@ describe("OverviewPage (T-41)", () => {
   });
 
   it("a failed fetch surfaces the error rather than an indefinite loading state", async () => {
-    searchParams = new URLSearchParams({ period: "2026-09-03" });
+    searchParams = new URLSearchParams({ week: "2026-09-03" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listPeriods.mockResolvedValue({ weeks: [] });
     getOverview.mockRejectedValue(new Error("network down"));

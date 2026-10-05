@@ -8,17 +8,17 @@ import EmptyState from "./EmptyState";
 
 interface AnomalyDigestProps {
   items: OverviewAnomalyDigestItem[];
-  /** The Overview screen's own selected period — carried onto the deep link
-   * so Transactions opens already scoped to the same invoice, not whatever
-   * period it last remembered. */
-  period: string | null;
+  /** The Overview screen's own selected billing week — carried onto the deep link
+   * so Transactions opens already scoped to the same week, not whatever
+   * it last remembered. */
+  week: string | null;
 }
 
 /** A8.1's deep link into Transactions, `anomalyOnly` pre-applied — the exact
  * query param `useTransactionFilters` reads (T-41 DoD). */
-export function anomalyDigestHref(period: string | null): string {
+export function anomalyDigestHref(week: string | null): string {
   const params = new URLSearchParams({ anomalyOnly: "true" });
-  if (period !== null) params.set("period", period);
+  if (week !== null) params.set("week", week);
   return `/transactions?${params.toString()}`;
 }
 
@@ -28,9 +28,9 @@ function formatDetectedAt(iso: string): string {
 
 /** A8.1's compact anomalies list (T-41) — every row and the header link
  * share one destination: Transactions, pre-filtered to flagged stops only. */
-export default function AnomalyDigest({ items, period }: AnomalyDigestProps) {
+export default function AnomalyDigest({ items, week }: AnomalyDigestProps) {
   const router = useRouter();
-  const href = anomalyDigestHref(period);
+  const href = anomalyDigestHref(week);
 
   const navigate = (e: MouseEvent) => {
     e.preventDefault();

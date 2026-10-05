@@ -167,8 +167,10 @@ export function getReceiptQueue(): Promise<ReceiptQueueResult> {
 export interface ListTransactionsParams {
   /** A billing week's end, `YYYY-MM-DD` (D26). */
   week?: string;
-  /** One side of the week; the server serves both when omitted, so a US screen says `USD`. */
+  /** One side of the week; the server serves both when omitted, so a screen reading one side says which. */
   currency?: "USD" | "CAD";
+  /** Converts quantities and per-unit prices (never money, D25); absent means as BVD printed them. */
+  units?: "imperial" | "metric";
   page?: number;
   pageSize?: number;
   sortField?: TransactionSortField;
@@ -203,9 +205,8 @@ export function listTransactions(params: ListTransactionsParams = {}): Promise<L
  * unscoped driver-roster endpoint exists (the truck equivalent is
  * `listTrucks`), so this is the reuse the endpoint was already built for
  * rather than a second one. */
-export function listDrivers(week: string): Promise<DriversResult> {
-  // The US side until T-64 adds the US | CA switch.
-  return request<DriversResult>(`/drivers?week=${encodeURIComponent(week)}&currency=USD`);
+export function listDrivers(week: string, currency: "USD" | "CAD"): Promise<DriversResult> {
+  return request<DriversResult>(`/drivers?week=${encodeURIComponent(week)}&currency=${currency}`);
 }
 
 /** `GET /overview?week=` — A8.1's whole landing screen in one call (T-41). */
