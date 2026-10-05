@@ -16,6 +16,7 @@ import type { BoundingBox, StationMapResolution, StationsPage } from "@ch/core/c
 import type { PlanListResult } from "@ch/core/planning/planPersistence";
 import type { HealthStatus } from "@ch/core/catalog/health";
 import type { ImportInvoiceResponse, InvoiceDetail, InvoiceListResult } from "@ch/core/api/routes/invoices";
+import type { PeriodWeek } from "@ch/core/api/routes/periods";
 import type { ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { DriversResult } from "@ch/core/actuals/drivers";
 import type { ListTransactionsResult, TransactionSortField } from "@ch/core/actuals/transactions";
@@ -141,10 +142,14 @@ export function getHealth(): Promise<HealthStatus> {
   return request<HealthStatus>("/health");
 }
 
-/** `GET /invoices` — A8.2's history list, also T-39's source for the
- * invoice-period picker's option list (newest-first by `importedAt`; the
- * picker filters to `status: "imported"` and re-sorts by `periodStart`
- * client-side — see `useInvoicePeriod.ts`). */
+/** `GET /periods` (T-63, D26) — billing weeks, newest first, each with the
+ * imported invoices behind it. The shell's week picker reads this; `GET
+ * /invoices` stays the Import screen's history list. */
+export function listPeriods(): Promise<{ weeks: PeriodWeek[] }> {
+  return request<{ weeks: PeriodWeek[] }>("/periods");
+}
+
+/** `GET /invoices` — A8.2's history list (newest-first by `importedAt`). */
 export function listInvoices(params: { page?: number; pageSize?: number } = {}): Promise<InvoiceListResult> {
   const search = new URLSearchParams();
   if (params.page !== undefined) search.set("page", String(params.page));
@@ -160,7 +165,10 @@ export function getReceiptQueue(): Promise<ReceiptQueueResult> {
 }
 
 export interface ListTransactionsParams {
-  period?: string;
+  /** A billing week's end, `YYYY-MM-DD` (D26). */
+  week?: string;
+  /** One side of the week; the server serves both when omitted, so a US screen says `USD`. */
+  currency?: "USD" | "CAD";
   page?: number;
   pageSize?: number;
   sortField?: TransactionSortField;
@@ -175,8 +183,8 @@ export interface ListTransactionsParams {
   receiptStatus?: "pending" | "confirmed" | "missing";
 }
 
-/** `GET /transactions` — A8.3's list (T-40). `?period=` is how the shell's
- * invoice-period selector (A7) scopes this screen — resolved to
+/** `GET /transactions` — A8.3's list (T-40). `?week=` is how the shell's
+ * week selector (A7) scopes this screen — resolved to
  * `fuel_stops.invoice_id` on the server, the same join every sibling
  * actuals query already scopes by, rather than a client-reconstructed
  * `dateFrom`/`dateTo` pair. */
@@ -189,17 +197,18 @@ export function listTransactions(params: ListTransactionsParams = {}): Promise<L
   return request<ListTransactionsResult>(`/transactions${qs ? `?${qs}` : ""}`);
 }
 
-/** `GET /drivers?period=` — A8.7's list, reused here (T-40) as the driver
+/** `GET /drivers?week=` — A8.7's list, reused here (T-40) as the driver
  * filter dropdown's option source: every driver on the roster, not just
  * those with stops this period, per its own doc comment. No dedicated
  * unscoped driver-roster endpoint exists (the truck equivalent is
  * `listTrucks`), so this is the reuse the endpoint was already built for
  * rather than a second one. */
-export function listDrivers(period: string): Promise<DriversResult> {
-  return request<DriversResult>(`/drivers?period=${encodeURIComponent(period)}`);
+export function listDrivers(week: string): Promise<DriversResult> {
+  // The US side until T-64 adds the US | CA switch.
+  return request<DriversResult>(`/drivers?week=${encodeURIComponent(week)}&currency=USD`);
 }
 
-/** `GET /overview?period=` — A8.1's whole landing screen in one call (T-41). */
-export function getOverview(period: string): Promise<OverviewResult> {
-  return request<OverviewResult>(`/overview?period=${encodeURIComponent(period)}`);
+/** `GET /overview?week=` — A8.1's whole landing screen in one call (T-41). */
+export function getOverview(week: string): Promise<OverviewResult> {
+  return request<OverviewResult>(`/overview?week=${encodeURIComponent(week)}`);
 }

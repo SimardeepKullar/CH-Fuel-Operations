@@ -40,7 +40,9 @@ export interface HealthStatus {
   };
   /** `price_imports.effective_date`, newest completed sheet. `null` if none imported. */
   latestSheetDate: string | null;
-  /** A16: `invoices.period_start`, newest successfully imported invoice. `null` if none. */
+  /** A16: the newest billing week (`invoices.billing_week_end`, D26) with an
+   * imported invoice on either side. `null` if none. Named for the period the
+   * screens' week selector defaulted to before billing weeks. */
   latestInvoicePeriod: string | null;
   /**
    * T-39: undismissed `anomalies` rows, system-wide — not scoped to the
@@ -113,11 +115,10 @@ async function loadLatestSheetDate(pool: Pool): Promise<string | null> {
 
 async function loadLatestInvoicePeriod(pool: Pool): Promise<string | null> {
   const { rows } = await pool.query<{ period: string }>(
-    `SELECT to_char(period_start, 'YYYY-MM-DD') AS period
+    `SELECT to_char(billing_week_end, 'YYYY-MM-DD') AS period
      FROM invoices
      WHERE status = 'imported'
-       AND currency = 'USD' -- the US screens' default period; US invoices only until T-63's billing weeks (T-61).
-     ORDER BY period_start DESC
+     ORDER BY billing_week_end DESC
      LIMIT 1`,
   );
   return rows[0]?.period ?? null;

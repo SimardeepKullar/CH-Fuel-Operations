@@ -71,7 +71,7 @@ describe.skipIf(!hasDatabase)("planActual (integration, T-38)", () => {
       const stationId = await insertGeoStation({ ref: "300", lat: 35, lng: -97 });
       await insertStop(pool, { invoiceId, cardId, occurredAt: "2026-08-10T12:00:00Z", stationId, lines: [{ code: "TA", gallons: 50, billed: 5.0 }] });
 
-      const request = new Request("http://localhost/api/v1/plan-actual?period=2026-08-01");
+      const request = new Request("http://localhost/api/v1/plan-actual?week=2026-08-31");
       const response = await handleGetPlanActual(pool, new URL(request.url));
       expect(response.status).toBe(200);
 
@@ -81,7 +81,7 @@ describe.skipIf(!hasDatabase)("planActual (integration, T-38)", () => {
     });
 
     it("returns zero coverage, not an error, when no invoice exists for the period", async () => {
-      const request = new Request("http://localhost/api/v1/plan-actual?period=2099-01-01");
+      const request = new Request("http://localhost/api/v1/plan-actual?week=2099-01-01");
       const response = await handleGetPlanActual(pool, new URL(request.url));
       expect(response.status).toBe(200);
       const body = (await response.json()) as { coverage: { covered: number; total: number }; invoiceId: string | null };
@@ -105,7 +105,7 @@ describe.skipIf(!hasDatabase)("planActual (integration, T-38)", () => {
       });
       await insertDispatchedPlan({ truckId, dispatchedAt: "2026-08-10T08:00:00Z", stationId, expectedUsdPerGal: 5.0 });
 
-      const result = await getPlanActual(pool, "2026-08-01");
+      const result = await getPlanActual(pool, "2026-08-31");
 
       expect(result.coverage).toEqual({ covered: 1, total: 1 });
       expect(result.matches).toHaveLength(1);
@@ -137,7 +137,7 @@ describe.skipIf(!hasDatabase)("planActual (integration, T-38)", () => {
 
       await insertDispatchedPlan({ truckId, dispatchedAt: "2026-08-15T08:00:00Z", stationId, expectedUsdPerGal: 5.0 });
 
-      const result = await getPlanActual(pool, "2026-08-01");
+      const result = await getPlanActual(pool, "2026-08-31");
 
       expect(result.matches).toEqual([
         expect.objectContaining({ kind: "skipped_recommendation" }),

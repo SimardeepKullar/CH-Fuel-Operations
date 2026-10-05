@@ -36,7 +36,7 @@ afterEach(() => {
 describe("useTransactionFilterOptions (T-40)", () => {
   it("drivers and trucks come from their roster endpoints; cards and states are derived from one unfiltered fetch", async () => {
     listDrivers.mockResolvedValue({
-      period: "2026-09-03",
+      week: "2026-09-03",
       invoiceId: "inv-1",
       rows: [
         { driver: { id: "d1", displayName: "JORDAN" }, totalUsd: 0, gallons: 0, avgBilledUsdPerGal: null },
@@ -65,7 +65,7 @@ describe("useTransactionFilterOptions (T-40)", () => {
     expect(screen.getByTestId("states").textContent).toBe("NVTX");
 
     expect(listDrivers).toHaveBeenCalledWith("2026-09-03");
-    expect(listTransactions).toHaveBeenCalledWith(expect.objectContaining({ period: "2026-09-03", pageSize: 200 }));
+    expect(listTransactions).toHaveBeenCalledWith(expect.objectContaining({ week: "2026-09-03", currency: "USD", pageSize: 200 }));
   });
 
   it("no period yet: skips the period-scoped fetches rather than erroring", () => {

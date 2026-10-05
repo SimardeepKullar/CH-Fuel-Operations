@@ -2,9 +2,10 @@ import type { Pool } from "pg";
 import { getPool } from "../db/pool.js";
 import { handleGetDriver, handleListDrivers } from "./routes/drivers.js";
 import { handleListExpressCharges } from "./routes/expressCharges.js";
-import { handleGetInvoice, handleImportInvoice, handleListInvoices } from "./routes/invoices.js";
+import { handleGetInvoice, handleImportInvoice, handleListInvoices, handlePatchInvoice } from "./routes/invoices.js";
 import { handleGetHealth } from "./routes/health.js";
 import { handleGetOverview } from "./routes/overview.js";
+import { handleListPeriods } from "./routes/periods.js";
 import { handleGetPlanActual, handleGetPlanActualBacktest } from "./routes/planActual.js";
 import { handlePatchPlan } from "./routes/planPatch.js";
 import { handleCreatePlan, handleGetPlan, handleListPlans } from "./routes/plans.js";
@@ -172,6 +173,14 @@ export function createApp(options: CreateAppOptions = {}): App {
       const invoiceDetailMatch = /^\/invoices\/([^/]+)$/.exec(path);
       if (invoiceDetailMatch && request.method === "GET") {
         return handleGetInvoice(options.pool ?? getPool(), invoiceDetailMatch[1]!, url);
+      }
+
+      if (invoiceDetailMatch && request.method === "PATCH") {
+        return handlePatchInvoice(options.pool ?? getPool(), invoiceDetailMatch[1]!, request, url);
+      }
+
+      if (path === "/periods" && request.method === "GET") {
+        return handleListPeriods(options.pool ?? getPool());
       }
 
       if (path === "/price-sheets" && request.method === "GET") {

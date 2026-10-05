@@ -12,7 +12,7 @@ interface ReconciliationPreviewProps {
 /**
  * A8.2 state 2 — "reconciliation passed" (T-42 step 42.1): the balance
  * check shown explicitly, per product code exactly as BVD printed it,
- * summing to the invoice's own printed grand total (`report.grandTotalUsd`,
+ * summing to the invoice's own printed grand total (`report.grandTotal`,
  * trusted as given — never recomputed here, the same rule CLAUDE.md states
  * for `YOUR PRICE`). Always-zero rows (e.g. a fleet that never uses `TF`)
  * are left out of the list — they still make up part of the printed total,
@@ -24,7 +24,7 @@ interface ReconciliationPreviewProps {
  * doesn't read as a lie.
  */
 export default function ReconciliationPreview({ report, onConfirm }: ReconciliationPreviewProps) {
-  const rows = report.productTotals.filter((p) => Number(p.amountUsd) !== 0);
+  const rows = report.productTotals.filter((p) => Number(p.amount) !== 0);
 
   return (
     <div className="panel-card blueprint import-preview" data-testid="reconciliation-preview">
@@ -37,20 +37,22 @@ export default function ReconciliationPreview({ report, onConfirm }: Reconciliat
       <div className="import-balance-table">
         <div className="import-balance-row import-balance-head">
           <span>Product code</span>
-          <span className="num">Gallons</span>
+          <span className="num">{report.qtyUnit === "L" ? "Litres" : "Gallons"}</span>
           <span className="num">Amount</span>
         </div>
         {rows.map((p) => (
           <div className="import-balance-row" key={p.productCode}>
             <span className="mono">{p.productCode}</span>
-            <span className="num muted">{p.gallons === null ? "—" : formatGallons2dp(Number(p.gallons))}</span>
-            <span className="num">{formatMoneyUsd(Number(p.amountUsd))}</span>
+            <span className="num muted">{p.qty === null ? "—" : formatGallons2dp(Number(p.qty))}</span>
+            <span className="num">{formatMoneyUsd(Number(p.amount))}</span>
           </div>
         ))}
         <div className="import-balance-row import-balance-total" data-testid="import-balance-total">
           <span>Grand total</span>
           <span />
-          <span className="num">{formatMoneyUsd(Number(report.grandTotalUsd))}</span>
+          <span className="num">
+            {formatMoneyUsd(Number(report.grandTotal))} {report.currency}
+          </span>
         </div>
       </div>
 

@@ -5,7 +5,7 @@ import {
   backfillInvoiceDirectory,
   type BackfillInvoicesResult,
 } from "../invoice/backfillInvoices.js";
-import { invoiceGaps } from "../invoice/invoiceGapReport.js";
+import { invoiceGapsByCurrency } from "../invoice/invoiceGapReport.js";
 import { getPool } from "../db/pool.js";
 
 function printResult(result: BackfillInvoicesResult): void {
@@ -43,19 +43,15 @@ function printResult(result: BackfillInvoicesResult): void {
     }
   }
 
-  const periods = result.files
+  // Coverage is per currency and over each invoice's actual transaction range,
+  // not the period BVD printed (T-63, D26).
+  const reports = result.files
     .map((f) => f.report)
     .filter((r): r is NonNullable<typeof r> => Boolean(r));
 
-  if (periods.length > 0) {
-    const start = [...periods].sort((a, b) => a.periodStart.localeCompare(b.periodStart))[0]!
-      .periodStart;
-    const end = [...periods].sort((a, b) => a.periodEnd.localeCompare(b.periodEnd))[
-      periods.length - 1
-    ]!.periodEnd;
-    const gaps = invoiceGaps(periods, { start, end });
-    console.log(`period range:      ${start} .. ${end}`);
-    console.log(`gaps:              ${gaps.length > 0 ? gaps.join(", ") : "none"}`);
+  for (const side of invoiceGapsByCurrency(reports)) {
+    console.log(`period range (${side.currency}): ${side.range.start} .. ${side.range.end}`);
+    console.log(`gaps (${side.currency}):         ${side.gaps.length > 0 ? side.gaps.join(", ") : "none"}`);
   }
 }
 

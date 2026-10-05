@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { PersonCardStatus } from "../db/types.js";
+import type { InvoiceCurrency, InvoiceQtyUnit, PersonCardStatus } from "../db/types.js";
 import { isUuid } from "./ids.js";
 import {
   EMPTY_SUMS,
@@ -12,16 +12,22 @@ import {
   type RollupHistoryPoint,
   type StopRollup,
 } from "./rollup.js";
+import { loadWeekInvoice, qtyConverter, qtyUnitFor, type WeekQuery } from "./units.js";
 
 export interface DriverListRow extends StopRollup {
   driver: { id: string; displayName: string };
 }
 
 export interface DriversResult {
-  period: string;
+  /** The billing week's end, as asked. */
+  week: string;
+  /** The side of the week shown: every money field below is in it. */
+  currency: InvoiceCurrency;
+  /** The unit every `qty` below is in — the invoice's own, unless `?units=` said otherwise. */
+  qtyUnit: InvoiceQtyUnit;
   invoiceId: string | null;
-  /** Every driver on the roster, spend descending. A driver with no stops in
-   * the period is a row of zeros (and a `null` average), not an omission. */
+  /** Every driver on the roster, spend descending. A driver with no stops in the
+   * week is a row of zeros (and a `null` average), not an omission. */
   rows: DriverListRow[];
   /** Stops whose card did not resolve to a driver (D19). They belong to no row,
    * but they are in the invoice, so they are here and in `fleet`. */
@@ -35,67 +41,65 @@ interface DriverRosterRow {
   display_name: string;
 }
 
-async function loadInvoiceId(pool: Pool, period: string): Promise<string | null> {
-  // US invoices only until T-63's billing weeks (T-61).
-  const { rows } = await pool.query<{ id: string }>(
-    "SELECT id FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
-    [period],
-  );
-  return rows[0]?.id ?? null;
-}
-
 /**
- * `GET /drivers?period=` (A8.7, A13). `period` is `invoices.period_start`, the
- * key `/overview` and `/express-charges` take (A7).
+ * `GET /drivers?week=&currency=` (A8.7, A13). One side of one billing week
+ * (D26): a sum of gallons and litres is meaningless, so a week's CA invoice is
+ * a separate read of the same endpoint, never folded into the US figures.
  *
  * Each row is the per-driver form of the Overview's per-invoice figures, from
- * the same weighted-average formula (`rollup.ts`). A period with no invoice is
- * an empty result with zero totals — the T-33/T-36 precedent — not an error.
+ * the same weighted-average formula (`rollup.ts`). A week with no invoice on
+ * that side is an empty result with zero totals — the T-33/T-36 precedent —
+ * not an error.
  */
-export async function listDrivers(pool: Pool, period: string): Promise<DriversResult> {
-  const invoiceId = await loadInvoiceId(pool, period);
-  if (invoiceId === null) {
-    const zero = toRollup(EMPTY_SUMS);
-    return { period, invoiceId: null, rows: [], unresolved: zero, fleet: zero };
+export async function listDrivers(pool: Pool, query: WeekQuery): Promise<DriversResult> {
+  const { week, currency } = query;
+  const invoice = await loadWeekInvoice(pool, week, currency);
+  const conv = qtyConverter(invoice?.qtyUnit ?? qtyUnitFor(currency), query.units);
+  const header = { week, currency, qtyUnit: conv.qtyUnit };
+  if (invoice === null) {
+    const zero = toRollup(EMPTY_SUMS, conv);
+    return { ...header, invoiceId: null, rows: [], unresolved: zero, fleet: zero };
   }
 
   const [groups, { rows: roster }] = await Promise.all([
-    loadRollupSums(pool, invoiceId, "driver"),
+    loadRollupSums(pool, invoice.id, "driver"),
     pool.query<DriverRosterRow>("SELECT id, display_name FROM drivers"),
   ]);
 
   const rows = roster
-    .map((d) => ({ driver: { id: d.id, displayName: d.display_name }, ...toRollup(groups.get(d.id) ?? EMPTY_SUMS) }))
+    .map((d) => ({ driver: { id: d.id, displayName: d.display_name }, ...toRollup(groups.get(d.id) ?? EMPTY_SUMS, conv) }))
     .sort(
       (a, b) =>
-        b.totalUsd - a.totalUsd ||
+        b.total - a.total ||
         a.driver.displayName.localeCompare(b.driver.displayName) ||
         a.driver.id.localeCompare(b.driver.id),
     );
 
   return {
-    period,
-    invoiceId,
+    ...header,
+    invoiceId: invoice.id,
     rows,
-    unresolved: toRollup(groups.get(null) ?? EMPTY_SUMS),
-    fleet: toRollup(fleetSums(groups)),
+    unresolved: toRollup(groups.get(null) ?? EMPTY_SUMS, conv),
+    fleet: toRollup(fleetSums(groups), conv),
   };
 }
 
 export interface DriverDetail {
-  period: string;
+  week: string;
+  currency: InvoiceCurrency;
+  qtyUnit: InvoiceQtyUnit;
   invoiceId: string | null;
   driver: { id: string; displayName: string; status: PersonCardStatus };
   summary: StopRollup;
   fleet: {
-    avgBilledUsdPerGal: number | null;
-    gallons: number;
+    avgBilledPerUnit: number | null;
+    qty: number;
     stopCount: number;
   };
-  /** Driver's average minus the fleet's for the period; `null` if either is undefined. */
-  avgVsFleetUsdPerGal: number | null;
+  /** Driver's average minus the fleet's for the week, per unit; `null` if either is undefined. */
+  avgVsFleetPerUnit: number | null;
   favouredStations: FavouredStations;
-  /** Trailing per-invoice series ending at `period`, oldest first. */
+  /** Trailing per-invoice series (this currency only) ending at `week`, oldest first. */
   history: RollupHistoryPoint[];
 }
 
@@ -106,15 +110,15 @@ interface DriverRow {
 }
 
 /**
- * `GET /drivers/{id}?period=`. `null` when the id doesn't name a driver — the
- * route maps that to a 404 problem+json. A driver with no stops in `period`
- * (or a period with no invoice) is not `null`: it is zeros, with a `null`
- * average and DEF ratio.
+ * `GET /drivers/{id}?week=&currency=`. `null` when the id doesn't name a
+ * driver — the route maps that to a 404 problem+json. A driver with no stops
+ * that week (or a week with no invoice on that side) is not `null`: it is
+ * zeros, with a `null` average and DEF ratio.
  *
- * "The fleet" is the whole invoice's gallons-weighted average, computed from
+ * "The fleet" is the whole invoice's quantity-weighted average, computed from
  * the same sums as the list — not a mean of driver averages.
  */
-export async function getDriverDetail(pool: Pool, id: string, period: string): Promise<DriverDetail | null> {
+export async function getDriverDetail(pool: Pool, id: string, query: WeekQuery): Promise<DriverDetail | null> {
   if (!isUuid(id)) {
     return null;
   }
@@ -124,40 +128,42 @@ export async function getDriverDetail(pool: Pool, id: string, period: string): P
     return null;
   }
 
-  const invoiceId = await loadInvoiceId(pool, period);
-  const history = await loadRollupHistory(pool, period, "driver", id);
+  const { week, currency } = query;
+  const invoice = await loadWeekInvoice(pool, week, currency);
+  const conv = qtyConverter(invoice?.qtyUnit ?? qtyUnitFor(currency), query.units);
+  const header = { week, currency, qtyUnit: conv.qtyUnit };
+  const history = await loadRollupHistory(pool, week, currency, "driver", id, conv);
   const driverRef = { id: driver.id, displayName: driver.display_name, status: driver.status };
 
-  if (invoiceId === null) {
-    const zero = toRollup(EMPTY_SUMS);
+  if (invoice === null) {
     return {
-      period,
+      ...header,
       invoiceId: null,
       driver: driverRef,
-      summary: zero,
-      fleet: { avgBilledUsdPerGal: null, gallons: 0, stopCount: 0 },
-      avgVsFleetUsdPerGal: null,
+      summary: toRollup(EMPTY_SUMS, conv),
+      fleet: { avgBilledPerUnit: null, qty: 0, stopCount: 0 },
+      avgVsFleetPerUnit: null,
       favouredStations: { stations: [], unresolvedStationStops: 0 },
       history,
     };
   }
 
   const [groups, favouredStations] = await Promise.all([
-    loadRollupSums(pool, invoiceId, "driver"),
-    loadFavouredStations(pool, invoiceId, "driver", id),
+    loadRollupSums(pool, invoice.id, "driver"),
+    loadFavouredStations(pool, invoice.id, "driver", id, conv),
   ]);
-  const summary = toRollup(groups.get(id) ?? EMPTY_SUMS);
-  const fleet = toRollup(fleetSums(groups));
+  const summary = toRollup(groups.get(id) ?? EMPTY_SUMS, conv);
+  const fleet = toRollup(fleetSums(groups), conv);
 
   return {
-    period,
-    invoiceId,
+    ...header,
+    invoiceId: invoice.id,
     driver: driverRef,
     summary,
-    fleet: { avgBilledUsdPerGal: fleet.avgBilledUsdPerGal, gallons: fleet.gallons, stopCount: fleet.stopCount },
-    avgVsFleetUsdPerGal:
-      summary.avgBilledUsdPerGal !== null && fleet.avgBilledUsdPerGal !== null
-        ? summary.avgBilledUsdPerGal - fleet.avgBilledUsdPerGal
+    fleet: { avgBilledPerUnit: fleet.avgBilledPerUnit, qty: fleet.qty, stopCount: fleet.stopCount },
+    avgVsFleetPerUnit:
+      summary.avgBilledPerUnit !== null && fleet.avgBilledPerUnit !== null
+        ? summary.avgBilledPerUnit - fleet.avgBilledPerUnit
         : null,
     favouredStations,
     history,

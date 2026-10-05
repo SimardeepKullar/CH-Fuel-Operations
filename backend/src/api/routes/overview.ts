@@ -1,11 +1,6 @@
 import type { Pool } from "pg";
-import { z } from "zod";
 import { getOverview } from "../../actuals/overview.js";
-import { problemResponse } from "../problem.js";
-
-const querySchema = z.object({
-  period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "period must be a YYYY-MM-DD date"),
-});
+import { parseWeekQuery } from "../query.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -14,18 +9,14 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-/** `GET /overview?period=` — A8.1's whole landing screen in one call. */
+/** `GET /overview?week=` — A8.1's whole landing screen in one call. Takes the
+ * week alone (T-65 shapes the CA and combined panels); `currency`, if sent, is
+ * validated like every period-scoped route and otherwise ignored. */
 export async function handleGetOverview(pool: Pool, url: URL): Promise<Response> {
-  const parsed = querySchema.safeParse({ period: url.searchParams.get("period") });
-  if (!parsed.success) {
-    return problemResponse({
-      title: "Bad Request",
-      status: 400,
-      detail: parsed.error.message,
-      instance: url.pathname,
-    });
+  const query = parseWeekQuery(url);
+  if (query instanceof Response) {
+    return query;
   }
 
-  const result = await getOverview(pool, parsed.data.period);
-  return jsonResponse(result);
+  return jsonResponse(await getOverview(pool, query.week, { units: query.units }));
 }

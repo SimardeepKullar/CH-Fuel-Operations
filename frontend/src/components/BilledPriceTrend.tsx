@@ -24,11 +24,11 @@ export interface TrendChartPoint {
  * rather than by inspecting rendered SVG geometry. */
 export function toTrendChartData(points: readonly OverviewTrendPoint[]): TrendChartPoint[] {
   return points.map((p) => ({
-    period: p.period,
+    period: p.week,
     label: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(
-      new Date(`${p.period}T00:00:00Z`),
+      new Date(`${p.week}T00:00:00Z`),
     ),
-    value: p.avgBilledUsdPerGal,
+    value: p.avgBilledPerUnit,
   }));
 }
 

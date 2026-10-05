@@ -1,33 +1,39 @@
 import type { Pool } from "pg";
-import type { AnomalySeverity } from "../db/types.js";
+import type { AnomalySeverity, InvoiceQtyUnit } from "../db/types.js";
+import { normalizeAnomalyDetail } from "./anomalyDetail.js";
+import { convertNullable, loadWeekInvoice, qtyConverter, type QtyConverter, type RequestedUnits, type WeekInvoice } from "./units.js";
 
 const TREND_PERIODS = 8;
 const TOP_DRIVER_LIMIT = 10;
 const ANOMALY_DIGEST_LIMIT = 10;
 
+/** T-63 serves the US side of a week only — `/overview` takes `week` alone and
+ * T-65 shapes the CA and combined panels — so every money field here is USD. */
+const OVERVIEW_CURRENCY = "USD" as const;
+
 export interface MoneyAmount {
-  amountUsd: number;
+  amount: number;
   currency: "USD";
 }
 
 export interface ProductRollup {
-  gallons: number;
-  amountUsd: number;
+  qty: number;
+  amount: number;
   currency: "USD";
 }
 
 export interface DiscountRollup {
-  totalUsd: number;
-  /** `null` when there are no TA gallons to average over. */
-  avgUsdPerGal: number | null;
+  total: number;
+  /** `null` when there is no TA quantity to average over. */
+  avgPerUnit: number | null;
   currency: "USD";
 }
 
 export interface OtherChargesRollup {
-  totalUsd: number;
-  scaleUsd: number;
-  expressUsd: number;
-  expressFeeUsd: number;
+  total: number;
+  scale: number;
+  express: number;
+  expressFee: number;
   currency: "USD";
 }
 
@@ -37,14 +43,15 @@ export interface ReceiptCompliance {
 }
 
 export interface OverviewKpis {
-  period: string;
+  /** The billing week's end, as asked. */
+  week: string;
   invoiceId: string | null;
   total: MoneyAmount;
   diesel: ProductRollup;
   def: ProductRollup;
-  /** Headline metric (A6.3/A9): gallons-weighted, never a mean of prices. `null` with no TA gallons this period. */
-  avgBilledUsdPerGal: number | null;
-  /** Subordinate to `avgBilledUsdPerGal` everywhere it's rendered (A9.1). */
+  /** Headline metric (A6.3/A9): quantity-weighted, never a mean of prices. `null` with no TA quantity this week. */
+  avgBilledPerUnit: number | null;
+  /** Subordinate to `avgBilledPerUnit` everywhere it's rendered (A9.1). */
   discount: DiscountRollup;
   otherCharges: OtherChargesRollup;
   receiptCompliance: ReceiptCompliance;
@@ -52,17 +59,18 @@ export interface OverviewKpis {
 }
 
 export interface OverviewTrendPoint {
-  period: string;
+  /** The billing week's end, `YYYY-MM-DD`. */
+  week: string;
   invoiceId: string;
-  avgBilledUsdPerGal: number | null;
+  avgBilledPerUnit: number | null;
 }
 
 export interface OverviewTopSpendDriver {
   driverId: string | null;
   driverName: string | null;
-  totalUsd: number;
-  gallons: number;
-  avgBilledUsdPerGal: number | null;
+  total: number;
+  qty: number;
+  avgBilledPerUnit: number | null;
 }
 
 export interface OverviewAnomalyDigestItem {
@@ -75,6 +83,10 @@ export interface OverviewAnomalyDigestItem {
 }
 
 export interface OverviewResult {
+  /** What every money field below is in. */
+  currency: "USD";
+  /** What every `qty` below is in — gallons, unless `?units=metric`. */
+  qtyUnit: InvoiceQtyUnit;
   kpis: OverviewKpis;
   trend: OverviewTrendPoint[];
   topSpendByDriver: OverviewTopSpendDriver[];
@@ -82,35 +94,23 @@ export interface OverviewResult {
 }
 
 export interface OverviewOptions {
+  /** `?units=` — absent means gallons, a US invoice as BVD printed it. */
+  units?: RequestedUnits;
   trendPeriods?: number;
   topDriverLimit?: number;
   anomalyDigestLimit?: number;
 }
 
-interface InvoiceRow {
-  id: string;
-  grand_total: string;
-}
-
-async function loadInvoice(pool: Pool, period: string): Promise<InvoiceRow | null> {
-  const { rows } = await pool.query<InvoiceRow>(
-    // US invoices only until T-63's billing weeks (T-61).
-    "SELECT id, grand_total FROM invoices WHERE period_start = $1::date AND currency = 'USD'",
-    [period],
-  );
-  return rows[0] ?? null;
-}
-
-function emptyKpis(period: string): OverviewKpis {
+function emptyKpis(week: string): OverviewKpis {
   return {
-    period,
+    week,
     invoiceId: null,
-    total: { amountUsd: 0, currency: "USD" },
-    diesel: { gallons: 0, amountUsd: 0, currency: "USD" },
-    def: { gallons: 0, amountUsd: 0, currency: "USD" },
-    avgBilledUsdPerGal: null,
-    discount: { totalUsd: 0, avgUsdPerGal: null, currency: "USD" },
-    otherCharges: { totalUsd: 0, scaleUsd: 0, expressUsd: 0, expressFeeUsd: 0, currency: "USD" },
+    total: { amount: 0, currency: OVERVIEW_CURRENCY },
+    diesel: { qty: 0, amount: 0, currency: OVERVIEW_CURRENCY },
+    def: { qty: 0, amount: 0, currency: OVERVIEW_CURRENCY },
+    avgBilledPerUnit: null,
+    discount: { total: 0, avgPerUnit: null, currency: OVERVIEW_CURRENCY },
+    otherCharges: { total: 0, scale: 0, express: 0, expressFee: 0, currency: OVERVIEW_CURRENCY },
     receiptCompliance: { confirmed: 0, total: 0 },
     anomaliesFlagged: 0,
   };
@@ -138,7 +138,7 @@ interface ReceiptAggRow {
   total: string;
 }
 
-/** `avgBilledUsdPerGal`'s gallons-weighted numerator/denominator — the
+/** `avgBilledPerUnit`'s quantity-weighted numerator/denominator — the
  * proven formula (invoice999210.test.ts). Discount is read straight off
  * `invoice_totals.discount` instead (`loadInvoiceTotals` below): BVD's
  * printed per-line "Disc AMT" doesn't reproduce from gallons ×
@@ -197,9 +197,9 @@ async function loadAnomalyCount(pool: Pool, invoiceId: string): Promise<number> 
   return Number(rows[0]!.count);
 }
 
-async function loadKpis(pool: Pool, period: string, invoice: InvoiceRow | null): Promise<OverviewKpis> {
+async function loadKpis(pool: Pool, week: string, invoice: WeekInvoice | null, conv: QtyConverter): Promise<OverviewKpis> {
   if (!invoice) {
-    return emptyKpis(period);
+    return emptyKpis(week);
   }
 
   const [totals, dieselAgg, expressAgg, receipts, anomaliesFlagged] = await Promise.all([
@@ -214,34 +214,34 @@ async function loadKpis(pool: Pool, period: string, invoice: InvoiceRow | null):
   const df = totals.get("DF");
   const scale = totals.get("S");
 
-  const taGallons = dieselAgg.ta_gallons === null ? 0 : Number(dieselAgg.ta_gallons);
-  const avgBilledUsdPerGal = taGallons > 0 ? Number(dieselAgg.weighted_num) / taGallons : null;
+  const taQty = dieselAgg.ta_gallons === null ? 0 : Number(dieselAgg.ta_gallons);
+  const avgBilledStored = taQty > 0 ? Number(dieselAgg.weighted_num) / taQty : null;
   const discountTotal = [...totals.values()].reduce(
     (sum, row) => sum + (row.discount === null ? 0 : Number(row.discount)),
     0,
   );
-  const scaleUsd = scale ? Number(scale.amount) : 0;
-  const expressUsd = expressAgg.total === null ? 0 : Number(expressAgg.total);
-  const expressFeeUsd = expressAgg.fee === null ? 0 : Number(expressAgg.fee);
+  const scaleAmount = scale ? Number(scale.amount) : 0;
+  const expressAmount = expressAgg.total === null ? 0 : Number(expressAgg.total);
+  const expressFee = expressAgg.fee === null ? 0 : Number(expressAgg.fee);
 
   return {
-    period,
+    week,
     invoiceId: invoice.id,
-    total: { amountUsd: Number(invoice.grand_total), currency: "USD" },
-    diesel: { gallons: ta ? Number(ta.qty) : 0, amountUsd: ta ? Number(ta.amount) : 0, currency: "USD" },
-    def: { gallons: df ? Number(df.qty) : 0, amountUsd: df ? Number(df.amount) : 0, currency: "USD" },
-    avgBilledUsdPerGal,
+    total: { amount: Number(invoice.grandTotal), currency: OVERVIEW_CURRENCY },
+    diesel: { qty: ta ? conv.qty(Number(ta.qty)) : 0, amount: ta ? Number(ta.amount) : 0, currency: OVERVIEW_CURRENCY },
+    def: { qty: df ? conv.qty(Number(df.qty)) : 0, amount: df ? Number(df.amount) : 0, currency: OVERVIEW_CURRENCY },
+    avgBilledPerUnit: convertNullable(conv.perUnit, avgBilledStored),
     discount: {
-      totalUsd: Math.round(discountTotal * 100) / 100,
-      avgUsdPerGal: taGallons > 0 ? discountTotal / taGallons : null,
-      currency: "USD",
+      total: Math.round(discountTotal * 100) / 100,
+      avgPerUnit: convertNullable(conv.perUnit, taQty > 0 ? discountTotal / taQty : null),
+      currency: OVERVIEW_CURRENCY,
     },
     otherCharges: {
-      totalUsd: Math.round((scaleUsd + expressUsd) * 100) / 100,
-      scaleUsd,
-      expressUsd,
-      expressFeeUsd,
-      currency: "USD",
+      total: Math.round((scaleAmount + expressAmount) * 100) / 100,
+      scale: scaleAmount,
+      express: expressAmount,
+      expressFee,
+      currency: OVERVIEW_CURRENCY,
     },
     receiptCompliance: { confirmed: Number(receipts.confirmed), total: Number(receipts.total) },
     anomaliesFlagged,
@@ -250,39 +250,38 @@ async function loadKpis(pool: Pool, period: string, invoice: InvoiceRow | null):
 
 interface TrendRow {
   invoice_id: string;
-  period_start: Date;
+  week_end: string;
   ta_gallons: string | null;
   weighted_num: string | null;
 }
 
 /**
- * The trailing window ends at `period` and only ever lists periods that
- * actually have an invoice row — a period nobody imported is absent from
- * the array, never a zero-filled placeholder (Step 33.2's own test).
+ * The trailing window ends at `week` and only ever lists weeks that actually
+ * have an imported USD invoice — a week nobody imported is absent from the
+ * array, never a zero-filled placeholder (Step 33.2's own test).
  */
-async function loadTrend(pool: Pool, period: string, limit: number): Promise<OverviewTrendPoint[]> {
+async function loadTrend(pool: Pool, week: string, limit: number, conv: QtyConverter): Promise<OverviewTrendPoint[]> {
   const { rows } = await pool.query<TrendRow>(
-    `SELECT i.id AS invoice_id, i.period_start,
+    `SELECT i.id AS invoice_id, to_char(i.billing_week_end, 'YYYY-MM-DD') AS week_end,
             SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA') AS ta_gallons,
             SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA') AS weighted_num
      FROM invoices i
      LEFT JOIN fuel_stops fs ON fs.invoice_id = i.id
      LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
-     WHERE i.period_start <= $1::date
-       AND i.currency = 'USD' -- US invoices only until T-63's billing weeks (T-61).
-     GROUP BY i.id, i.period_start
-     ORDER BY i.period_start DESC
+     WHERE i.billing_week_end <= $1::date AND i.currency = $3 AND i.status = 'imported'
+     GROUP BY i.id, i.billing_week_end
+     ORDER BY i.billing_week_end DESC
      LIMIT $2`,
-    [period, limit],
+    [week, limit, OVERVIEW_CURRENCY],
   );
 
   return rows
     .map((row) => {
-      const taGallons = row.ta_gallons === null ? 0 : Number(row.ta_gallons);
+      const taQty = row.ta_gallons === null ? 0 : Number(row.ta_gallons);
       return {
-        period: row.period_start.toISOString().slice(0, 10),
+        week: row.week_end,
         invoiceId: row.invoice_id,
-        avgBilledUsdPerGal: taGallons > 0 ? Number(row.weighted_num) / taGallons : null,
+        avgBilledPerUnit: convertNullable(conv.perUnit, taQty > 0 ? Number(row.weighted_num) / taQty : null),
       };
     })
     .reverse();
@@ -299,7 +298,12 @@ interface TopSpendRow {
 /** Lines are folded into one row per stop *before* the group-by: summing
  * `fuel_stops.total` straight across a join to `fuel_stop_lines` counts a
  * stop's total once per line, so a stop with a TA and a DF line was doubled. */
-async function loadTopSpendByDriver(pool: Pool, invoiceId: string, limit: number): Promise<OverviewTopSpendDriver[]> {
+async function loadTopSpendByDriver(
+  pool: Pool,
+  invoiceId: string,
+  limit: number,
+  conv: QtyConverter,
+): Promise<OverviewTopSpendDriver[]> {
   const { rows } = await pool.query<TopSpendRow>(
     `WITH stop_agg AS (
        SELECT fs.id, fs.driver_id, fs.total,
@@ -323,13 +327,13 @@ async function loadTopSpendByDriver(pool: Pool, invoiceId: string, limit: number
   );
 
   return rows.map((row) => {
-    const taGallons = row.ta_gallons === null ? 0 : Number(row.ta_gallons);
+    const taQty = row.ta_gallons === null ? 0 : Number(row.ta_gallons);
     return {
       driverId: row.driver_id,
       driverName: row.display_name,
-      totalUsd: Number(row.total),
-      gallons: taGallons,
-      avgBilledUsdPerGal: taGallons > 0 ? Number(row.weighted_num) / taGallons : null,
+      total: Number(row.total),
+      qty: conv.qty(taQty),
+      avgBilledPerUnit: convertNullable(conv.perUnit, taQty > 0 ? Number(row.weighted_num) / taQty : null),
     };
   });
 }
@@ -361,35 +365,37 @@ async function loadAnomalyDigest(pool: Pool, invoiceId: string, limit: number): 
     fuelStopId: row.fuel_stop_id,
     rule: row.rule,
     severity: row.severity,
-    detail: row.detail,
+    // Stored as each rule wrote it; the legacy US shape carries `Usd`/`gallons`
+    // keys that the contract no longer has (T-63), so it is normalised on the way out.
+    detail: normalizeAnomalyDetail(row.detail),
     detectedAt: row.detected_at.toISOString(),
   }));
 }
 
 /**
- * `GET /overview?period=` (A8.1, A13). `period` is `invoices.period_start`
- * as a `YYYY-MM-DD` date — the one natural, near-unique key this table has
- * (A7's top-bar selector talks about periods, not invoice numbers).
+ * `GET /overview?week=` (A8.1, A13). `week` is a billing week's end (D26).
+ * T-63 serves the week's US invoice only; T-65 shapes the CA and combined panels.
  *
- * A period with no matching invoice is not an error: `kpis` comes back
- * zeroed with `invoiceId: null`, and `topSpendByDriver`/`anomalyDigest` come
- * back empty, since both are scoped to one invoice. `trend` is independent
- * of whether `period` itself resolves — it's the trailing window of whatever
- * periods actually exist at or before it.
+ * A week with no US invoice is not an error: `kpis` comes back zeroed with
+ * `invoiceId: null`, and `topSpendByDriver`/`anomalyDigest` come back empty,
+ * since both are scoped to one invoice. `trend` is independent of whether
+ * `week` itself resolves — it's the trailing window of whatever weeks actually
+ * exist at or before it.
  */
-export async function getOverview(pool: Pool, period: string, options: OverviewOptions = {}): Promise<OverviewResult> {
+export async function getOverview(pool: Pool, week: string, options: OverviewOptions = {}): Promise<OverviewResult> {
   const trendPeriods = options.trendPeriods ?? TREND_PERIODS;
   const topDriverLimit = options.topDriverLimit ?? TOP_DRIVER_LIMIT;
   const anomalyDigestLimit = options.anomalyDigestLimit ?? ANOMALY_DIGEST_LIMIT;
 
-  const invoice = await loadInvoice(pool, period);
+  const invoice = await loadWeekInvoice(pool, week, OVERVIEW_CURRENCY);
+  const conv = qtyConverter(invoice?.qtyUnit ?? "gal", options.units ?? null);
 
   const [kpis, trend, topSpendByDriver, anomalyDigest] = await Promise.all([
-    loadKpis(pool, period, invoice),
-    loadTrend(pool, period, trendPeriods),
-    invoice ? loadTopSpendByDriver(pool, invoice.id, topDriverLimit) : Promise.resolve([]),
+    loadKpis(pool, week, invoice, conv),
+    loadTrend(pool, week, trendPeriods, conv),
+    invoice ? loadTopSpendByDriver(pool, invoice.id, topDriverLimit, conv) : Promise.resolve([]),
     invoice ? loadAnomalyDigest(pool, invoice.id, anomalyDigestLimit) : Promise.resolve([]),
   ]);
 
-  return { kpis, trend, topSpendByDriver, anomalyDigest };
+  return { currency: OVERVIEW_CURRENCY, qtyUnit: conv.qtyUnit, kpis, trend, topSpendByDriver, anomalyDigest };
 }

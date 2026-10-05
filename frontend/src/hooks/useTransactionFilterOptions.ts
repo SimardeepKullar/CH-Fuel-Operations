@@ -41,7 +41,7 @@ export function useTransactionFilterOptions(period: string | null): TransactionF
   const { data: trucksResult, loading: trucksLoading } = useApiResource(trucksFetcher);
 
   const seedFetcher = useCallback(
-    () => (period === null ? Promise.resolve(null) : listTransactions({ period, pageSize: 200 })),
+    () => (period === null ? Promise.resolve(null) : listTransactions({ week: period, currency: "USD", pageSize: 200 })),
     [period],
   );
   const { data: seedResult, loading: seedLoading } = useApiResource(seedFetcher);

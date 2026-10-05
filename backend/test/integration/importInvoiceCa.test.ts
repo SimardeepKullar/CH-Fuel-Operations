@@ -151,31 +151,37 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
     expect((await pool.query("SELECT count(*) FROM anomalies WHERE rule = 'price_above_published'")).rows[0].count).toBe("0");
   });
 
-  describe("no US screen shows a CA figure before T-63", () => {
+  describe("no US screen shows a CA figure (T-61, kept by T-63)", () => {
     const app = () => createApp({ authRequired: false, pool });
 
-    it("/overview for the CA invoice's printed start reports no invoice, no spend and no trend point", async () => {
+    it("/overview for the CA invoice's week serves the US side only: no US invoice, no spend, no trend point", async () => {
       await importCa();
-      const response = await app().handle(new Request("http://localhost/api/v1/overview?period=2026-08-01"));
+      const response = await app().handle(new Request("http://localhost/api/v1/overview?week=2026-09-09"));
       expect(response.status).toBe(200);
       const body = (await response.json()) as OverviewResult;
+      expect(body.currency).toBe("USD");
       expect(body.kpis.invoiceId).toBeNull();
-      expect(body.kpis.total.amountUsd).toBe(0);
+      expect(body.kpis.total.amount).toBe(0);
       expect(body.trend).toEqual([]);
       expect(body.topSpendByDriver).toEqual([]);
       expect(body.anomalyDigest).toEqual([]);
     });
 
-    it("/transactions for the CA invoice's printed start returns no rows", async () => {
+    it("/transactions for the CA invoice's week: USD has no rows, CAD has the invoice's stops", async () => {
       await importCa();
-      const response = await app().handle(new Request("http://localhost/api/v1/transactions?period=2026-08-01"));
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as ListTransactionsResult;
-      expect(body.rows).toEqual([]);
-      expect(body.total).toBe(0);
+      const us = (await (
+        await app().handle(new Request("http://localhost/api/v1/transactions?week=2026-09-09&currency=USD"))
+      ).json()) as ListTransactionsResult;
+      expect(us.rows).toEqual([]);
+      expect(us.total).toBe(0);
+      const ca = (await (
+        await app().handle(new Request("http://localhost/api/v1/transactions?week=2026-09-09&currency=CAD&pageSize=200"))
+      ).json()) as ListTransactionsResult;
+      expect(ca.total).toBe(8);
+      expect(ca.rows.every((r) => r.currency === "CAD" && r.qtyUnit === "L")).toBe(true);
     });
 
-    it("with a US invoice beside it, /overview and /transactions for the US period carry US figures only", async () => {
+    it("with a US invoice beside it, /overview and /transactions for the US week carry US figures only", async () => {
       // The US fixture's own cards and units, as importInvoice.test.ts seeds them.
       await pool.query("INSERT INTO fuel_cards (card_number) VALUES ('1000001'), ('1000002'), ('1000003') ON CONFLICT DO NOTHING");
       await pool.query("INSERT INTO trucks (unit_number) VALUES ('101'), ('102') ON CONFLICT DO NOTHING");
@@ -183,18 +189,19 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
       expect(us.status).toBe("imported");
       await importCa();
 
-      const overview = (await (await app().handle(new Request("http://localhost/api/v1/overview?period=2026-01-05"))).json()) as OverviewResult;
-      expect(overview.kpis.total.amountUsd).toBe(840.67);
-      expect(overview.trend.map((p) => p.period)).toEqual(["2026-01-05"]);
+      const overview = (await (await app().handle(new Request("http://localhost/api/v1/overview?week=2026-01-07"))).json()) as OverviewResult;
+      expect(overview.kpis.total.amount).toBe(840.67);
+      expect(overview.trend.map((p) => p.week)).toEqual(["2026-01-07"]);
 
       const transactions = (await (
-        await app().handle(new Request("http://localhost/api/v1/transactions?period=2026-01-05&pageSize=200"))
+        await app().handle(new Request("http://localhost/api/v1/transactions?week=2026-01-07&pageSize=200"))
       ).json()) as ListTransactionsResult;
       expect(transactions.total).toBe(3);
       expect(transactions.rows.every((r) => r.baseAuthCode.startsWith("B1"))).toBe(true);
 
       const health = (await (await app().handle(new Request("http://localhost/api/v1/health"))).json()) as HealthStatus;
-      expect(health.latestInvoicePeriod).toBe("2026-01-05");
+      // The newest billing week on either side: the CA invoice's, even though it is not a US week.
+      expect(health.latestInvoicePeriod).toBe("2026-09-09");
     });
   });
 });

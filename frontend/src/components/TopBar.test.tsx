@@ -10,10 +10,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 const getHealth = vi.fn();
-const listInvoices = vi.fn();
+const listPeriods = vi.fn();
 vi.mock("../lib/api", () => ({
   getHealth: (...args: unknown[]) => getHealth(...args),
-  listInvoices: (...args: unknown[]) => listInvoices(...args),
+  listPeriods: (...args: unknown[]) => listPeriods(...args),
 }));
 
 const { default: TopBar } = await import("./TopBar");
@@ -22,12 +22,12 @@ afterEach(() => {
   cleanup();
   pathname = "/";
   getHealth.mockReset();
-  listInvoices.mockReset();
+  listPeriods.mockReset();
 });
 
 function setup() {
   getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 3 });
-  listInvoices.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
+  listPeriods.mockResolvedValue({ weeks: [] });
 }
 
 describe("TopBar (T-39 step 39.2, A7)", () => {

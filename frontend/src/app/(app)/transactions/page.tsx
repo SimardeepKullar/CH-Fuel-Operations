@@ -51,7 +51,9 @@ export default function TransactionsPage() {
     setLoading(true);
     setError(null);
     listTransactions({
-      period,
+      week: period,
+      // The US side until T-64 adds the US | CA switch; the server serves both when omitted.
+      currency: "USD",
       pageSize: 200,
       includeLines: true,
       driverId: filters.driverId || undefined,

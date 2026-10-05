@@ -141,7 +141,13 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
 - **QTY × Billed ≠ Final AMT to the cent** on most real lines, US or CA — BVD prints QTY at 2dp and prices at 4dp from unrounded figures. Reconcile it within the rounding bound (`withinRoundingBound` in `reconcile.ts`), never to the cent and never with a loose tolerance. Retail − Billed = Disc Rate *is* exact.
 - A CA invoice imports from the **PDF only** (`CA_CSV_UNVERIFIED`, D30). A CA site name carries no `#` ("BVD MISSISSAUGA - SHAWSON"); the PDF reader splits it from the city at the layout's tab.
 - Invoice quantities and money are stored **as printed** — `currency` and `qty_unit` on `invoices`, no `_usd` or gallon suffix on any invoice column (D25). A threshold in gallons (the sub-gallon rule) converts at the rule's input with `litersToGallons`; nothing converted is stored.
-- Until T-63, every period-scoped read filters `invoices.currency = 'USD'`, so a CA invoice cannot leak into a US screen.
+
+**Invoices: billing weeks (T-63)**
+- A "period" is a **billing week**, keyed on `invoices.billing_week_end` (the printed `period_end` unless moved) — never on `period_start`, which for 999217 is Aug 1 and would never pair with 999210. The printed range is stored as printed; the *actual* range (`actual_start`/`actual_end`) is the first and last transaction's UTC date, and the two disagreeing is an amber note (`datesDiffer`), never a block. The gap report runs over actual ranges, per currency.
+- **One imported invoice per `(billing_week_end, currency)`** — a partial unique index on `status = 'imported'`. Every week lookup filters `status = 'imported'` too: a quarantined invoice has no rows and must not shadow the one that replaces it.
+- **Never sum across currencies or units.** A period-scoped read is one side of a week and says which: `currency` and `qtyUnit` on the response root, or per row where both sides can appear (Transactions, the receipt queue). `?units=` converts a *quantity* and a *per-unit price* at the API (`actuals/units.ts`, `qtyConverter`) and never money; nothing converted is stored (D25).
+- **No response key contains `Usd`.** `responseKeys.test.ts` walks every period-scoped response, free-form JSON included: anomaly `detail` was stored with legacy `amountUsd`/`gallons` keys, and `normalizeAnomalyDetail` renames them on the way out rather than rewriting the table. A new rule's detail cannot reintroduce one unnoticed.
+- The planner and Plan vs Actual stay US-only through a fixed literal (`i.currency = 'USD'`), never a parameter.
 
 **Licensing and retention**
 - **Never store a provider geocode permanently.** 30-day cap. Station coordinates come only from an operator export (Love's, or BVD's own travel-centre directory for CA sites), OSM, or the Census gazetteer.

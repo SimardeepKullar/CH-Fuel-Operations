@@ -1,12 +1,7 @@
 import type { Pool } from "pg";
-import { z } from "zod";
 import { getTruckDetail, listTruckRoster, listTrucks } from "../../actuals/trucks.js";
 import { problemResponse } from "../problem.js";
-
-const periodSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "period must be a YYYY-MM-DD date");
-const querySchema = z.object({ period: periodSchema });
-/** `period` optional here only (D23) — the list endpoint doubles as an unscoped roster picker; the detail endpoint below always needs one to compute `assignedCard`/`favouredStations` as of a date. */
-const listQuerySchema = z.object({ period: periodSchema.optional() });
+import { parseWeekQuery } from "../query.js";
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -16,29 +11,30 @@ function jsonResponse(body: unknown): Response {
 }
 
 /**
- * `GET /trucks?period=` — A8.8's list. `period` omitted (D23) returns the
- * plain 27-unit roster instead — no invoice, no spend figures — for a picker
- * that carries no period of its own (New Plan's truck field, A7).
+ * `GET /trucks?week=&currency=` — A8.8's list, one side of one billing week.
+ * `week` omitted (D23) returns the plain 27-unit roster instead — no invoice,
+ * no spend figures — for a picker that carries no week of its own (New Plan's
+ * truck field, A7). A `week` that is present but malformed is still a 400.
  */
 export async function handleListTrucks(pool: Pool, url: URL): Promise<Response> {
-  const parsed = listQuerySchema.safeParse({ period: url.searchParams.get("period") ?? undefined });
-  if (!parsed.success) {
-    return problemResponse({ title: "Bad Request", status: 400, detail: parsed.error.message, instance: url.pathname });
-  }
-  if (parsed.data.period === undefined) {
+  if (!url.searchParams.has("week") && !url.searchParams.has("currency") && !url.searchParams.has("units")) {
     return jsonResponse(await listTruckRoster(pool));
   }
-  return jsonResponse(await listTrucks(pool, parsed.data.period));
+  const query = parseWeekQuery(url);
+  if (query instanceof Response) {
+    return query;
+  }
+  return jsonResponse(await listTrucks(pool, query));
 }
 
-/** `GET /trucks/{id}?period=` — A8.8's detail, with the assignment history. */
+/** `GET /trucks/{id}?week=&currency=` — A8.8's detail, with the assignment history. */
 export async function handleGetTruck(pool: Pool, id: string, url: URL): Promise<Response> {
-  const parsed = querySchema.safeParse({ period: url.searchParams.get("period") });
-  if (!parsed.success) {
-    return problemResponse({ title: "Bad Request", status: 400, detail: parsed.error.message, instance: url.pathname });
+  const query = parseWeekQuery(url);
+  if (query instanceof Response) {
+    return query;
   }
 
-  const detail = await getTruckDetail(pool, id, parsed.data.period);
+  const detail = await getTruckDetail(pool, id, query);
   if (!detail) {
     return problemResponse({
       title: "Not Found",

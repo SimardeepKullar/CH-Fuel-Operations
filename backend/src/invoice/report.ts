@@ -1,4 +1,4 @@
-import type { InvoiceCurrency } from "../db/types.js";
+import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
 import type { InvoiceLineRejectionCode, PrintedProductTotal } from "./parseInvoiceCsv.js";
 import type { CentsDelta, ReconcileResult } from "./reconcile.js";
 import type { FuelStopGroup } from "./groupByAuthCode.js";
@@ -26,16 +26,15 @@ export interface NormalizedRejection {
 }
 
 /**
- * One printed per-code row as the import preview's API contract names it.
- * The parser's `PrintedProductTotal` is currency- and unit-neutral (T-61);
- * this keeps the response's existing field names until T-63 reshapes the
- * contract — `currency` on the report says what the figures are in.
+ * One printed per-code row as the import preview's API contract names it:
+ * the parser's currency- and unit-neutral `PrintedProductTotal`, as printed.
+ * `currency` and `qtyUnit` on the report say what the figures are in (D25).
  */
 export interface ReportProductTotal {
   productCode: string;
-  gallons: string | null;
-  amountUsd: string;
-  discountUsd: string | null;
+  qty: string | null;
+  amount: string;
+  discount: string | null;
 }
 
 export interface ImportReport {
@@ -45,10 +44,17 @@ export interface ImportReport {
    * gap report's covered set unions these, never the imported_at clock. */
   periodStart: string;
   periodEnd: string;
-  /** The invoice's currency (D24). Every money figure in this report is in
-   * it, whatever its field is named until T-63. */
+  /** D26: the week this invoice belongs to — `periodEnd` at import. */
+  billingWeekEnd: string;
+  /** First and last transaction's UTC date, or `null` for a file with none. The
+   * gap report's covered set unions these, not the printed range (T-63). */
+  actualStart: string | null;
+  actualEnd: string | null;
+  /** The invoice's currency (D24). Every money figure in this report is in it. */
   currency: InvoiceCurrency;
-  grandTotalUsd: string;
+  /** What every quantity in this report is in — litres on a CAD invoice (D25). */
+  qtyUnit: InvoiceQtyUnit;
+  grandTotal: string;
   /** The invoice's own printed per-product-code rows (T-42's import preview:
    * "TA + DF + S + Express = $50,929.71") — `parsed.printedTotals.products`
    * verbatim, already computed wherever the report is built, before the
@@ -87,8 +93,11 @@ export interface BuildImportReportInput {
   fileSha256: string;
   periodStart: string;
   periodEnd: string;
+  actualStart: string | null;
+  actualEnd: string | null;
   currency: InvoiceCurrency;
-  grandTotalUsd: string;
+  qtyUnit: InvoiceQtyUnit;
+  grandTotal: string;
   productTotals: readonly PrintedProductTotal[];
   parserRejections: ReadonlyArray<{
     lineNumber: number;
@@ -179,13 +188,17 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
     fileSha256: input.fileSha256,
     periodStart: input.periodStart,
     periodEnd: input.periodEnd,
+    billingWeekEnd: input.periodEnd,
+    actualStart: input.actualStart,
+    actualEnd: input.actualEnd,
     currency: input.currency,
-    grandTotalUsd: input.grandTotalUsd,
+    qtyUnit: input.qtyUnit,
+    grandTotal: input.grandTotal,
     productTotals: input.productTotals.map((p) => ({
       productCode: p.productCode,
-      gallons: p.qty,
-      amountUsd: p.amount,
-      discountUsd: p.discount,
+      qty: p.qty,
+      amount: p.amount,
+      discount: p.discount,
     })),
     reconcile: reconcileResult,
     parserRejectionCount: input.parserRejections.length,

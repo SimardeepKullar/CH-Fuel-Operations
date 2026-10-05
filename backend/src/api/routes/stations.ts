@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getStationBilledPrices } from "../../actuals/stations.js";
 import { getStationPriceHistory, listStations, type StationMapResolution } from "../../catalog/stations.js";
 import { problemResponse } from "../problem.js";
+import { badRequest, currencySchema, parseUnits } from "../query.js";
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -12,9 +13,19 @@ function jsonResponse(body: unknown): Response {
 }
 
 /** `GET /stations/{id}/billed-prices` — A8.9's price history and A6.5's audit
- * hook. `id` is `stations.id`; an id that names no station (or isn't a uuid) is a 404. */
+ * hook. `id` is `stations.id`; an id that names no station (or isn't a uuid) is a 404.
+ * `currency` (optional) picks the side of the series and defaults to the
+ * station's own; an unknown one is a 400. */
 export async function handleGetStationBilledPrices(pool: Pool, id: string, url: URL): Promise<Response> {
-  const result = await getStationBilledPrices(pool, id);
+  const units = parseUnits(url);
+  if (units instanceof Response) {
+    return units;
+  }
+  const currency = currencySchema.optional().safeParse(url.searchParams.get("currency") ?? undefined);
+  if (!currency.success) {
+    return badRequest(url, currency.error.message);
+  }
+  const result = await getStationBilledPrices(pool, id, { currency: currency.data, units });
   if (!result) {
     return problemResponse({
       title: "Not Found",

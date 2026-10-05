@@ -14,7 +14,9 @@ export interface TruckVariance {
 }
 
 export interface PlanActualResult {
-  period: string;
+  /** The billing week's end (D26), as asked. Plan vs Actual is US-only — plans
+   * are — so this is always the week's USD invoice. */
+  week: string;
   invoiceId: string | null;
   /** "X of Y stops covered by a plan" (A8.10) — `total` is every actual fuel stop on the invoice, `covered` is how many matched. */
   coverage: { covered: number; total: number };
@@ -34,11 +36,13 @@ interface InvoiceRow {
   period_end: string;
 }
 
-async function loadInvoice(pool: Pool, period: string): Promise<InvoiceRow | null> {
+async function loadInvoice(pool: Pool, week: string): Promise<InvoiceRow | null> {
   const { rows } = await pool.query<InvoiceRow>(
-    // Plans are US-only, so Plan vs Actual reads US invoices only (T-61, T-63).
-    `SELECT id, period_start::text, period_end::text FROM invoices WHERE period_start = $1::date AND currency = 'USD'`,
-    [period],
+    // Plans are US-only, so Plan vs Actual reads the week's USD invoice only —
+    // a fixed literal, never a parameter (T-61, T-63).
+    `SELECT id, period_start::text, period_end::text FROM invoices
+     WHERE billing_week_end = $1::date AND currency = 'USD' AND status = 'imported'`,
+    [week],
   );
   return rows[0] ?? null;
 }
@@ -199,15 +203,15 @@ async function computeByTruckVariance(pool: Pool, matches: readonly MatchRow[], 
 }
 
 /**
- * `GET /plan-actual?period=` (A14, A13). Zero overlap between plans and
+ * `GET /plan-actual?week=` (A14, A13). Zero overlap between plans and
  * invoices is a real, persistent state (A8.10) — this always returns a
  * well-formed payload with coverage counts, never a 404 or a bare `[]`.
  */
-export async function getPlanActual(pool: Pool, period: string): Promise<PlanActualResult> {
-  const invoice = await loadInvoice(pool, period);
+export async function getPlanActual(pool: Pool, week: string): Promise<PlanActualResult> {
+  const invoice = await loadInvoice(pool, week);
   if (invoice === null) {
     return {
-      period,
+      week,
       invoiceId: null,
       coverage: { covered: 0, total: 0 },
       matches: [],
@@ -229,7 +233,7 @@ export async function getPlanActual(pool: Pool, period: string): Promise<PlanAct
   const byTruckVarianceUsd = await computeByTruckVariance(pool, matches, planStops);
 
   return {
-    period,
+    week,
     invoiceId: invoice.id,
     coverage: { covered, total: totalFuelStops },
     matches,

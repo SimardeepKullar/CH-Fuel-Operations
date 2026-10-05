@@ -369,6 +369,11 @@ export interface InvoiceRow {
   invoice_number: string;
   period_start: Date;
   period_end: Date;
+  /** D26: the week this invoice belongs to; defaults to `period_end` at import. */
+  billing_week_end: Date;
+  /** First/last transaction's UTC date; null when the file has none. */
+  actual_start: Date | null;
+  actual_end: Date | null;
   invoice_date: Date;
   due_date: Date;
   currency: InvoiceCurrency;

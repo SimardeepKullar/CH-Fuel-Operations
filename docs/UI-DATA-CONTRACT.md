@@ -82,7 +82,8 @@ note is explicit that `truck_profiles.truck_number` (022/056/091) are
 placeholders, never the roster. `GET /trucks` already exists (T-37) but is
 period-scoped and 400s with no `period` — Plan screens carry no period (A7), so
 it cannot serve this picker as built. **D23** (`PROJECT-SCOPE-v2.md` A15) makes
-`period` optional on that endpoint instead of adding a second one: omitted, it
+`period` optional on that endpoint instead of adding a second one (T-63 renamed
+the key `week`, see §9): omitted, it
 returns the plain roster (`id`, `unitNumber`) this picker needs; supplied, T-37's
 existing spend-scoped shape is unchanged. Confirmed necessary, not speculative:
 `CH Fuel App.dc.html`'s New Plan screen already has a `Truck` select bound to
@@ -453,3 +454,57 @@ express them:
 
 These are design work, not backend work — but the payloads above will arrive
 before there is anywhere to put them.
+
+---
+
+## 9. Actuals — billing weeks, currency and units (T-63)
+
+What every period-scoped Actuals screen reads, after D24–D28. Plan screens carry
+no week (A7) and are unaffected; **Plan vs Actual stays US-only**, since plans
+are, and takes `?week=` alone.
+
+**The key is a billing week.** `GET /periods` lists weeks, newest first —
+`{ weeks: [{ weekEnd, invoices: [{ id, invoiceNumber, currency, printedStart,
+printedEnd, actualStart, actualEnd, datesDiffer }] }] }` — USD invoice first,
+then CAD, at most one of each, imported invoices only. `datesDiffer` is the
+amber note ("Printed Aug 1 – Sep 9; transactions Sep 3 – Sep 10"): printed range
+≠ actual range, where *actual* is the first and last transaction's UTC date. It
+is a note, never a block. `PATCH /invoices/{id}` `{ billingWeekEnd }` moves an
+invoice to another week; moving onto an occupied week of the same currency is a
+409. `GET /health`'s `latestInvoicePeriod` is the newest week with an imported
+invoice on either side.
+
+**Query parameters**, on every period-scoped route:
+
+| Param | Rule |
+|---|---|
+| `week` | `YYYY-MM-DD`, a real date. **Required** on `/overview`, `/drivers`, `/drivers/{id}`, `/trucks/{id}`, `/express-charges`, `/plan-actual`; a missing or malformed one is a 400 problem+json. **Optional** where the screen has no week of its own — `/trucks` (omitted: the plain roster, D23), `/transactions` (a driver's or truck's history spans weeks), `/receipt-queue` (a standing worklist) — but a malformed one is still a 400. |
+| `currency` | `USD` or `CAD`; anything else is a 400. On the one-sided screens (`/drivers`, `/trucks`, `/express-charges` and their details) an omitted `currency` is `USD` and the response says so: gallons and litres cannot be summed. On `/transactions` and `/receipt-queue` an omitted `currency` is *both* sides, each row carrying its own. `/overview` takes the week alone and serves the US side (T-65 shapes the rest); `/stations/{id}/billed-prices` defaults to the station's own country. |
+| `units` | `imperial` or `metric`; anything else is a 400. Absent means as BVD printed it — gallons on a US invoice, litres on a CA one. Converts **quantity and per-unit prices only**, at the API (D25): CAD/L × 3.785411784 is CAD/gal. Money never changes, and nothing converted is stored. |
+
+**Field names carry no currency or unit.** `…Usd` is gone from every Actuals
+response (the Plan screens' `unitPriceUsd`-style fields are USD by construction
+and keep theirs): `totalUsd` → `total`, `amountUsd` → `amount`, `feeUsd` →
+`fee`, `gallons` → `qty`, `defGallons` → `defQty`, `avgBilledUsdPerGal` →
+`avgBilledPerUnit`, `avgVsFleetUsdPerGal` → `avgVsFleetPerUnit`,
+`retailUsdPerGal`/`billedUsdPerGal` → `retailPerUnit`/`billedPerUnit`,
+`publishedUsdPerGal` → `publishedPerUnit`, and `period` → `week` (a billing
+week's end) wherever a result echoes it. The import report's `grandTotalUsd`
+and `productTotals[].gallons/amountUsd/discountUsd` are `grandTotal` and
+`qty/amount/discount`. The transactions sort value `total_usd` is `total`.
+
+**A currency beside every money field.** Each response carries `currency` (and
+`qtyUnit`, `"gal"` or `"L"`, for the quantities) either on the object that holds
+the money or on an ancestor — at the root for `/drivers`, `/trucks`,
+`/express-charges`, `/overview` and the station series; per row for
+`/transactions` and `/receipt-queue`, whose rows can come from either side. A
+transaction line carries `preTaxAmount`, `hst`, `gst`, `pst`, `qst` beside
+`amount` (the printed Final AMT, tax included) for the Canadian detail view (D28).
+
+**Anomaly `detail` is normalised on the way out.** `/overview`'s `anomalyDigest`
+returns each finding's stored `detail`, and US findings were stored with legacy
+`amountUsd`/`totalUsd`/`gallons`/`…UsdPerGal` keys. The API renames those to the
+keys above and adds `currency: "USD"` (and `qtyUnit: "gal"`), so no response key
+contains `Usd`; the stored history is not rewritten. A CA finding already has the
+neutral keys and is passed through. The response-key walk in the route tests
+visits `detail` too.

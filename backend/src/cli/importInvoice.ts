@@ -10,7 +10,7 @@ import { getPool } from "../db/pool.js";
 
 function printReport(report: ImportReport): void {
   console.log(`invoice:             ${report.invoiceNumber}`);
-  console.log(`grand total:         ${report.grandTotalUsd}`);
+  console.log(`grand total:         ${report.grandTotal} ${report.currency}`);
   console.log(`balanced:            ${report.reconcile.balanced}`);
   console.log(`parser rejections:   ${report.parserRejectionCount}`);
 

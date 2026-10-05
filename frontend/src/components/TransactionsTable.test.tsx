@@ -27,16 +27,17 @@ function stop(overrides: Partial<TransactionListItem> = {}): TransactionListItem
     driver: { resolved: "JORDAN", raw: "JORDAN", agrees: true },
     truck: { resolved: "072", raw: "072", agrees: true },
     station: { id: "st-1", loveNumber: 294, city: "Dallas", state: "TX" },
-    gallons: 40.0,
-    retailUsdPerGal: 5.799,
-    billedUsdPerGal: 5.499,
-    totalUsd: 238.26,
+    qty: 40.0,
+    qtyUnit: "gal",
+    retailPerUnit: 5.799,
+    billedPerUnit: 5.499,
+    total: 238.26,
     currency: "USD",
     receiptStatus: "confirmed",
     flags: [],
     lines: [
-      { productCode: "TA", gallons: 40.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 219.96, currency: "USD" },
-      { productCode: "DF", gallons: 3.0, retailUsdPerGal: 6.2, billedUsdPerGal: 6.1, amountUsd: 18.3, currency: "USD" },
+      { productCode: "TA", qty: 40.0, retailPerUnit: 5.799, billedPerUnit: 5.499, amount: 219.96, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
+      { productCode: "DF", qty: 3.0, retailPerUnit: 6.2, billedPerUnit: 6.1, amount: 18.3, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
     ],
     ...overrides,
   };
@@ -153,7 +154,7 @@ describe("TransactionsTable", () => {
 
   it("a stop with one product shows only that badge", () => {
     const dieselOnly = stop({
-      lines: [{ productCode: "TA", gallons: 40.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 219.96, currency: "USD" }],
+      lines: [{ productCode: "TA", qty: 40.0, retailPerUnit: 5.799, billedPerUnit: 5.499, amount: 219.96, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" }],
     });
     render(<TransactionsTable {...baseProps([dieselOnly])} />);
     const products = document.querySelector(".tx-products")!;
@@ -164,8 +165,8 @@ describe("TransactionsTable", () => {
   it("a stop with two lines of the same product shows one deduped badge", () => {
     const duplicateProduct = stop({
       lines: [
-        { productCode: "TA", gallons: 30.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 164.97, currency: "USD" },
-        { productCode: "TA", gallons: 10.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 54.99, currency: "USD" },
+        { productCode: "TA", qty: 30.0, retailPerUnit: 5.799, billedPerUnit: 5.499, amount: 164.97, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
+        { productCode: "TA", qty: 10.0, retailPerUnit: 5.799, billedPerUnit: 5.499, amount: 54.99, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
       ],
     });
     render(<TransactionsTable {...baseProps([duplicateProduct])} />);
@@ -183,9 +184,9 @@ describe("TransactionsTable", () => {
   it("Diesel, DEF and Scale badges render in three distinct colour variants", () => {
     const allThree = stop({
       lines: [
-        { productCode: "TA", gallons: 40.0, retailUsdPerGal: 5.799, billedUsdPerGal: 5.499, amountUsd: 219.96, currency: "USD" },
-        { productCode: "DF", gallons: 3.0, retailUsdPerGal: 6.2, billedUsdPerGal: 6.1, amountUsd: 18.3, currency: "USD" },
-        { productCode: "S", gallons: 0, retailUsdPerGal: 0, billedUsdPerGal: 0, amountUsd: 15.25, currency: "USD" },
+        { productCode: "TA", qty: 40.0, retailPerUnit: 5.799, billedPerUnit: 5.499, amount: 219.96, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
+        { productCode: "DF", qty: 3.0, retailPerUnit: 6.2, billedPerUnit: 6.1, amount: 18.3, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
+        { productCode: "S", qty: 0, retailPerUnit: 0, billedPerUnit: 0, amount: 15.25, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
       ],
     });
     render(<TransactionsTable {...baseProps([allThree])} />);
@@ -197,7 +198,7 @@ describe("TransactionsTable", () => {
 
   it("a stop with a Scale product line drops the Scale flag, keeping other flags", () => {
     const scaleCharge = stop({
-      lines: [{ productCode: "S", gallons: 0, retailUsdPerGal: 0, billedUsdPerGal: 0, amountUsd: 15.25, currency: "USD" }],
+      lines: [{ productCode: "S", qty: 0, retailPerUnit: 0, billedPerUnit: 0, amount: 15.25, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" }],
       flags: [
         { rule: "charges_no_fuel", severity: "amber" },
         { rule: "sub_gallon", severity: "red" },
@@ -211,7 +212,7 @@ describe("TransactionsTable", () => {
 
   it("a charges_no_fuel flag also drops when the stop has no Scale line (T-40H)", () => {
     const cashOnly = stop({
-      lines: [{ productCode: "C", gallons: 0, retailUsdPerGal: 0, billedUsdPerGal: 0, amountUsd: 5, currency: "USD" }],
+      lines: [{ productCode: "C", qty: 0, retailPerUnit: 0, billedPerUnit: 0, amount: 5, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" }],
       flags: [
         { rule: "charges_no_fuel", severity: "amber" },
         { rule: "sub_gallon", severity: "red" },

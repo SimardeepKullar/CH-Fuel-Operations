@@ -88,8 +88,8 @@ describe.skipIf(!hasDatabase)("GET /stations/{id}/billed-prices (integration)", 
         expect(d.cardCount).toBe(5);
         expect(d.stopCount).toBe(5);
         expect(d.distinctBilledPrices).toEqual([5.5208]);
-        expect(d.avgBilledUsdPerGal).toBeCloseTo(5.5208, 10);
-        expect(d.gallons).toBe(500);
+        expect(d.avgBilledPerUnit).toBeCloseTo(5.5208, 10);
+        expect(d.qty).toBe(500);
       }
     });
 
@@ -98,7 +98,7 @@ describe.skipIf(!hasDatabase)("GET /stations/{id}/billed-prices (integration)", 
 
       expect(d.distinctBilledPrices).toEqual([5.5, 5.6]);
       // (100 × 5.50 + 300 × 5.60) / 400 = 5.575 — not the 5.55 mean of the two prices.
-      expect(d.avgBilledUsdPerGal).toBeCloseTo(5.575, 10);
+      expect(d.avgBilledPerUnit).toBeCloseTo(5.575, 10);
     });
 
     it("returns days oldest first, one row per day, and the station's own identity", async () => {
@@ -140,7 +140,7 @@ describe.skipIf(!hasDatabase)("GET /stations/{id}/billed-prices (integration)", 
     it("is null — not 0 — on every day when no published price file exists, with the published price null beside it", async () => {
       for (const d of (await getPrices()).days) {
         expect(d.discrepancy).toBeNull();
-        expect(d.publishedUsdPerGal).toBeNull();
+        expect(d.publishedPerUnit).toBeNull();
         expect(d.severity).toBeNull();
       }
     });
@@ -159,7 +159,7 @@ describe.skipIf(!hasDatabase)("GET /stations/{id}/billed-prices (integration)", 
       const d = await day("2026-09-07");
 
       expect(d.discrepancy).toBe(0);
-      expect(d.publishedUsdPerGal).toBe(5.5208);
+      expect(d.publishedPerUnit).toBe(5.5208);
       expect(d.severity).toBeNull();
     });
 
@@ -169,7 +169,7 @@ describe.skipIf(!hasDatabase)("GET /stations/{id}/billed-prices (integration)", 
       const d = await day("2026-09-07");
 
       expect(d.discrepancy).toBe(0.02);
-      expect(d.publishedUsdPerGal).toBe(5.5008);
+      expect(d.publishedPerUnit).toBe(5.5008);
     });
 
     it("2 cents does NOT cross the seeded 10-cent threshold, so it carries no severity", async () => {
@@ -309,7 +309,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /stations/{id}/billed-pric
     const sept9 = days.find((d) => d.date === "2026-09-09");
     expect(sept7).toMatchObject({ stopCount: 3, cardCount: 3, distinctBilledPrices: [5.5208] });
     expect(sept9).toMatchObject({ stopCount: 1, cardCount: 1, distinctBilledPrices: [5.5208] });
-    expect(sept7!.avgBilledUsdPerGal).toBeCloseTo(5.5208, 10);
+    expect(sept7!.avgBilledPerUnit).toBeCloseTo(5.5208, 10);
   });
 
   it("the price moves between days, not within one: 09-03 was 5.6593, and the station has exactly five diesel stops in all", async () => {
@@ -332,7 +332,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /stations/{id}/billed-pric
     expect(days.length).toBeGreaterThan(0);
     for (const d of days) {
       expect(d.discrepancy).toBeNull();
-      expect(d.publishedUsdPerGal).toBeNull();
+      expect(d.publishedPerUnit).toBeNull();
       expect(d.severity).toBeNull();
     }
   });
@@ -347,6 +347,6 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /stations/{id}/billed-pric
     );
 
     expect(days.reduce((s, d) => s + d.stopCount, 0)).toBe(Number(rows[0]!.stops));
-    expect(days.reduce((s, d) => s + d.gallons, 0)).toBeCloseTo(Number(rows[0]!.gallons), 2);
+    expect(days.reduce((s, d) => s + d.qty, 0)).toBeCloseTo(Number(rows[0]!.gallons), 2);
   });
 });

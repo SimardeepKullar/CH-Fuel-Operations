@@ -106,7 +106,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-60** | **Canadian stations from BVD's travel-centre directory** | T-08 | **11** | **done — merged (`13e7c88`, PR #14)** |
 | **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **done — merged (`22496c8`, PR #16)** |
 | **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **done — merged (`043eee2`, PR #15)** |
-| **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **new** |
+| **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **done — PR pending** |
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **new** |
 | **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
 | **T-66** | **Bank of Canada exchange rate on the CA invoice** | T-61 | **11** | **new** |
@@ -1314,10 +1314,10 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Why.** Every Actuals endpoint keys on `?period=` = `invoices.period_start`. 999210 (US) prints 09-03 → 09-09; 999217 (CA) prints **08-01** → 09-09 while its transactions run 09-03 → 09-10. Keyed on start, the two can never pair, and the gap report (`invoiceGapReport.ts`) would count Aug 1 – Sep 2 as covered.
 
 **Design.**
-- `invoices` gains `billing_week_end date NOT NULL` (defaulted at import to the printed `period_end`), `actual_start date`, `actual_end date` (first/last transaction date) and a unique `(billing_week_end, currency)` — two US invoices in one week is a 409, not a silent merge. `period_start`/`period_end` stay as printed.
+- `invoices` gains `billing_week_end date NOT NULL` (defaulted at import to the printed `period_end`), `actual_start date`, `actual_end date` (first/last transaction date) and a unique `(billing_week_end, currency)` — two US invoices in one week is a 409, not a silent merge. *(As built: the unique index is partial, `WHERE status = 'imported'`. A quarantined invoice has no rows and can never be re-imported under its number, so a full constraint would let it hold a week for ever and turn the replacement's import into a unique violation instead of a named conflict.)* `period_start`/`period_end` stay as printed.
 - `PATCH /invoices/{id}` `{ billingWeekEnd }` moves an invoice to another week (the Import screen's override, T-64); a collision is a 409 problem+json.
 - `GET /periods` returns weeks, newest first: `{ weekEnd, invoices: [{ id, invoiceNumber, currency, printedStart, printedEnd, actualStart, actualEnd, datesDiffer }] }` — `datesDiffer` when the printed range ≠ the actual range.
-- Period-scoped endpoints take `?week=YYYY-MM-DD` plus `?currency=USD|CAD` where a screen shows one side (Transactions, Drivers, Trucks, Stations, Other Charges, Receipts). `/overview` takes `week` alone (T-65 shapes its body). Plan vs Actual stays US-only — plans are US-only.
+- Period-scoped endpoints take `?week=YYYY-MM-DD` plus `?currency=USD|CAD` where a screen shows one side (Transactions, Drivers, Trucks, Stations, Other Charges, Receipts). `/overview` takes `week` alone (T-65 shapes its body). Plan vs Actual stays US-only — plans are US-only. *(As built: `week` is required except where the screen has none of its own — `GET /trucks` (the D23 roster), `GET /transactions` (a driver's or truck's history spans weeks) and `GET /receipt-queue` (a standing worklist, D17) — and `currency` defaults to `USD` on the one-sided screens, since gallons and litres cannot be summed, but means "both sides" on Transactions and the receipt queue, whose rows each carry their own. The station billed-price series takes `currency` too, defaulting to the station's own country. `/overview` serves the week's US invoice until T-65.)*
 - Money fields drop their `Usd` suffix (`amountUsd` → `amount`, `avgBilledUsdPerGal` → `avgBilledPerUnit`, …) beside the existing `currency` field, which now carries the invoice's currency (A13 as amended). `?units=` converts quantities and per-unit prices at the API (D25).
 - The gap report runs over each currency's actual ranges, not printed ones.
 - T-61's temporary `currency = 'USD'` filter is removed.
@@ -1327,12 +1327,12 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Dependencies.** T-61.
 
 **Definition of done.**
-- [ ] 999210 and 999217 land in one week, ending 2026-09-09; `datesDiffer` is true for 999217 only.
-- [ ] Moving an invoice to another week via `PATCH` moves it in `/periods`; moving a second US invoice into an occupied week → 409.
-- [ ] `/transactions?week=2026-09-09&currency=CAD` returns only 999217's stops, in litres and CAD; `?units=imperial` returns gallons with the same money.
-- [ ] The gap report treats Aug 1 – Sep 2 as **not** covered by 999217.
-- [ ] Every period-scoped route rejects a missing or malformed `week` with a 400 problem+json, and an unknown `currency` likewise.
-- [ ] No response field ends in `Usd`; every money field has a `currency` beside it.
+- [x] 999210 and 999217 land in one week, ending 2026-09-09; `datesDiffer` is true for 999217 only. *(Gated, `billingWeeksReal.test.ts`; the synthetic pair is composed in the test by re-dating a copy of the US fixture, `billingWeeks.test.ts`.)*
+- [x] Moving an invoice to another week via `PATCH` moves it in `/periods`; moving a second US invoice into an occupied week → 409.
+- [x] `/transactions?week=2026-09-09&currency=CAD` returns only 999217's stops, in litres and CAD; `?units=imperial` returns gallons with the same money.
+- [x] The gap report treats Aug 1 – Sep 2 as **not** covered by 999217. *(Per currency, over each invoice's actual range; the import report carries `actualStart`/`actualEnd`.)*
+- [x] Every period-scoped route rejects a missing or malformed `week` with a 400 problem+json, and an unknown `currency` likewise. *(`weekParams.test.ts`, no database; on the three routes where `week` is optional, only a malformed one.)*
+- [x] No response field ends in `Usd`; every money field has a `currency` beside it. *(`responseKeys.test.ts` walks every period-scoped response, anomaly `detail` included; the legacy US `detail` keys are renamed at the API, not rewritten in the table.)*
 
 ---
 

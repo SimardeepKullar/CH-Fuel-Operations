@@ -83,8 +83,8 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     );
     const row = result.rows.find((r) => r.baseAuthCode === "A252014353");
     expect(row).toBeDefined();
-    expect(row!.totalUsd).toBe(255.13);
-    const lineSum = row!.lines!.reduce((sum, l) => sum + l.amountUsd, 0);
+    expect(row!.total).toBe(255.13);
+    const lineSum = row!.lines!.reduce((sum, l) => sum + l.amount, 0);
     expect(Math.round(lineSum * 100) / 100).toBe(255.13);
     // Never derived from the TA line alone (CLAUDE.md) — DF must be present too.
     expect(row!.lines!.map((l) => l.productCode).sort()).toEqual(["DF", "TA"]);
@@ -112,8 +112,8 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
       { page: 1, pageSize: 200 },
     );
     const row = result.rows.find((r) => r.baseAuthCode === "A252014353")!;
-    expect(row.billedUsdPerGal).toBe(5.2395);
-    expect(typeof row.billedUsdPerGal).toBe("number");
+    expect(row.billedPerUnit).toBe(5.2395);
+    expect(typeof row.billedPerUnit).toBe("number");
   });
 
   it("each filter alone narrows the result, and three combined still compose", async () => {
@@ -234,15 +234,15 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     expect(response.headers.get("content-type")).toBe("application/problem+json");
   });
 
-  it("?period= scopes to that invoice's stops via invoice_id, not a reconstructed date range (T-40, A7)", async () => {
+  it("?week= scopes to that invoice's stops via invoice_id, not a reconstructed date range (T-40, A7)", async () => {
     const app = createApp({ authRequired: false, pool: scopedPool });
-    const { rows: invoiceRows } = await scopedPool.query<{ period_start: string }>(
-      "SELECT to_char(period_start, 'YYYY-MM-DD') AS period_start FROM invoices",
+    const { rows: invoiceRows } = await scopedPool.query<{ week_end: string }>(
+      "SELECT to_char(billing_week_end, 'YYYY-MM-DD') AS week_end FROM invoices",
     );
-    const period = invoiceRows[0]!.period_start;
+    const period = invoiceRows[0]!.week_end;
 
     const scoped = await app.handle(
-      new Request(`http://localhost/api/v1/transactions?pageSize=200&period=${period}`),
+      new Request(`http://localhost/api/v1/transactions?pageSize=200&week=${period}`),
     );
     const scopedBody = (await scoped.json()) as { rows: unknown[]; total: number };
 
@@ -254,7 +254,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     expect(scopedBody.total).toBe(unscopedBody.total);
 
     const noMatch = await app.handle(
-      new Request("http://localhost/api/v1/transactions?pageSize=200&period=2099-01-01"),
+      new Request("http://localhost/api/v1/transactions?pageSize=200&week=2099-01-01"),
     );
     const noMatchBody = (await noMatch.json()) as { rows: unknown[]; total: number };
     expect(noMatchBody.total).toBe(0);
@@ -333,8 +333,8 @@ describe.skipIf(!hasDatabase)("fuel_stops default-sort query plan (integration)"
     await runMigrations(scopedPool, migrationsDir);
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ('EXPLAIN-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('EXPLAIN-TEST', '2020-01-01', '2020-01-07', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
     );
     await scopedPool.query("INSERT INTO fuel_cards (card_number) VALUES ('9999999')");
     await scopedPool.query(
@@ -389,8 +389,8 @@ describe.skipIf(!hasDatabase)("anomalyOnly excludes a charges_no_fuel-only stop 
     await runMigrations(scopedPool, migrationsDir);
 
     await scopedPool.query(
-      `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ('T-40I-TEST', '2020-01-01', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('1', 64))`,
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+       VALUES ('T-40I-TEST', '2020-01-01', '2020-01-07', '2020-01-07', '2020-01-08', '2020-01-09', 'USD', 'gal', 0, 'imported', repeat('1', 64))`,
     );
     await scopedPool.query("INSERT INTO fuel_cards (card_number) VALUES ('9999901'), ('9999902')");
 

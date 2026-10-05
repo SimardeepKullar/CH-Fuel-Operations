@@ -144,17 +144,17 @@ describe.skipIf(!hasDatabase)("GET /drivers, /drivers/{id} (integration)", () =>
 
   describe("list", () => {
     it("returns spend, diesel gallons, weighted average billed, compliance % and open anomaly count per driver", async () => {
-      const result = await get<DriversResult>("/drivers?period=2026-03-01");
+      const result = await get<DriversResult>("/drivers?week=2026-03-07");
       const ann = result.rows.find((r) => r.driver.id === ids.ann)!;
 
       expect(result.invoiceId).toBe(ids.invoice);
       expect(ann.driver.displayName).toBe("T37 ANN");
       // a1 carries a TA and a DF line: its 512.00 is counted once, not once per line.
       expect(ann.stopCount).toBe(3);
-      expect(ann.totalUsd).toBe(1312);
-      expect(ann.gallons).toBe(250);
-      expect(ann.defGallons).toBe(3);
-      expect(ann.avgBilledUsdPerGal).toBeCloseTo(5.2, 10);
+      expect(ann.total).toBe(1312);
+      expect(ann.qty).toBe(250);
+      expect(ann.defQty).toBe(3);
+      expect(ann.avgBilledPerUnit).toBeCloseTo(5.2, 10);
       expect(ann.receiptCompliance.confirmed).toBe(2);
       expect(ann.receiptCompliance.total).toBe(3);
       expect(ann.receiptCompliance.pct).toBeCloseTo(66.6667, 3);
@@ -162,28 +162,28 @@ describe.skipIf(!hasDatabase)("GET /drivers, /drivers/{id} (integration)", () =>
     });
 
     it("the average is gallons-weighted (5.20), not the mean of her prices (5.00)", async () => {
-      const ann = (await get<DriversResult>("/drivers?period=2026-03-01")).rows.find((r) => r.driver.id === ids.ann)!;
+      const ann = (await get<DriversResult>("/drivers?week=2026-03-07")).rows.find((r) => r.driver.id === ids.ann)!;
 
-      expect(ann.avgBilledUsdPerGal).not.toBeCloseTo((5 + 6 + 4) / 3, 2);
+      expect(ann.avgBilledPerUnit).not.toBeCloseTo((5 + 6 + 4) / 3, 2);
     });
 
     it("counts every open anomaly on a driver's stops, and skips dismissed ones", async () => {
-      const rows = (await get<DriversResult>("/drivers?period=2026-03-01")).rows;
+      const rows = (await get<DriversResult>("/drivers?week=2026-03-07")).rows;
 
       expect(rows.find((r) => r.driver.id === ids.bob)!.anomalyCount).toBe(2);
       expect(rows.find((r) => r.driver.id === ids.ann)!.anomalyCount).toBe(1);
     });
 
     it("a driver with no stops in the period is a row of zeros with a null average — not an error, not omitted", async () => {
-      const cy = (await get<DriversResult>("/drivers?period=2026-03-01")).rows.find((r) => r.driver.id === ids.cy)!;
+      const cy = (await get<DriversResult>("/drivers?week=2026-03-07")).rows.find((r) => r.driver.id === ids.cy)!;
 
       expect(cy).toEqual({
         driver: { id: ids.cy, displayName: "T37 CY" },
         stopCount: 0,
-        totalUsd: 0,
-        gallons: 0,
-        defGallons: 0,
-        avgBilledUsdPerGal: null,
+        total: 0,
+        qty: 0,
+        defQty: 0,
+        avgBilledPerUnit: null,
         defRatio: null,
         receiptCompliance: { confirmed: 0, total: 0, pct: null },
         anomalyCount: 0,
@@ -191,90 +191,90 @@ describe.skipIf(!hasDatabase)("GET /drivers, /drivers/{id} (integration)", () =>
     });
 
     it("lists rows spend-descending", async () => {
-      const spend = (await get<DriversResult>("/drivers?period=2026-03-01")).rows.map((r) => r.totalUsd);
+      const spend = (await get<DriversResult>("/drivers?week=2026-03-07")).rows.map((r) => r.total);
 
       expect(spend).toEqual([...spend].sort((a, b) => b - a));
     });
 
     it("stops on a card with no driver are not a row, but stay in `unresolved` and the fleet", async () => {
-      const result = await get<DriversResult>("/drivers?period=2026-03-01");
+      const result = await get<DriversResult>("/drivers?week=2026-03-07");
 
       expect(result.rows.some((r) => r.driver.id === null)).toBe(false);
-      expect(result.unresolved).toMatchObject({ stopCount: 1, totalUsd: 700, gallons: 100 });
-      expect(result.unresolved.avgBilledUsdPerGal).toBeCloseTo(7, 10);
+      expect(result.unresolved).toMatchObject({ stopCount: 1, total: 700, qty: 100 });
+      expect(result.unresolved.avgBilledPerUnit).toBeCloseTo(7, 10);
 
       // Nothing vanishes: driver rows + the unresolved bucket are the whole invoice.
-      const rowsTotal = result.rows.reduce((sum, r) => sum + r.totalUsd, 0);
+      const rowsTotal = result.rows.reduce((sum, r) => sum + r.total, 0);
       const rowsStops = result.rows.reduce((sum, r) => sum + r.stopCount, 0);
-      expect(rowsTotal + result.unresolved.totalUsd).toBeCloseTo(result.fleet.totalUsd, 2);
+      expect(rowsTotal + result.unresolved.total).toBeCloseTo(result.fleet.total, 2);
       expect(rowsStops + result.unresolved.stopCount).toBe(result.fleet.stopCount);
       expect(result.fleet.stopCount).toBe(6);
-      expect(result.fleet.totalUsd).toBe(3152);
+      expect(result.fleet.total).toBe(3152);
     });
 
     it("the fleet average is the same figure as the Overview's headline — one formula, not two", async () => {
-      const list = await get<DriversResult>("/drivers?period=2026-03-01");
-      const overview = await get<OverviewResult>("/overview?period=2026-03-01");
+      const list = await get<DriversResult>("/drivers?week=2026-03-07");
+      const overview = await get<OverviewResult>("/overview?week=2026-03-07");
 
-      expect(list.fleet.avgBilledUsdPerGal).toBeCloseTo(3100 / 550, 10);
-      expect(list.fleet.avgBilledUsdPerGal).toBeCloseTo(overview.kpis.avgBilledUsdPerGal!, 10);
+      expect(list.fleet.avgBilledPerUnit).toBeCloseTo(3100 / 550, 10);
+      expect(list.fleet.avgBilledPerUnit).toBeCloseTo(overview.kpis.avgBilledPerUnit!, 10);
     });
 
     it("a period with no invoice is empty with zero totals, not an error", async () => {
-      const result = await get<DriversResult>("/drivers?period=2026-04-01");
+      const result = await get<DriversResult>("/drivers?week=2026-04-07");
 
       expect(result.invoiceId).toBeNull();
       expect(result.rows).toEqual([]);
-      expect(result.fleet).toMatchObject({ stopCount: 0, totalUsd: 0, gallons: 0, avgBilledUsdPerGal: null });
+      expect(result.fleet).toMatchObject({ stopCount: 0, total: 0, qty: 0, avgBilledPerUnit: null });
     });
 
     it("400s a malformed period through the app", async () => {
-      await get("/drivers?period=nope", 400);
+      await get("/drivers?week=nope", 400);
     });
   });
 
   describe("detail", () => {
     it("returns their average against the fleet's, both gallons-weighted", async () => {
-      const detail = await get<DriverDetail>(`/drivers/${ids.ann}?period=2026-03-01`);
+      const detail = await get<DriverDetail>(`/drivers/${ids.ann}?week=2026-03-07`);
 
       expect(detail.driver).toEqual({ id: ids.ann, displayName: "T37 ANN", status: "active" });
-      expect(detail.summary.avgBilledUsdPerGal).toBeCloseTo(5.2, 10);
-      expect(detail.fleet.avgBilledUsdPerGal).toBeCloseTo(3100 / 550, 10);
-      expect(detail.avgVsFleetUsdPerGal).toBeCloseTo(5.2 - 3100 / 550, 10);
-      expect(detail.fleet).toMatchObject({ gallons: 550, stopCount: 6 });
+      expect(detail.summary.avgBilledPerUnit).toBeCloseTo(5.2, 10);
+      expect(detail.fleet.avgBilledPerUnit).toBeCloseTo(3100 / 550, 10);
+      expect(detail.avgVsFleetPerUnit).toBeCloseTo(5.2 - 3100 / 550, 10);
+      expect(detail.fleet).toMatchObject({ qty: 550, stopCount: 6 });
     });
 
     it("the fleet average includes the driverless stops rather than dropping them", async () => {
-      const detail = await get<DriverDetail>(`/drivers/${ids.bob}?period=2026-03-01`);
+      const detail = await get<DriverDetail>(`/drivers/${ids.bob}?week=2026-03-07`);
 
       // Without the $7.00 driverless fill the fleet would be (1300 + 1100) / 450 = 5.33.
-      expect(detail.fleet.avgBilledUsdPerGal).toBeCloseTo(3100 / 550, 10);
-      expect(detail.fleet.avgBilledUsdPerGal).not.toBeCloseTo(2400 / 450, 2);
+      expect(detail.fleet.avgBilledPerUnit).toBeCloseTo(3100 / 550, 10);
+      expect(detail.fleet.avgBilledPerUnit).not.toBeCloseTo(2400 / 450, 2);
     });
 
     it("DEF:diesel is DF gallons over TA gallons", async () => {
-      const detail = await get<DriverDetail>(`/drivers/${ids.ann}?period=2026-03-01`);
+      const detail = await get<DriverDetail>(`/drivers/${ids.ann}?week=2026-03-07`);
 
       expect(detail.summary.defRatio).toBeCloseTo(3 / 250, 10);
     });
 
     it("DEF:diesel is 0 for a driver who bought diesel and no DEF", async () => {
-      const detail = await get<DriverDetail>(`/drivers/${ids.bob}?period=2026-03-01`);
+      const detail = await get<DriverDetail>(`/drivers/${ids.bob}?week=2026-03-07`);
 
       expect(detail.summary.defRatio).toBe(0);
     });
 
     it("DEF:diesel is null — not Infinity, not 0 — for a driver with DEF and no diesel gallons", async () => {
-      const detail = await get<DriverDetail>(`/drivers/${ids.dee}?period=2026-03-01`);
+      const detail = await get<DriverDetail>(`/drivers/${ids.dee}?week=2026-03-07`);
 
-      expect(detail.summary).toMatchObject({ stopCount: 1, defGallons: 10, gallons: 0 });
+      expect(detail.summary).toMatchObject({ stopCount: 1, defQty: 10, qty: 0 });
       expect(detail.summary.defRatio).toBeNull();
-      expect(detail.summary.avgBilledUsdPerGal).toBeNull();
-      expect(detail.avgVsFleetUsdPerGal).toBeNull();
+      expect(detail.summary.avgBilledPerUnit).toBeNull();
+      expect(detail.avgVsFleetPerUnit).toBeNull();
     });
 
     it("favoured stations rank by stop count: Alpha (2 stops) ahead of Bravo (1)", async () => {
-      const { favouredStations } = await get<DriverDetail>(`/drivers/${ids.ann}?period=2026-03-01`);
+      const { favouredStations } = await get<DriverDetail>(`/drivers/${ids.ann}?week=2026-03-07`);
 
       expect(favouredStations.stations.map((s) => [s.station.nameRaw, s.stopCount])).toEqual([
         ["LOVES #1", 2],
@@ -282,38 +282,38 @@ describe.skipIf(!hasDatabase)("GET /drivers, /drivers/{id} (integration)", () =>
       ]);
       expect(favouredStations.stations[0]).toMatchObject({
         station: { id: ids.alpha, cityRaw: "Alpha City", stateUsps: "MO" },
-        gallons: 200,
-        totalUsd: 1112,
+        qty: 200,
+        total: 1112,
       });
-      expect(favouredStations.stations[0]!.avgBilledUsdPerGal).toBeCloseTo(5.5, 10);
+      expect(favouredStations.stations[0]!.avgBilledPerUnit).toBeCloseTo(5.5, 10);
       expect(favouredStations.unresolvedStationStops).toBe(0);
     });
 
     it("a driver with no stops in the period returns zeros — not a 404", async () => {
-      const detail = await get<DriverDetail>(`/drivers/${ids.cy}?period=2026-03-01`);
+      const detail = await get<DriverDetail>(`/drivers/${ids.cy}?week=2026-03-07`);
 
       expect(detail.invoiceId).toBe(ids.invoice);
-      expect(detail.summary).toMatchObject({ stopCount: 0, totalUsd: 0, gallons: 0, anomalyCount: 0 });
-      expect(detail.summary.avgBilledUsdPerGal).toBeNull();
+      expect(detail.summary).toMatchObject({ stopCount: 0, total: 0, qty: 0, anomalyCount: 0 });
+      expect(detail.summary.avgBilledPerUnit).toBeNull();
       expect(detail.summary.defRatio).toBeNull();
       expect(detail.summary.receiptCompliance).toEqual({ confirmed: 0, total: 0, pct: null });
-      expect(detail.avgVsFleetUsdPerGal).toBeNull();
+      expect(detail.avgVsFleetPerUnit).toBeNull();
       expect(detail.favouredStations).toEqual({ stations: [], unresolvedStationStops: 0 });
       // The fleet is still the whole invoice, for the comparison a UI would draw.
-      expect(detail.fleet.avgBilledUsdPerGal).toBeCloseTo(3100 / 550, 10);
+      expect(detail.fleet.avgBilledPerUnit).toBeCloseTo(3100 / 550, 10);
     });
 
     it("a period with no invoice returns zeros for a real driver — not a 404", async () => {
-      const detail = await get<DriverDetail>(`/drivers/${ids.ann}?period=2026-04-01`);
+      const detail = await get<DriverDetail>(`/drivers/${ids.ann}?week=2026-04-07`);
 
       expect(detail.invoiceId).toBeNull();
       expect(detail.summary.stopCount).toBe(0);
-      expect(detail.fleet).toEqual({ avgBilledUsdPerGal: null, gallons: 0, stopCount: 0 });
+      expect(detail.fleet).toEqual({ avgBilledPerUnit: null, qty: 0, stopCount: 0 });
     });
 
     it("404s a well-formed id that names no driver, and a malformed one, as problem+json", async () => {
       for (const id of [UNKNOWN_UUID, "not-a-uuid"]) {
-        const response = await app.handle(new Request(`http://localhost/api/v1/drivers/${id}?period=2026-03-01`));
+        const response = await app.handle(new Request(`http://localhost/api/v1/drivers/${id}?week=2026-03-07`));
         expect(response.status).toBe(404);
         expect(response.headers.get("content-type")).toBe("application/problem+json");
       }
@@ -344,17 +344,17 @@ describe.skipIf(!hasDatabase)("GET /drivers, /drivers/{id} (integration)", () =>
         lines: [{ code: "TA", gallons: 100, billed: 6 }],
       });
 
-      const { history } = await get<DriverDetail>(`/drivers/${ids.ann}?period=2026-03-01`);
+      const { history } = await get<DriverDetail>(`/drivers/${ids.ann}?week=2026-03-07`);
 
-      expect(history.map((h) => h.period)).toEqual(["2026-02-01", "2026-03-01"]);
+      expect(history.map((h) => h.week)).toEqual(["2026-02-07", "2026-03-07"]);
       expect(history[0]).toMatchObject({
         stopCount: 1,
         receiptCompliance: { confirmed: 1, total: 1, pct: 100 },
       });
-      expect(history[0]!.avgBilledUsdPerGal).toBeCloseTo(4, 10);
-      expect(history[0]!.fleetAvgBilledUsdPerGal).toBeCloseTo(5, 10);
-      expect(history[1]!.avgBilledUsdPerGal).toBeCloseTo(5.2, 10);
-      expect(history[1]!.fleetAvgBilledUsdPerGal).toBeCloseTo(3100 / 550, 10);
+      expect(history[0]!.avgBilledPerUnit).toBeCloseTo(4, 10);
+      expect(history[0]!.fleetAvgBilledPerUnit).toBeCloseTo(5, 10);
+      expect(history[1]!.avgBilledPerUnit).toBeCloseTo(5.2, 10);
+      expect(history[1]!.fleetAvgBilledPerUnit).toBeCloseTo(3100 / 550, 10);
     });
   });
 });
@@ -405,7 +405,7 @@ describe.skipIf(!hasDatabase)("favoured stations: deterministic ties (integratio
       lines: [{ code: "TA", gallons: 10, billed: 5 }],
     });
 
-    const response = await app.handle(new Request(`http://localhost/api/v1/drivers/${eve}?period=2026-05-01`));
+    const response = await app.handle(new Request(`http://localhost/api/v1/drivers/${eve}?week=2026-05-07`));
     const { favouredStations } = (await response.json()) as DriverDetail;
 
     expect(favouredStations.stations.map((s) => s.station.nameRaw)).toEqual(["LOVES #10", "LOVES #20"]);
@@ -422,7 +422,7 @@ describe.skipIf(!hasDatabase)("favoured stations: deterministic ties (integratio
     await insertStop(scopedPool, { invoiceId: invoice, cardId: card, driverId: fay, stationId: small, occurredAt: "2026-06-02T15:00:00Z", lines: [{ code: "TA", gallons: 20, billed: 5 }] });
     await insertStop(scopedPool, { invoiceId: invoice, cardId: card, driverId: fay, stationId: big, occurredAt: "2026-06-02T18:00:00Z", lines: [{ code: "TA", gallons: 90, billed: 5 }] });
 
-    const response = await app.handle(new Request(`http://localhost/api/v1/drivers/${fay}?period=2026-06-01`));
+    const response = await app.handle(new Request(`http://localhost/api/v1/drivers/${fay}?week=2026-06-07`));
     const { favouredStations } = (await response.json()) as DriverDetail;
 
     expect(favouredStations.stations.map((s) => s.station.nameRaw)).toEqual(["LOVES #2", "LOVES #1"]);
@@ -440,7 +440,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("driver and truck rollups on 99
   let scopedPool: Pool;
   let schema: string;
   let app: App;
-  let period: string;
+  let week: string;
 
   beforeEach(async () => {
     ({ adminPool, scopedPool, schema } = await scopedSchema("test_rollups_999210", realMigrationsDir));
@@ -451,7 +451,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("driver and truck rollups on 99
     logSpy.mockRestore();
     errorSpy.mockRestore();
     expect(exitCode).toBe(0);
-    period = (await scopedPool.query<{ p: string }>("SELECT to_char(period_start, 'YYYY-MM-DD') AS p FROM invoices")).rows[0]!.p;
+    week = (await scopedPool.query<{ p: string }>("SELECT to_char(billing_week_end, 'YYYY-MM-DD') AS p FROM invoices")).rows[0]!.p;
   });
 
   afterEach(async () => {
@@ -465,51 +465,51 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("driver and truck rollups on 99
   }
 
   it("the driver fleet is the whole invoice: 66 stops, 8,733.11 diesel gallons, 174.43 DEF, weighted average 5.55", async () => {
-    const { fleet } = await get<DriversResult>(`/drivers?period=${period}`);
+    const { fleet } = await get<DriversResult>(`/drivers?week=${week}`);
 
     expect(fleet.stopCount).toBe(66);
-    expect(fleet.gallons).toBe(8733.11);
-    expect(fleet.defGallons).toBe(174.43);
-    expect(fleet.avgBilledUsdPerGal!.toFixed(2)).toBe("5.55");
+    expect(fleet.qty).toBe(8733.11);
+    expect(fleet.defQty).toBe(174.43);
+    expect(fleet.avgBilledPerUnit!.toFixed(2)).toBe("5.55");
   });
 
   it("driver rows plus the unresolved bucket reconcile to the fleet — no stop, dollar or gallon is lost", async () => {
-    const { rows, unresolved, fleet } = await get<DriversResult>(`/drivers?period=${period}`);
+    const { rows, unresolved, fleet } = await get<DriversResult>(`/drivers?week=${week}`);
 
     expect(rows.reduce((s, r) => s + r.stopCount, 0) + unresolved.stopCount).toBe(fleet.stopCount);
-    expect(rows.reduce((s, r) => s + r.totalUsd, 0) + unresolved.totalUsd).toBeCloseTo(fleet.totalUsd, 2);
-    expect(rows.reduce((s, r) => s + r.gallons, 0) + unresolved.gallons).toBeCloseTo(fleet.gallons, 2);
+    expect(rows.reduce((s, r) => s + r.total, 0) + unresolved.total).toBeCloseTo(fleet.total, 2);
+    expect(rows.reduce((s, r) => s + r.qty, 0) + unresolved.qty).toBeCloseTo(fleet.qty, 2);
   });
 
   it("truck rows plus the unresolved bucket reconcile to the same fleet", async () => {
-    const drivers = await get<DriversResult>(`/drivers?period=${period}`);
-    const { rows, unresolved, fleet } = await get<TrucksResult>(`/trucks?period=${period}`);
+    const drivers = await get<DriversResult>(`/drivers?week=${week}`);
+    const { rows, unresolved, fleet } = await get<TrucksResult>(`/trucks?week=${week}`);
 
     expect(rows.reduce((s, r) => s + r.stopCount, 0) + unresolved.stopCount).toBe(66);
     // The same figures grouped two ways: identical up to float summation order.
-    const { avgBilledUsdPerGal, defRatio, ...exact } = fleet;
-    const { avgBilledUsdPerGal: driverAvg, defRatio: driverDefRatio, ...driverExact } = drivers.fleet;
+    const { avgBilledPerUnit, defRatio, ...exact } = fleet;
+    const { avgBilledPerUnit: driverAvg, defRatio: driverDefRatio, ...driverExact } = drivers.fleet;
     expect(exact).toEqual(driverExact);
-    expect(avgBilledUsdPerGal).toBeCloseTo(driverAvg!, 10);
+    expect(avgBilledPerUnit).toBeCloseTo(driverAvg!, 10);
     expect(defRatio).toBeCloseTo(driverDefRatio!, 10);
   });
 
   it("the biggest spender is the same driver, at the same dollars, as the Overview's top-spend list", async () => {
-    const list = await get<DriversResult>(`/drivers?period=${period}`);
-    const overview = await get<OverviewResult>(`/overview?period=${period}`);
+    const list = await get<DriversResult>(`/drivers?week=${week}`);
+    const overview = await get<OverviewResult>(`/overview?week=${week}`);
     const top = overview.topSpendByDriver.find((d) => d.driverId !== null)!;
     const row = list.rows.find((r) => r.driver.id === top.driverId)!;
 
-    expect(row.totalUsd).toBe(top.totalUsd);
-    expect(row.gallons).toBe(top.gallons);
-    expect(row.avgBilledUsdPerGal).toBeCloseTo(top.avgBilledUsdPerGal!, 10);
+    expect(row.total).toBe(top.total);
+    expect(row.qty).toBe(top.qty);
+    expect(row.avgBilledPerUnit).toBeCloseTo(top.avgBilledPerUnit!, 10);
   });
 
   it("a driver's detail matches their list row", async () => {
-    const list = await get<DriversResult>(`/drivers?period=${period}`);
+    const list = await get<DriversResult>(`/drivers?week=${week}`);
     const busiest = list.rows.find((r) => r.stopCount > 0)!;
 
-    const detail = await get<DriverDetail>(`/drivers/${busiest.driver.id}?period=${period}`);
+    const detail = await get<DriverDetail>(`/drivers/${busiest.driver.id}?week=${week}`);
 
     const { driver: _driver, ...rollup } = busiest;
     expect(detail.summary).toEqual(rollup);

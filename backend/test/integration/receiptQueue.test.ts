@@ -35,8 +35,8 @@ interface SeedIds {
  */
 async function seed(pool: Pool): Promise<SeedIds> {
   await pool.query(
-    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-     VALUES ('T35-TEST', '2026-02-01', '2026-02-07', '2026-02-08', '2026-02-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
+    `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ('T35-TEST', '2026-02-01', '2026-02-07', '2026-02-07', '2026-02-08', '2026-02-09', 'USD', 'gal', 0, 'imported', repeat('0', 64))`,
   );
   const invoiceId = (
     await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = 'T35-TEST'")
@@ -143,7 +143,7 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
         driver: { resolved: string | null; raw: string; agrees: boolean | null };
         truck: { resolved: string | null; raw: string; agrees: boolean | null };
         station: unknown;
-        totalUsd: number;
+        total: number;
         receiptStatus: string;
       }>;
       progress: { done: number; total: number };
@@ -157,7 +157,7 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     const item = body.items.find((i) => i.id === ids.stopA1)!;
     expect(item.driver.resolved).toBe("DRIVER A");
     expect(item.truck.resolved).toBe("201");
-    expect(item.totalUsd).toBe(100);
+    expect(item.total).toBe(100);
     expect(item.receiptStatus).toBe("pending");
 
     expect(body.progress).toEqual({ done: 1, total: 5 }); // stopBConfirmed is the one "done" stop

@@ -1,4 +1,4 @@
-import type { ReceiptStatus } from "../db/types.js";
+import type { InvoiceCurrency, ReceiptStatus } from "../db/types.js";
 
 /**
  * A8.3's filters. Every field is optional and they compose with `AND` —
@@ -11,16 +11,15 @@ export interface TransactionFilters {
   /** Inclusive upper bound on `fuel_stops.occurred_at`. */
   dateTo?: Date;
   /**
-   * `fuel_stops.invoice_id` — how the shell's period selector (A7) scopes
-   * this screen, the same `invoice_id` join every sibling actuals query
-   * (`overview.ts`, `drivers.ts`, `otherCharges.ts`) filters on, rather than
-   * reconstructing the period as a `dateFrom`/`dateTo` pair client-side.
-   * Resolved from `?period=` at the route boundary (T-40); `null` means the
-   * period matched no invoice, which must return zero rows rather than the
-   * unfiltered set — `fs.invoice_id = ?` with a `null` param does exactly
-   * that (`x = NULL` is never true), so no special-casing is needed here.
+   * A billing week's end (D26), `YYYY-MM-DD` — how the shell's week selector
+   * (A7) scopes this screen: the stops of whichever invoices have that
+   * `billing_week_end`, rather than a client-reconstructed `dateFrom`/`dateTo`
+   * pair. A week with no invoice matches no row, never the unfiltered set.
+   * Needs the `invoices i` join the queries in `transactions.ts` make.
    */
-  invoiceId?: string | null;
+  week?: string;
+  /** One side of the week (`invoices.currency`); omitted, both sides. */
+  currency?: InvoiceCurrency;
   driverId?: string;
   truckId?: string;
   cardId?: string;
@@ -48,7 +47,8 @@ export interface TransactionFilterClause {
 }
 
 /**
- * Builds a parameterised WHERE clause from A8.3's filters (D1: no value is
+ * Builds a parameterised WHERE clause from A8.3's filters, over `fuel_stops fs`
+ * joined to `invoices i` (D1: no value is
  * ever interpolated into SQL text — every value lands in `params`, referenced
  * back by a `$n` placeholder). Every filter is optional and they compose with
  * `AND`.
@@ -79,8 +79,11 @@ export function buildTransactionFilterClause(
   if (filters.dateTo !== undefined) {
     add("fs.occurred_at <= ?", filters.dateTo);
   }
-  if (filters.invoiceId !== undefined) {
-    add("fs.invoice_id = ?", filters.invoiceId);
+  if (filters.week !== undefined) {
+    add("i.billing_week_end = ?::date", filters.week);
+  }
+  if (filters.currency !== undefined) {
+    add("i.currency = ?", filters.currency);
   }
   if (filters.driverId !== undefined) {
     add("fs.driver_id = ?", filters.driverId);

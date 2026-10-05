@@ -151,6 +151,11 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
 
   // ─── Step 25.2: invoice layer ───────────────────────────────────────────
 
+  // Each helper invoice gets its own billing week: one imported invoice per
+  // currency and week is the rule (invoices_billing_week_currency), and these
+  // tests make several of one currency.
+  let weekSeq = 0;
+
   async function insertInvoice(
     invoiceNumber: string,
     fileSha256: string,
@@ -160,11 +165,11 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
   ): Promise<string> {
     const { rows } = await scopedPool.query<{ id: string }>(
       `INSERT INTO invoices
-         (invoice_number, period_start, period_end, invoice_date, due_date,
+         (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date,
           currency, qty_unit, grand_total, status, file_sha256)
-       VALUES ($1, '2026-09-03', '2026-09-09', '2026-09-10', '2026-09-11', $4, $5, 50929.71, $3, $2)
+       VALUES ($1, '2026-09-03', '2026-09-09', DATE '2026-09-09' + $6::int, '2026-09-10', '2026-09-11', $4, $5, 50929.71, $3, $2)
        RETURNING id`,
-      [invoiceNumber, fileSha256, status, currency, qtyUnit],
+      [invoiceNumber, fileSha256, status, currency, qtyUnit, ++weekSeq],
     );
     const id = rows[0]?.id;
     if (!id) throw new Error("insertInvoice failed");

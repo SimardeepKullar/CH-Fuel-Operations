@@ -95,6 +95,14 @@ CREATE TABLE invoices (
   invoice_number  text NOT NULL UNIQUE,
   period_start    date NOT NULL,
   period_end      date NOT NULL,
+  -- D26: the week this invoice belongs to, so a US and a CA invoice for the
+  -- same week pair up even though their printed starts differ. Defaults at
+  -- import to the printed period_end; the Import screen can move it. The
+  -- printed start/end above stay as printed; actual_start/actual_end are the
+  -- first and last transaction's UTC date (NULL on a file with none).
+  billing_week_end date NOT NULL,
+  actual_start    date,
+  actual_end      date,
   invoice_date    date NOT NULL,
   due_date        date NOT NULL,
   currency        text NOT NULL CHECK (currency IN ('USD','CAD')),
@@ -105,6 +113,13 @@ CREATE TABLE invoices (
   file_sha256     char(64) NOT NULL UNIQUE,
   imported_at     timestamptz NOT NULL DEFAULT now()
 );
+
+-- Two imported invoices of one currency in one week is a 409, not a silent
+-- merge (D26). Imported only: a quarantined invoice has no child rows and
+-- must not claim a week from the invoice that replaces it.
+CREATE UNIQUE INDEX invoices_billing_week_currency
+  ON invoices (billing_week_end, currency)
+  WHERE status = 'imported';
 
 -- The reconciliation target: parsed rows sum to the printed grand total per
 -- product code (A8.2).

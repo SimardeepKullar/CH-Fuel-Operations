@@ -30,8 +30,8 @@ async function seedFuelStop(pool: Pool): Promise<Fixture> {
   const originalTruckId = originalTruckRows[0]!.id;
 
   const { rows: invoiceRows } = await pool.query<{ id: string }>(
-    `INSERT INTO invoices (invoice_number, period_start, period_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
-     VALUES ('re-resolve-test', '2026-09-01', '2026-09-07', '2026-09-08', '2026-09-09', 'USD', 'gal', 100.00, 'imported', repeat('a', 64))
+    `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date, currency, qty_unit, grand_total, status, file_sha256)
+     VALUES ('re-resolve-test', '2026-09-01', '2026-09-07', '2026-09-07', '2026-09-08', '2026-09-09', 'USD', 'gal', 100.00, 'imported', repeat('a', 64))
      RETURNING id`,
   );
 

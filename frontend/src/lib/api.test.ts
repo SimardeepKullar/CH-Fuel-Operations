@@ -144,11 +144,11 @@ describe("api client", () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ rows: [], page: 1, pageSize: 200, total: 0 }, 200));
     vi.stubGlobal("fetch", fetchMock);
 
-    await listTransactions({ period: "2026-09-03", anomalyOnly: true, includeLines: true, driverId: "d1" });
+    await listTransactions({ week: "2026-09-09", anomalyOnly: true, includeLines: true, driverId: "d1" });
 
     const url = new URL(fetchMock.mock.calls[0]![0] as string, "http://localhost");
     expect(url.pathname).toBe("/api/v1/transactions");
-    expect(url.searchParams.get("period")).toBe("2026-09-03");
+    expect(url.searchParams.get("week")).toBe("2026-09-09");
     expect(url.searchParams.get("anomalyOnly")).toBe("true");
     expect(url.searchParams.get("includeLines")).toBe("true");
     expect(url.searchParams.get("driverId")).toBe("d1");

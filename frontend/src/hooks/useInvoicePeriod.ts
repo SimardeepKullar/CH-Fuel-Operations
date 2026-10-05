@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { getHealth, listInvoices } from "../lib/api";
-import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
+import { getHealth, listPeriods } from "../lib/api";
+import type { PeriodInvoice, PeriodWeek } from "@ch/core/api/routes/periods";
 
 export interface InvoicePeriodOption {
-  /** `invoices.period_start`, `YYYY-MM-DD` — the value stored in the URL and
-   * the natural key `GET /overview?period=` etc. take (A13). */
+  /** A billing week's end, `YYYY-MM-DD` (D26) — the value stored in the URL
+   * and the key every period-scoped route takes as `?week=` (A13). */
   value: string;
   label: string;
   invoiceNumber: string;
@@ -37,27 +37,24 @@ function formatRange(periodStart: string, periodEnd: string): string {
     : `${month(start)} ${day(start)} – ${month(end)} ${day(end)}, ${year}`;
 }
 
-function toOption(row: InvoiceListItem): InvoicePeriodOption {
+function toOption(week: PeriodWeek, us: PeriodInvoice): InvoicePeriodOption {
   return {
-    value: row.periodStart,
-    label: `${row.invoiceNumber} · ${formatRange(row.periodStart, row.periodEnd)}`,
-    invoiceNumber: row.invoiceNumber,
+    value: week.weekEnd,
+    label: `${us.invoiceNumber} · ${formatRange(us.printedStart, us.printedEnd)}`,
+    invoiceNumber: us.invoiceNumber,
   };
 }
 
 /**
- * The shell's invoice-period selector (T-39 step 39.2, A7). Defaults to the
- * newest invoice (`GET /health`'s `latestInvoicePeriod` — `period_start`
- * order, immune to backfill import order, A16) and persists the choice in
- * the URL's `period` query param so a filtered Actuals/Analysis view is
- * linkable and survives a reload.
- *
- * `GET /invoices` has no `status`/`sort` query params yet (T-34 built only
- * `page`/`pageSize`), so the picker's list — `status: "imported"` only,
- * sorted by `periodStart` — is filtered and re-sorted here rather than in
- * SQL. A dedicated query param would be the better long-term shape once a
- * screen needs more than ~200 periods; noted rather than built now, per the
- * open question this ticket's kickoff prompt raised.
+ * The shell's invoice-period selector (T-39 step 39.2, A7), now over billing
+ * weeks (T-63, D26). The screens it governs still read the US side, so the
+ * list is the weeks that have a USD invoice — one option each, labelled with
+ * that invoice — until T-64 replaces this with a week selector and a US | CA
+ * switch. Defaults to the newest week (`GET /health`'s `latestInvoicePeriod`,
+ * immune to backfill import order, A16) when it has a US invoice, else the
+ * newest week that does, and persists the choice in the URL's `period` query
+ * param so a filtered Actuals/Analysis view is linkable and survives a reload.
+ * The value is a week end, whatever the param is still called.
  */
 export function useInvoicePeriod(): UseInvoicePeriodResult {
   const router = useRouter();
@@ -70,16 +67,19 @@ export function useInvoicePeriod(): UseInvoicePeriodResult {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([getHealth(), listInvoices({ pageSize: 200 })])
-      .then(([health, invoices]) => {
+    Promise.all([getHealth(), listPeriods()])
+      .then(([health, { weeks }]) => {
         if (cancelled) return;
-        setDefaultPeriod(health.latestInvoicePeriod);
-        // US invoices only until T-63 pairs US and CA invoices into
-        // billing weeks: the period-scoped endpoints read USD alone (T-61).
-        const imported = invoices.rows
-          .filter((row) => row.status === "imported" && row.currency === "USD")
-          .sort((a, b) => b.periodStart.localeCompare(a.periodStart));
-        setOptions(imported.map(toOption));
+        const usWeeks = weeks.flatMap((week) => {
+          const us = week.invoices.find((invoice) => invoice.currency === "USD");
+          return us ? [toOption(week, us)] : [];
+        });
+        setOptions(usWeeks);
+        setDefaultPeriod(
+          usWeeks.some((option) => option.value === health.latestInvoicePeriod)
+            ? health.latestInvoicePeriod
+            : (usWeeks[0]?.value ?? null),
+        );
       })
       .catch(() => {
         if (!cancelled) {
