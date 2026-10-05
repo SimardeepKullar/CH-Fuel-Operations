@@ -106,7 +106,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-60** | **Canadian stations from BVD's travel-centre directory** | T-08 | **11** | **done — merged (`13e7c88`, PR #14)** |
 | **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **done — merged (`22496c8`, PR #16)** |
 | **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **done — merged (`043eee2`, PR #15)** |
-| **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **done — PR pending** |
+| **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **done — merged (`7c008b0`, PR #17)** |
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **new** |
 | **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
 | **T-66** | **Bank of Canada exchange rate on the CA invoice** | T-61 | **11** | **new** |
