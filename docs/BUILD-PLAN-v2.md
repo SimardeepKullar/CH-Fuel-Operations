@@ -1294,13 +1294,13 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 **Tests.** `PATCH { fxCadPerUsd: 1.3712 }` on a CA invoice stores it and `fx_entered_at`; a second value replaces it; `null` clears both; on a USD invoice → 400; `0`, `-1`, `0.4`, `3.1`, a string → 400 with nothing changed; `{ billingWeekEnd, fxCadPerUsd }` together applies both or neither. `--fx-rate 1.3712` on a CA file stores it; on a USD file it fails before any row is written. The drift test sees the new columns in both migration sets.
 **Pass:** all, with no network.
 
-### Step 66.2 — Import screen: ask, show, correct
+### Step 66.2 — Overview: show, enter, correct
 
-**Goal.** The dispatcher enters the rate where the CA invoice arrives, and can fix it later.
+**Goal.** The dispatcher enters the week's rate on the Overview, and can fix it later. (The only place it is entered, for now; T-65 moves the field into the combined panel.)
 
-**Files.** Modified: `frontend/src/lib/api.ts`, `ReconciliationPreview.tsx`, `ImportHistory.tsx`, `import/page.tsx` (+ tests).
+**Files.** New: `frontend/src/components/ExchangeRateField.tsx`. Modified: `frontend/src/lib/api.ts`, `frontend/src/app/(app)/overview/page.tsx` (+ tests).
 
-**Tests.** A CA preview shows "Exchange rate (CAD per USD)"; entering 1.3712 calls `PATCH` with it; skipping calls nothing and the history row reads "rate pending". A CA history row shows its rate, and editing it calls `PATCH`; a 400 shows its reason on the row. A USD row has no rate field.
+**Tests.** A week with a CA invoice and no rate shows "Exchange rate (CAD per USD)" and "rate pending"; entering 1.3712 calls `PATCH /invoices/{caId}` with it and then shows 1.3712 and when it was entered, without a reload; editing it calls `PATCH` again; a 400 shows its reason beside the field. A US-only week shows no field. The Import screen shows no rate field.
 **Pass:** all.
 
 ### Step 66.3 — Money in the Transactions conversion
@@ -1309,7 +1309,7 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 
 **Files.** Modified: `backend/src/actuals/transactions.ts`, `backend/src/api/routes/transactions.ts` (`?convertTo=USD|CAD`), `frontend/src/lib/conversion.ts` (`conversionParams` adds `convertTo`), `TransactionsTable.tsx` (rate line, `ratePending` cells, the link to enter a missing rate), `docs/UI-DATA-CONTRACT.md` §9, `PROJECT-SCOPE-v2.md` D25 (+ tests).
 
-**Tests.** 999217's week with `convertTo=USD`: every money field and line (amount, pre-tax, HST, GST, PST, QST, total) = CAD ÷ rate, rounded once to the cent; prices to 4dp; the row carries `fx` and `invoiceCurrency`; a USD row is unchanged; no entered rate → money `null`, `ratePending: true`, never 1.0; a corrected rate changes the next read; the response-key walk still finds no `Usd`. Frontend: `USD/gal` on the CA invoice sends `convertTo=USD&units=imperial` and shows USD money with the rate and when it was entered; with no rate, "rate pending" and a link to Import history.
+**Tests.** 999217's week with `convertTo=USD`: every money field and line (amount, pre-tax, HST, GST, PST, QST, total) = CAD ÷ rate, rounded once to the cent; prices to 4dp; the row carries `fx` and `invoiceCurrency`; a USD row is unchanged; no entered rate → money `null`, `ratePending: true`, never 1.0; a corrected rate changes the next read; the response-key walk still finds no `Usd`. Frontend: `USD/gal` on the CA invoice sends `convertTo=USD&units=imperial` and shows USD money with the rate and when it was entered; with no rate, "rate pending" and a link to that week's Overview.
 **Pass:** all; `npm run verify` green.
 
 ---
