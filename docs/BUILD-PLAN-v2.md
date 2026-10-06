@@ -1303,29 +1303,38 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 **Tests.** Fake provider: CA import stores rate, date, source; USD import stores nulls; a failing provider still imports; `POST /invoices/{id}/fx-rate` fills a null and is a no-op on a stored rate.
 **Pass:** all.
 
+### Step 66.3 — Money in the Transactions conversion
+
+**Goal.** T-64's `USD/gal` | `CAD/L` control converts money too, at the stored rate.
+
+**Files.** Modified: `backend/src/actuals/transactions.ts`, `backend/src/api/routes/transactions.ts` (`?convertTo=USD|CAD`), `frontend/src/lib/conversion.ts` (`conversionParams` adds `convertTo`), `TransactionsTable.tsx` (rate line, `ratePending` cells), `docs/UI-DATA-CONTRACT.md` §9, `PROJECT-SCOPE-v2.md` D25 (+ tests).
+
+**Tests.** 999217's week with `convertTo=USD`: every money field and line (amount, pre-tax, HST, GST, PST, QST, total) = CAD ÷ rate, rounded once to the cent; prices to 4dp; the row carries `fx` and `invoiceCurrency`; a USD row is unchanged; no stored rate → money `null`, `ratePending: true`, never 1.0; the response-key walk still finds no `Usd`. Frontend: `USD/gal` on the CA invoice sends `convertTo=USD&units=imperial` and shows USD money with the rate and its date; the "rate pending" note shows only for a `ratePending` row.
+**Pass:** all; `npm run verify` green.
+
 ---
 
 ## T-64 · Week selector, "Invoices in view", Transactions in native units
 
 ### Step 64.1 — Week selector and context
 
-**Files.** New: `WeekSelector.tsx` (+ test). Modified: `TopBar.tsx`, the period context hook. Removed: `InvoicePeriodSelector.tsx`.
+**Files.** New: `WeekSelector.tsx`, `hooks/useWeek.tsx` (the shell's week context, mounted in the `(app)` layout), `lib/weeks.ts` (+ tests). Modified: `TopBar.tsx`, `(app)/layout.tsx`. Removed: `InvoicePeriodSelector.tsx`, `useInvoicePeriod.ts`.
 
 **Tests.** Options read "Week ending Sep 9, 2026 · 🇺🇸 999210 · 🇨🇦 999217"; a one-sided week shows "🇨🇦 —"; ⚠ on `datesDiffer`; navigation does not refetch `/periods` (T-39's rule).
 **Pass:** all.
 
-### Step 64.2 — "Invoices in view" strip and the US | CA switch
+### Step 64.2 — "Invoices in view" strip as the invoice picker
 
-**Files.** New: `InvoicesInView.tsx`, `CurrencySideSwitch.tsx` (+ tests).
+**Files.** New: `InvoicesInView.tsx`, `hooks/useInvoiceInView.ts` (+ tests).
 
-**Tests.** Chip states (in view, not in view, not imported, ⚠ tooltip text); a chip links to that invoice in Import history; the switch defaults to US on every mount and disables a missing side.
+**Tests.** Chip states (in view, not in view, not imported, ⚠ tooltip text); a chip opens that invoice on Transactions (`?invoice=<id>`), "All invoices" (`?invoice=all`) appears only for a two-invoice week; on Transactions a chip keeps the filters; a screen that reads no invoice dims nothing.
 **Pass:** all.
 
 ### Step 64.3 — Transactions in native units
 
-**Files.** Modified: `transactions/page.tsx`, `TransactionsTable.tsx`, `StopExpansion` (+ tests).
+**Files.** New: `ConversionToggle.tsx`, `lib/conversion.ts` (+ tests). Modified: `transactions/page.tsx`, `TransactionsTable.tsx`, `StopExpansion` (+ tests).
 
-**Tests.** CA: L and CAD/L by default, gallons and CAD/gal after the toggle, money identical; US: the reverse. Every money header carries its currency. A CA stop's detail shows Pre-tax, HST, GST, PST, QST and Final. The strip highlights only the invoice whose rows are shown — asserted against the request made.
+**Tests.** Each invoice opens as it came in (CA: L and CAD/L; US: gal and USD/gal) with no `units`; `USD/gal` on the CA invoice asks for `units=imperial` and keeps money in CAD with "rate pending" (money converts in T-66); `CAD/L` on the US invoice asks for `units=metric`; choosing the invoice's own format sends nothing; the choice applies under All invoices and does not carry over to another invoice, or back. Every money header carries its currency; under All invoices no total adds litres to gallons or CAD to USD. A CA stop's detail shows Pre-tax, HST, GST, PST, QST and Final. The strip highlights exactly the invoices whose rows are shown — asserted against the request made.
 **Pass:** all.
 
 ### Step 64.4 — Import screen: mismatch note and week override

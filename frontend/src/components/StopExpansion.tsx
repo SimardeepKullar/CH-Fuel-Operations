@@ -1,5 +1,5 @@
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
-import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../lib/formatMoney";
+import { QTY_UNIT_NAMES, formatMoney, formatPricePerUnit, formatQty2dp, sumMoney } from "../lib/formatMoney";
 import { productLabel } from "../lib/transactionFilterConstants";
 import RawResolved from "./RawResolved";
 
@@ -27,16 +27,19 @@ interface StopExpansionProps {
    * it to overlap), is the equivalent, deterministic check.
    */
   stacked?: boolean;
-  /** The page's scoping invoice number (`useInvoicePeriod`'s own
-   * `invoiceNumber`, A7) — every row already belongs to the one invoice the
-   * top bar has selected, so this is passed down rather than re-derived per
-   * stop. `null` while loading. */
+  /** The number of the invoice on the side the page is reading (the selected
+   * week's USD or CAD invoice, A7/D28) — every row already belongs to it, so it
+   * is passed down rather than re-derived per stop. `null` while loading. */
   invoiceNumber?: string | null;
 }
 
 /**
  * A stop's expanded detail (T-40 step 40.2, A8.3): every product line and an
- * "unmissable" stop total. The total shown is `stop.totalUsd` — the stored,
+ * "unmissable" stop total. A CA stop (D28) also lays each line's tax out —
+ * Pre-tax, HST, GST, PST, QST and Final side by side — since BVD bills the 13%
+ * HST on top of the per-litre price and the dispatcher needs both figures.
+ * Money keeps the stop's own currency and quantities its own unit throughout;
+ * nothing here converts. The total shown is `stop.total` — the stored,
  * authoritative figure (CLAUDE.md: a stored total stays authoritative over
  * a recomputation) — not a client-side re-sum of `lines`, though the two
  * always agree in real data (`transactions.test.ts`'s own $255.13 case).
@@ -50,36 +53,86 @@ interface StopExpansionProps {
  */
 export default function StopExpansion({ stop, stacked = false, invoiceNumber = null }: StopExpansionProps) {
   const lines = stop.lines ?? [];
+  const { currency } = stop;
+  const unit = lines[0]?.qtyUnit ?? stop.qtyUnit;
+  const perUnit = unit === "L" ? "/L" : "/gal";
+  const showTax = currency === "CAD";
+  const rowClass = showTax ? " stop-expansion-line-row-tax" : "";
+  // A line BVD printed no Pre Tax AMT for (Scale, Manual, Express) makes the
+  // column's sum meaningless — "—", not a total that leaves that line out.
+  const preTaxKnown = lines.length > 0 && lines.every((line) => line.preTaxAmount !== null);
+  const taxTotal = (pick: (line: (typeof lines)[number]) => number) => formatMoney(sumMoney(lines.map(pick)), currency);
 
   return (
     <div className={`stop-expansion${stacked ? " stop-expansion-stacked" : ""}`} data-testid="stop-expansion">
       <div className="stop-expansion-lines">
-        <div className="stop-expansion-line-row stop-expansion-lines-head">
+        <div className={`stop-expansion-line-row stop-expansion-lines-head${rowClass}`}>
           <span>Cd</span>
           <span>Product</span>
-          <span className="num">Gallons</span>
-          <span className="num">Retail</span>
-          <span className="num">Billed</span>
-          <span className="num">Amount</span>
+          <span className="num">{QTY_UNIT_NAMES[unit]}</span>
+          <span className="num">{`Retail ${currency}${perUnit}`}</span>
+          <span className="num">{`Billed ${currency}${perUnit}`}</span>
+          {showTax ? (
+            <>
+              <span className="num">{`Pre-tax ${currency}`}</span>
+              <span className="num">{`HST ${currency}`}</span>
+              <span className="num">{`GST ${currency}`}</span>
+              <span className="num">{`PST ${currency}`}</span>
+              <span className="num">{`QST ${currency}`}</span>
+              <span className="num">{`Final ${currency}`}</span>
+            </>
+          ) : (
+            <span className="num">{`Amount ${currency}`}</span>
+          )}
         </div>
         {lines.map((line) => (
-          <div className="stop-expansion-line-row stop-expansion-line" key={line.productCode}>
+          <div className={`stop-expansion-line-row stop-expansion-line${rowClass}`} key={line.productCode}>
             <span className="mono">{line.productCode}</span>
             <span className="stop-expansion-line-label">{productLabel(line.productCode)}</span>
-            <span className="num">{formatGallons2dp(line.qty)}</span>
-            <span className="num muted">{formatPricePerGal(line.retailPerUnit)}</span>
-            <span className="num stop-expansion-line-billed">{formatPricePerGal(line.billedPerUnit)}</span>
-            <span className="num">{formatMoneyUsd(line.amount)}</span>
+            <span className="num">{formatQty2dp(line.qty)}</span>
+            <span className="num muted">{formatPricePerUnit(line.retailPerUnit, line.currency)}</span>
+            <span className="num stop-expansion-line-billed">{formatPricePerUnit(line.billedPerUnit, line.currency)}</span>
+            {showTax ? (
+              <>
+                <span className="num">{line.preTaxAmount === null ? "—" : formatMoney(line.preTaxAmount, line.currency)}</span>
+                <span className="num">{formatMoney(line.hst, line.currency)}</span>
+                <span className="num">{formatMoney(line.gst, line.currency)}</span>
+                <span className="num">{formatMoney(line.pst, line.currency)}</span>
+                <span className="num">{formatMoney(line.qst, line.currency)}</span>
+                <span className="num">{formatMoney(line.amount, line.currency)}</span>
+              </>
+            ) : (
+              <span className="num">{formatMoney(line.amount, line.currency)}</span>
+            )}
           </div>
         ))}
-        <div className="stop-expansion-line-row stop-expansion-total">
+        <div className={`stop-expansion-line-row stop-expansion-total${rowClass}`}>
           <span />
           <span className="stop-expansion-total-label">Stop total</span>
-          <span className="num muted">{stop.qty === null ? "—" : formatGallons2dp(stop.qty)}</span>
+          <span className="num muted">{stop.qty === null ? "—" : formatQty2dp(stop.qty)}</span>
           <span />
           <span />
+          {showTax && (
+            <>
+              <span className="num muted" data-testid="stop-pretax">
+                {preTaxKnown ? formatMoney(sumMoney(lines.map((line) => line.preTaxAmount ?? 0)), currency) : "—"}
+              </span>
+              <span className="num muted" data-testid="stop-hst">
+                {taxTotal((line) => line.hst)}
+              </span>
+              <span className="num muted" data-testid="stop-gst">
+                {taxTotal((line) => line.gst)}
+              </span>
+              <span className="num muted" data-testid="stop-pst">
+                {taxTotal((line) => line.pst)}
+              </span>
+              <span className="num muted" data-testid="stop-qst">
+                {taxTotal((line) => line.qst)}
+              </span>
+            </>
+          )}
           <span className="num stop-expansion-total-value" data-testid="stop-total">
-            {formatMoneyUsd(stop.total)}
+            {formatMoney(stop.total, currency)}
           </span>
         </div>
       </div>

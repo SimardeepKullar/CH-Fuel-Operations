@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { OverviewResult } from "@ch/core/actuals/overview";
 import { getOverview } from "../../../lib/api";
-import { useInvoicePeriod } from "../../../hooks/useInvoicePeriod";
+import { usePublishInView, useWeek } from "../../../hooks/useWeek";
+import { invoiceOnSide } from "../../../lib/weeks";
 import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../../../lib/formatMoney";
 import KpiCard from "../../../components/KpiCard";
 import BilledPriceTrend from "../../../components/BilledPriceTrend";
@@ -14,15 +15,19 @@ import Corners from "../../../components/Corners";
 
 /**
  * A8.1 (T-41) — the whole landing screen behind one call, `GET
- * /overview?period=` (T-33). The effect depends on `period` alone, not
- * `useInvoicePeriod`'s own `loading` flag: once `period` resolves to a real
- * value it does not change again just because that hook's background
- * `getHealth`/`listInvoices` calls finish later, so keying off it too would
- * fire this screen's fetch a second time for the same period (DoD: exactly
- * one API call).
+ * /overview?week=` (T-33). The effect depends on `week` alone, not
+ * `useWeek`'s own `loading` flag: once `week` resolves to a real value it does
+ * not change again just because the shell's background `getHealth`/`listPeriods`
+ * calls finish later, so keying off it too would fire this screen's fetch a
+ * second time for the same week (DoD: exactly one API call).
+ *
+ * `/overview` serves the US side alone until T-65 shapes the CA and combined
+ * panels, so the screen tells the "Invoices in view" strip its figures are the US invoice's.
  */
 export default function OverviewPage() {
-  const { period, loading: periodLoading } = useInvoicePeriod();
+  const { week: period, loading: periodLoading, weekEntry } = useWeek();
+  const usInvoiceId = invoiceOnSide(weekEntry, "USD")?.id ?? null;
+  usePublishInView(weekEntry === null ? null : usInvoiceId === null ? [] : [usInvoiceId]);
   const [result, setResult] = useState<OverviewResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -141,7 +146,7 @@ export default function OverviewPage() {
 
       <div className="panel-card blueprint overview-anomaly-panel">
         <Corners />
-        <AnomalyDigest items={anomalyDigest} period={period} />
+        <AnomalyDigest items={anomalyDigest} week={period} />
       </div>
     </div>
   );

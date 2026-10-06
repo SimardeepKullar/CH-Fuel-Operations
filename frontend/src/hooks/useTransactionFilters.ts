@@ -33,8 +33,8 @@ export interface UseTransactionFiltersResult {
 
 /**
  * A8.3's filters, round-tripped through the URL's query string (T-40 DoD:
- * "every filter round-trips ... so a filtered view is linkable"). `period`
- * is deliberately not one of these keys — that's `useInvoicePeriod`'s own
+ * "every filter round-trips ... so a filtered view is linkable"). `week`
+ * is deliberately not one of these keys — that's the shell's week context's own
  * param (A7), read/written independently; both hooks preserve whatever
  * params the other owns by reading `searchParams` fresh on every write.
  */

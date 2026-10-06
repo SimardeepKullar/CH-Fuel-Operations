@@ -192,6 +192,64 @@
   background: var(--color-control-bg);
   cursor: pointer;
 }
+/* — "Invoices in view" strip (T-64): one chip per side of the selected week — */
+.invoices-in-view {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 22px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+}
+.invoices-in-view-label {
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a4abb9;
+  white-space: nowrap;
+}
+.invoice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font: 600 12px var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent-800);
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.invoice-chip { cursor: pointer; }
+a.invoice-chip:hover { background: var(--color-accent-100); }
+.invoice-chip[data-state="in-view"] {
+  background: var(--color-accent-100);
+  border-color: var(--color-accent);
+}
+.invoice-chip[data-state="not-in-view"] { opacity: 0.5; }
+.invoice-chip[data-state="not-imported"] {
+  color: var(--color-muted);
+  background: var(--color-bg);
+  font-weight: 400;
+}
+.invoice-chip-warn { color: var(--color-amber); cursor: help; }
+
+/* — USD/gal | CAD/L conversion toggle (T-64) — */
+.side-switch { display: inline-flex; border: 1px solid var(--color-control-border); border-radius: var(--radius-md); overflow: hidden; }
+.side-switch-option {
+  padding: 5px 12px;
+  border: 0;
+  background: var(--color-control-bg);
+  font: 600 12.5px var(--font-body);
+  color: var(--color-control-fg);
+  cursor: pointer;
+}
+.side-switch-option + .side-switch-option { border-left: 1px solid var(--color-control-border); }
+.side-switch-option.active { background: var(--color-accent-800); color: #fff; }
+.tx-conversion-pending { color: #8a5a00; }
+
 .topbar-standing {
   display: flex;
   align-items: center;
@@ -982,6 +1040,7 @@ select.input { width: 100%; }
    TRANSACTIONS (T-40, A8.3)
    =========================================================================== */
 .tx-page { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px 22px 26px; }
+.tx-side-bar { display: flex; align-items: center; gap: 12px; }
 .tx-toolbar { background: var(--color-surface); border: 1px solid var(--color-border); border-top: 2px solid var(--color-accent); }
 .tx-toolbar-row {
   display: flex;
@@ -1103,6 +1162,18 @@ select.tx-filter-select {
 .tx-datetime { display: flex; flex-direction: column; gap: 1px; }
 .tx-date { font: 600 12px var(--font-body); color: var(--color-accent-800); }
 .tx-time { font: 400 10.5px var(--font-mono); color: #a4abb9; }
+.tx-invoice-tag {
+  margin-top: 2px;
+  width: fit-content;
+  padding: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: 600 10px var(--font-mono);
+  color: var(--color-label);
+  white-space: nowrap;
+}
+.tx-invoice-tag[data-currency="CAD"] { background: #fdeeee; border-color: #f2c4c4; color: #8a2a2a; }
+.tx-invoice-tag[data-currency="USD"] { background: var(--color-accent-100); border-color: var(--color-accent-300); color: var(--color-accent-800); }
 .tx-card-cell { font: 400 11.5px var(--font-mono); color: var(--color-label); }
 .tx-station { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .tx-station-name { font: 600 12px var(--font-body); color: var(--color-accent-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1175,6 +1246,8 @@ select.tx-filter-select {
   grid-template-columns: 34px minmax(60px, 1fr) 86px 86px 86px 100px;
   align-items: center;
 }
+.stop-expansion-line-row-tax { grid-template-columns: 34px minmax(60px, 1fr) 76px 92px 92px 92px 82px 82px 82px 82px 100px; column-gap: 6px; }
+.stop-expansion-lines { overflow-x: auto; }
 .stop-expansion-lines-head {
   font: 600 9.5px var(--font-heading);
   letter-spacing: 0.11em;
@@ -1393,6 +1466,21 @@ select.tx-filter-select {
 .import-duplicate, .import-error { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 
 .import-history-table { display: flex; flex-direction: column; }
+.import-history-entry { border-bottom: 1px solid var(--color-divider); }
+.import-history-entry .import-history-row { border-bottom: none; }
+.import-history-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 0 0 8px;
+  font: 400 11.5px var(--font-body);
+  color: var(--color-label);
+}
+.import-history-note { color: #8a5a00; background: #fff6e0; border: 1px solid var(--color-amber); border-radius: 10px; padding: 1px 9px; }
+.import-history-week { display: inline-flex; align-items: center; gap: 8px; }
+.import-history-week-input { width: auto; height: 26px; min-height: 0; padding: 0 6px; font: 400 12px var(--font-body); }
+.import-history-error { flex-basis: 100%; color: var(--color-error); }
 .import-history-row {
   display: grid;
   grid-template-columns: 110px 1fr 100px 110px 160px;

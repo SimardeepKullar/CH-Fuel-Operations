@@ -15,7 +15,7 @@ import type { PriceSheetSummary } from "@ch/core/catalog/priceSheets";
 import type { BoundingBox, StationMapResolution, StationsPage } from "@ch/core/catalog/stations";
 import type { PlanListResult } from "@ch/core/planning/planPersistence";
 import type { HealthStatus } from "@ch/core/catalog/health";
-import type { ImportInvoiceResponse, InvoiceDetail, InvoiceListResult } from "@ch/core/api/routes/invoices";
+import type { ImportInvoiceResponse, InvoiceDetail, InvoiceListItem, InvoiceListResult } from "@ch/core/api/routes/invoices";
 import type { PeriodWeek } from "@ch/core/api/routes/periods";
 import type { ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { DriversResult } from "@ch/core/actuals/drivers";
@@ -158,6 +158,16 @@ export function listInvoices(params: { page?: number; pageSize?: number } = {}):
   return request<InvoiceListResult>(`/invoices${qs ? `?${qs}` : ""}`);
 }
 
+/** `PATCH /invoices/{id}` (T-63, D26) — moves an invoice to another billing week, the Import
+ * screen's override. Moving onto a week another imported invoice of the same currency holds is
+ * a 409 whose `detail` names that invoice; `ApiError` carries it. */
+export function patchInvoiceWeek(id: string, billingWeekEnd: string): Promise<InvoiceListItem> {
+  return request<InvoiceListItem>(`/invoices/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ billingWeekEnd }),
+  });
+}
+
 /** `GET /receipt-queue` — T-39's source for the sidebar's pending badge and
  * the top bar's standing "Receipts" count (both global, D17). */
 export function getReceiptQueue(): Promise<ReceiptQueueResult> {
@@ -167,8 +177,10 @@ export function getReceiptQueue(): Promise<ReceiptQueueResult> {
 export interface ListTransactionsParams {
   /** A billing week's end, `YYYY-MM-DD` (D26). */
   week?: string;
-  /** One side of the week; the server serves both when omitted, so a US screen says `USD`. */
+  /** One side of the week; the server serves both when omitted, so a screen reading one side says which. */
   currency?: "USD" | "CAD";
+  /** Converts quantities and per-unit prices (never money, D25); absent means as BVD printed them. */
+  units?: "imperial" | "metric";
   page?: number;
   pageSize?: number;
   sortField?: TransactionSortField;
@@ -203,9 +215,8 @@ export function listTransactions(params: ListTransactionsParams = {}): Promise<L
  * unscoped driver-roster endpoint exists (the truck equivalent is
  * `listTrucks`), so this is the reuse the endpoint was already built for
  * rather than a second one. */
-export function listDrivers(week: string): Promise<DriversResult> {
-  // The US side until T-64 adds the US | CA switch.
-  return request<DriversResult>(`/drivers?week=${encodeURIComponent(week)}&currency=USD`);
+export function listDrivers(week: string, currency: "USD" | "CAD"): Promise<DriversResult> {
+  return request<DriversResult>(`/drivers?week=${encodeURIComponent(week)}&currency=${currency}`);
 }
 
 /** `GET /overview?week=` — A8.1's whole landing screen in one call (T-41). */

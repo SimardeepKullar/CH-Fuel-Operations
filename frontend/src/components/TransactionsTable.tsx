@@ -8,9 +8,11 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import type { ReceiptStatus } from "@ch/core/db/types";
+import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "@ch/core/db/types";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
-import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../lib/formatMoney";
+import { QTY_UNIT_NAMES, formatMoney, formatPricePerUnit, formatQty2dp, sumMoney } from "../lib/formatMoney";
+import { moneyConversionPending, type DisplayChoice } from "../lib/conversion";
+import { SIDE_FLAGS, SIDE_LABELS } from "../lib/weeks";
 import {
   PRODUCT_OPTIONS,
   RECEIPT_STATUS_OPTIONS,
@@ -46,141 +48,186 @@ function isTypingTarget(el: EventTarget | null): boolean {
 
 const columnHelper = createColumnHelper<TransactionListItem>();
 
-const columns: ColumnDef<TransactionListItem, any>[] = [
-  // Rendered specially in the row loop below (it needs the live `expandedId`
-  // state, not just the row's own data) — this definition exists so the
-  // chevron still occupies a real TanStack column/cell slot.
-  columnHelper.display({ id: "chevron", header: "" }),
-  columnHelper.accessor("occurredAt", {
-    header: "Date · time",
-    cell: ({ getValue }) => {
-      const { date, time } = formatDateTime(getValue());
-      return (
-        <span className="tx-datetime">
-          <span className="tx-date">{date}</span>
-          <span className="tx-time">{time}</span>
+/** A per-unit header: `Billed CAD/L` when every row agrees; with rows in more than
+ * one currency (All invoices) the cells carry it (`US$`/`CA$`) and the header says
+ * only the unit, and with more than one unit, neither. */
+function perUnitHeader(prefix: string, currency: InvoiceCurrency | null, unit: InvoiceQtyUnit | null): string {
+  if (currency !== null) return `${prefix} ${currency}${unit === null ? " per unit" : `/${unit}`}`;
+  return `${prefix} per ${unit ?? "unit"}`;
+}
+
+/** Under All invoices, the tag under a row's date naming the invoice it came
+ * from and its country: `🇨🇦 999217`. A row carries its currency, and a week
+ * holds one imported invoice per currency (D26), so the currency names it. */
+function InvoiceTag({ currency, invoiceNumber }: { currency: InvoiceCurrency; invoiceNumber: string | null }) {
+  return (
+    <span className="tx-invoice-tag" data-currency={currency} data-testid="tx-invoice-tag">
+      <span role="img" aria-label={SIDE_LABELS[currency]}>
+        {SIDE_FLAGS[currency]}
+      </span>{" "}
+      {invoiceNumber ?? SIDE_LABELS[currency]}
+    </span>
+  );
+}
+
+/** The columns for the rows' currency and unit — `null` where the rows hold more
+ * than one. The money and per-unit headers carry both when they can (A6.1 as
+ * amended): a CA invoice reads `Litres`, `Billed CAD/L`, `Total CAD`. With
+ * `invoiceNumbers`, each row is tagged with its invoice (All invoices). */
+function buildColumns(
+  currency: InvoiceCurrency | null,
+  unit: InvoiceQtyUnit | null,
+  invoiceNumbers: Partial<Record<InvoiceCurrency, string>> | null,
+): ColumnDef<TransactionListItem, any>[] {
+  return [
+    // Rendered specially in the row loop below (it needs the live `expandedId`
+    // state, not just the row's own data) — this definition exists so the
+    // chevron still occupies a real TanStack column/cell slot.
+    columnHelper.display({ id: "chevron", header: "" }),
+    columnHelper.accessor("occurredAt", {
+      header: "Date · time",
+      cell: ({ row, getValue }) => {
+        const { date, time } = formatDateTime(getValue());
+        return (
+          <span className="tx-datetime">
+            <span className="tx-date">{date}</span>
+            <span className="tx-time">{time}</span>
+            {invoiceNumbers !== null && (
+              <InvoiceTag currency={row.original.currency} invoiceNumber={invoiceNumbers[row.original.currency] ?? null} />
+            )}
+          </span>
+        );
+      },
+    }),
+    columnHelper.accessor((row) => row.card.number, {
+      id: "card",
+      header: "Card",
+      cell: ({ getValue }) => <span className="tx-card-cell">{getValue()}</span>,
+    }),
+    columnHelper.display({
+      id: "driver",
+      header: "Driver",
+      cell: ({ row }) => <RawResolved value={row.original.driver} />,
+    }),
+    columnHelper.display({
+      id: "unit",
+      header: "Unit",
+      // The unit/truck field is operationally worth double-checking even when
+      // it agrees with the card assignment (a pump mistype is common) — the
+      // design shows it always paired with its raw text, unlike driver. The
+      // invoice unit (what was actually pumped) is primary here, not the
+      // assigned truck (a schedule expectation) — T-40E.
+      cell: ({ row }) => <RawResolved value={row.original.truck} showRawWhenAgreeing primary="raw" />,
+    }),
+    columnHelper.display({
+      id: "station",
+      header: "Station",
+      cell: ({ row }) => {
+        const station = row.original.station;
+        return (
+          <span className="tx-station">
+            <span className="tx-station-name">{station ? `Love's #${station.loveNumber ?? "?"}` : "Unresolved"}</span>
+            <span className="tx-station-place">{station ? `${station.city}, ${station.state}` : "—"}</span>
+          </span>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: "gallons",
+      header: unit === null ? "Quantity" : QTY_UNIT_NAMES[unit],
+      cell: ({ row }) => (
+        <span className="tx-gal">
+            {row.original.qty === null
+              ? "—"
+              : unit === null
+                ? `${formatQty2dp(row.original.qty)} ${row.original.qtyUnit}`
+                : formatQty2dp(row.original.qty)}
+          </span>
+      ),
+    }),
+    columnHelper.display({
+      id: "billed",
+      header: perUnitHeader("Billed", currency, unit),
+      cell: ({ row }) => (
+        <BilledPrice
+          billedPerUnit={row.original.billedPerUnit}
+          retailPerUnit={row.original.retailPerUnit}
+          currency={row.original.currency}
+        />
+      ),
+    }),
+    columnHelper.display({
+      id: "retail",
+      header: perUnitHeader("Retail", currency, unit),
+      cell: ({ row }) => (
+        <span className="muted">
+          {row.original.retailPerUnit === null ? "—" : formatPricePerUnit(row.original.retailPerUnit, row.original.currency)}
         </span>
-      );
-    },
-  }),
-  columnHelper.accessor((row) => row.card.number, {
-    id: "card",
-    header: "Card",
-    cell: ({ getValue }) => <span className="tx-card-cell">{getValue()}</span>,
-  }),
-  columnHelper.display({
-    id: "driver",
-    header: "Driver",
-    cell: ({ row }) => <RawResolved value={row.original.driver} />,
-  }),
-  columnHelper.display({
-    id: "unit",
-    header: "Unit",
-    // The unit/truck field is operationally worth double-checking even when
-    // it agrees with the card assignment (a pump mistype is common) — the
-    // design shows it always paired with its raw text, unlike driver. The
-    // invoice unit (what was actually pumped) is primary here, not the
-    // assigned truck (a schedule expectation) — T-40E.
-    cell: ({ row }) => <RawResolved value={row.original.truck} showRawWhenAgreeing primary="raw" />,
-  }),
-  columnHelper.display({
-    id: "station",
-    header: "Station",
-    cell: ({ row }) => {
-      const station = row.original.station;
-      return (
-        <span className="tx-station">
-          <span className="tx-station-name">{station ? `Love's #${station.loveNumber ?? "?"}` : "Unresolved"}</span>
-          <span className="tx-station-place">{station ? `${station.city}, ${station.state}` : "—"}</span>
-        </span>
-      );
-    },
-  }),
-  columnHelper.display({
-    id: "gallons",
-    header: "Gallons",
-    cell: ({ row }) => (
-      <span className="tx-gal">{row.original.qty === null ? "—" : formatGallons2dp(row.original.qty)}</span>
-    ),
-  }),
-  columnHelper.display({
-    id: "billed",
-    header: "Billed $/gal",
-    cell: ({ row }) => (
-      <BilledPrice billedUsdPerGal={row.original.billedPerUnit} retailUsdPerGal={row.original.retailPerUnit} />
-    ),
-  }),
-  columnHelper.display({
-    id: "retail",
-    header: "Retail",
-    cell: ({ row }) => (
-      <span className="muted">
-        {row.original.retailPerUnit === null ? "—" : formatPricePerGal(row.original.retailPerUnit)}
-      </span>
-    ),
-  }),
-  columnHelper.accessor("total", {
-    header: "Total USD",
-    cell: ({ getValue }) => <span className="tx-total">{formatMoneyUsd(getValue())}</span>,
-  }),
-  columnHelper.display({
-    id: "receipt",
-    header: "Rcpt",
-    cell: ({ row }) => {
-      const status = row.original.receiptStatus;
-      return (
-        <span className={`tx-receipt-mark ${status}`} title={RECEIPT_LABELS[status]}>
-          {RECEIPT_MARKS[status]}
-        </span>
-      );
-    },
-  }),
-  columnHelper.display({
-    id: "products",
-    header: "Products",
-    // Facts, not warnings — a badge per distinct product the stop carries,
-    // in `.anomaly-flag`'s visual language but neutral color (T-40C).
-    // `lines` is optional on the type even though `includeLines: true` is
-    // always requested for this list; no lines means no badges rather than
-    // a guess off the diesel-only `gallons` summary.
-    cell: ({ row }) => {
-      const lines = row.original.lines ?? [];
-      const seen = new Set<string>();
-      const distinct = lines.filter((line) => {
-        if (seen.has(line.productCode)) return false;
-        seen.add(line.productCode);
-        return true;
-      });
-      return (
-        <span className="tx-products">
-          {distinct.map((line) => (
-            <span key={line.productCode} className={`product-badge product-badge-${productBadgeVariant(line.productCode)}`}>
-              {productLabel(line.productCode)}
-            </span>
-          ))}
-        </span>
-      );
-    },
-  }),
-  columnHelper.display({
-    id: "flags",
-    header: "Flags",
-    // A charge-with-no-fuel stop (scale, cash, or otherwise) is a routine
-    // fact visible in the row's own line items, not an anomaly — the
-    // charges_no_fuel/"Scale" flag never renders here (T-40H, extending
-    // T-40G's Scale-badge-specific suppression to every case).
-    cell: ({ row }) => {
-      const flags = row.original.flags.filter((f) => f.rule !== "charges_no_fuel");
-      return (
-        <span className="tx-flags">
-          {flags.map((f) => (
-            <AnomalyFlag key={f.rule} flag={f} />
-          ))}
-        </span>
-      );
-    },
-  }),
-];
+      ),
+    }),
+    columnHelper.accessor("total", {
+      header: currency === null ? "Total" : `Total ${currency}`,
+      cell: ({ row }) => <span className="tx-total">{formatMoney(row.original.total, row.original.currency)}</span>,
+    }),
+    columnHelper.display({
+      id: "receipt",
+      header: "Rcpt",
+      cell: ({ row }) => {
+        const status = row.original.receiptStatus;
+        return (
+          <span className={`tx-receipt-mark ${status}`} title={RECEIPT_LABELS[status]}>
+            {RECEIPT_MARKS[status]}
+          </span>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: "products",
+      header: "Products",
+      // Facts, not warnings — a badge per distinct product the stop carries,
+      // in `.anomaly-flag`'s visual language but neutral color (T-40C).
+      // `lines` is optional on the type even though `includeLines: true` is
+      // always requested for this list; no lines means no badges rather than
+      // a guess off the diesel-only `gallons` summary.
+      cell: ({ row }) => {
+        const lines = row.original.lines ?? [];
+        const seen = new Set<string>();
+        const distinct = lines.filter((line) => {
+          if (seen.has(line.productCode)) return false;
+          seen.add(line.productCode);
+          return true;
+        });
+        return (
+          <span className="tx-products">
+            {distinct.map((line) => (
+              <span key={line.productCode} className={`product-badge product-badge-${productBadgeVariant(line.productCode)}`}>
+                {productLabel(line.productCode)}
+              </span>
+            ))}
+          </span>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: "flags",
+      header: "Flags",
+      // A charge-with-no-fuel stop (scale, cash, or otherwise) is a routine
+      // fact visible in the row's own line items, not an anomaly — the
+      // charges_no_fuel/"Scale" flag never renders here (T-40H, extending
+      // T-40G's Scale-badge-specific suppression to every case).
+      cell: ({ row }) => {
+        const flags = row.original.flags.filter((f) => f.rule !== "charges_no_fuel");
+        return (
+          <span className="tx-flags">
+            {flags.map((f) => (
+              <AnomalyFlag key={f.rule} flag={f} />
+            ))}
+          </span>
+        );
+      },
+    }),
+  ];
+}
 
 interface TransactionsTableProps {
   /** Already filtered (server-side filters + client-side search) and
@@ -192,10 +239,17 @@ interface TransactionsTableProps {
   totalBeforeSearch: number;
   loading: boolean;
   error: Error | null;
-  /** The page's single scoping invoice (A7: `GET /transactions` is always
-   * filtered to one `period`/invoice) — `null` while loading. Passed through
-   * to `StopExpansion`'s "Source" row rather than re-derived per row. */
-  invoiceNumber: string | null;
+  /** The week's invoice number per currency (one imported invoice per side, D26) — a row's
+   * own invoice for `StopExpansion`'s "Source" row. A row carries its currency, not its
+   * invoice id (A7); T-66's money conversion must keep the invoice's own currency on the row. */
+  invoiceNumbers: Partial<Record<InvoiceCurrency, string>>;
+  /** Tag each row with the invoice it came from (flag + number) — on under All invoices. */
+  showInvoice?: boolean;
+  /** The conversion chosen on screen, `null` for as printed — for the "conversion pending" caption. */
+  conversion?: DisplayChoice | null;
+  /** What the page asked for — the headers' currency and unit when no row says. */
+  currency: InvoiceCurrency;
+  qtyUnit: InvoiceQtyUnit;
   filters: TransactionFiltersState;
   setFilter: (key: keyof TransactionFiltersState, value: string | boolean) => void;
   clearFilters: () => void;
@@ -218,7 +272,11 @@ export default function TransactionsTable({
   totalBeforeSearch,
   loading,
   error,
-  invoiceNumber,
+  invoiceNumbers,
+  showInvoice = false,
+  conversion = null,
+  currency: requestedCurrency,
+  qtyUnit: requestedUnit,
   filters,
   setFilter,
   clearFilters,
@@ -277,30 +335,43 @@ export default function TransactionsTable({
     [rows, activeIndex, toggleRow],
   );
 
+  // The headers follow the rows when there are any. One invoice is one currency
+  // and one unit; All invoices can hold two of either, and then the totals below
+  // that would add them — litres with gallons, CAD with USD — are withheld.
+  const currencies = new Set(rows.map((row) => row.currency));
+  const units = new Set(rows.map((row) => row.qtyUnit));
+  const currency = currencies.size > 1 ? null : (rows[0]?.currency ?? requestedCurrency);
+  const unit = units.size > 1 ? null : (rows[0]?.qtyUnit ?? requestedUnit);
+  const pendingCurrencies = [...currencies].filter((c) => moneyConversionPending(conversion, c));
+  const columns = useMemo(
+    () => buildColumns(currency, unit, showInvoice ? invoiceNumbers : null),
+    [currency, unit, showInvoice, invoiceNumbers],
+  );
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
 
   const totals = useMemo(() => {
-    let gallons = 0;
-    let hasGallons = false;
+    // Quantity adds up within one unit, money within one currency, and a
+    // weighted price needs both.
+    let qty = 0;
+    let hasQty = false;
     let weightedBilled = 0;
     let weightedRetail = 0;
-    let totalUsd = 0;
     for (const row of rows) {
-      totalUsd += row.total;
       if (row.qty !== null && row.billedPerUnit !== null && row.retailPerUnit !== null) {
-        hasGallons = true;
-        gallons += row.qty;
+        hasQty = true;
+        qty += row.qty;
         weightedBilled += row.qty * row.billedPerUnit;
         weightedRetail += row.qty * row.retailPerUnit;
       }
     }
+    const priced = currency !== null && unit !== null && hasQty && qty > 0;
     return {
-      gallons: hasGallons ? gallons : null,
-      avgBilled: hasGallons && gallons > 0 ? weightedBilled / gallons : null,
-      avgRetail: hasGallons && gallons > 0 ? weightedRetail / gallons : null,
-      totalUsd,
+      qty: unit !== null && hasQty ? qty : null,
+      avgBilled: priced ? weightedBilled / qty : null,
+      avgRetail: priced ? weightedRetail / qty : null,
+      total: currency !== null ? sumMoney(rows.map((row) => row.total)) : null,
     };
-  }, [rows]);
+  }, [rows, currency, unit]);
 
   return (
     <>
@@ -496,7 +567,7 @@ export default function TransactionsTable({
                         ),
                       )}
                     </div>
-                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumber} />}
+                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumbers[stop.currency] ?? null} />}
                   </div>
                 );
               })}
@@ -507,14 +578,14 @@ export default function TransactionsTable({
                 <span className="tx-foot-label">
                   {rows.length} stop{rows.length === 1 ? "" : "s"} shown
                 </span>
-                <span className="tx-foot-cell">{totals.gallons === null ? "—" : formatGallons2dp(totals.gallons)}</span>
+                <span className="tx-foot-cell">{totals.qty === null ? "—" : formatQty2dp(totals.qty)}</span>
                 <span className="tx-foot-cell tx-foot-billed">
-                  {totals.avgBilled === null ? "—" : formatPricePerGal(totals.avgBilled)}
+                  {totals.avgBilled === null || currency === null ? "—" : formatPricePerUnit(totals.avgBilled, currency)}
                 </span>
                 <span className="tx-foot-cell muted">
-                  {totals.avgRetail === null ? "—" : formatPricePerGal(totals.avgRetail)}
+                  {totals.avgRetail === null || currency === null ? "—" : formatPricePerUnit(totals.avgRetail, currency)}
                 </span>
-                <span className="tx-foot-cell">{formatMoneyUsd(totals.totalUsd)}</span>
+                <span className="tx-foot-cell">{totals.total === null || currency === null ? "—" : formatMoney(totals.total, currency)}</span>
                 <span />
                 <span />
                 <span />
@@ -525,7 +596,20 @@ export default function TransactionsTable({
       </div>
 
       <div className="tx-caption">
-        <span>Rows are one fuel stop, grouped by base auth code — expand to see every product line. All amounts USD.</span>
+        <span>
+          Rows are one fuel stop, grouped by base auth code — expand to see every product line.{" "}
+          {currency === null
+            ? "Amounts are in each invoice's own currency — no combined total."
+            : `All amounts ${currency}.`}
+          {pendingCurrencies.length > 0 && (
+            <span className="tx-conversion-pending" data-testid="conversion-pending">
+              {" "}
+              Shown per {unit === "L" ? "litre" : "gallon"}; {pendingCurrencies.join(" and ")} amounts stay in{" "}
+              {pendingCurrencies.length > 1 ? "their own currency" : pendingCurrencies[0]} — converting them needs the
+              Bank of Canada rate (rate pending).
+            </span>
+          )}
+        </span>
       </div>
     </>
   );

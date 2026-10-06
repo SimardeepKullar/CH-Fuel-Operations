@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Sidebar from "../../components/Sidebar";
 import TopBar from "../../components/TopBar";
+import { WeekProvider } from "../../hooks/useWeek";
 import { useStandingCounts } from "../../hooks/useStandingCounts";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "../../App.css";
@@ -18,12 +19,14 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
   const pendingReceipts = receipts ? receipts.total - receipts.done : null;
 
   return (
-    <div className="app-shell">
-      <Sidebar pendingReceipts={pendingReceipts} />
-      <div className="app-shell-main">
-        <TopBar receipts={receipts} flags={flags} />
-        <main className="app-shell-content">{children}</main>
+    <WeekProvider>
+      <div className="app-shell">
+        <Sidebar pendingReceipts={pendingReceipts} />
+        <div className="app-shell-main">
+          <TopBar receipts={receipts} flags={flags} />
+          <main className="app-shell-content">{children}</main>
+        </div>
       </div>
-    </div>
+    </WeekProvider>
   );
 }

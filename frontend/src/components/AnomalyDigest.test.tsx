@@ -28,30 +28,30 @@ function item(overrides: Partial<OverviewAnomalyDigestItem> = {}): OverviewAnoma
 }
 
 describe("anomalyDigestHref", () => {
-  it("pre-applies anomalyOnly and carries the current period", () => {
-    expect(anomalyDigestHref("2026-09-03")).toBe("/transactions?anomalyOnly=true&period=2026-09-03");
+  it("pre-applies anomalyOnly and carries the current week", () => {
+    expect(anomalyDigestHref("2026-09-03")).toBe("/transactions?anomalyOnly=true&week=2026-09-03");
   });
 
-  it("omits period when it isn't known yet, rather than writing 'null'", () => {
+  it("omits week when it isn't known yet, rather than writing 'null'", () => {
     expect(anomalyDigestHref(null)).toBe("/transactions?anomalyOnly=true");
   });
 });
 
 describe("AnomalyDigest (T-41 DoD: deep-links into Transactions with anomalyOnly applied)", () => {
   it("renders an empty state when nothing is flagged", () => {
-    render(<AnomalyDigest items={[]} period="2026-09-03" />);
+    render(<AnomalyDigest items={[]} week="2026-09-03" />);
     expect(screen.getByText("No anomalies flagged")).toBeTruthy();
   });
 
-  it("clicking an item navigates to Transactions with anomalyOnly and the period pre-applied", () => {
-    render(<AnomalyDigest items={[item()]} period="2026-09-03" />);
+  it("clicking an item navigates to Transactions with anomalyOnly and the week pre-applied", () => {
+    render(<AnomalyDigest items={[item()]} week="2026-09-03" />);
     screen.getByText("Sub-gal").closest("a")!.click();
-    expect(push).toHaveBeenCalledWith("/transactions?anomalyOnly=true&period=2026-09-03");
+    expect(push).toHaveBeenCalledWith("/transactions?anomalyOnly=true&week=2026-09-03");
   });
 
   it("the header's view-all link goes to the same destination", () => {
-    render(<AnomalyDigest items={[item()]} period="2026-09-03" />);
+    render(<AnomalyDigest items={[item()]} week="2026-09-03" />);
     screen.getByText("View flagged in Transactions →").click();
-    expect(push).toHaveBeenCalledWith("/transactions?anomalyOnly=true&period=2026-09-03");
+    expect(push).toHaveBeenCalledWith("/transactions?anomalyOnly=true&week=2026-09-03");
   });
 });

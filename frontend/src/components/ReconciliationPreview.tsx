@@ -1,7 +1,7 @@
 "use client";
 
 import type { ImportReport } from "@ch/core/invoice/report";
-import { formatGallons2dp, formatMoneyUsd } from "../lib/formatMoney";
+import { formatMoney, formatQty2dp } from "../lib/formatMoney";
 import Corners from "./Corners";
 
 interface ReconciliationPreviewProps {
@@ -38,21 +38,19 @@ export default function ReconciliationPreview({ report, onConfirm }: Reconciliat
         <div className="import-balance-row import-balance-head">
           <span>Product code</span>
           <span className="num">{report.qtyUnit === "L" ? "Litres" : "Gallons"}</span>
-          <span className="num">Amount</span>
+          <span className="num">{`Amount ${report.currency}`}</span>
         </div>
         {rows.map((p) => (
           <div className="import-balance-row" key={p.productCode}>
             <span className="mono">{p.productCode}</span>
-            <span className="num muted">{p.qty === null ? "—" : formatGallons2dp(Number(p.qty))}</span>
-            <span className="num">{formatMoneyUsd(Number(p.amount))}</span>
+            <span className="num muted">{p.qty === null ? "—" : formatQty2dp(Number(p.qty))}</span>
+            <span className="num">{formatMoney(Number(p.amount), report.currency)}</span>
           </div>
         ))}
         <div className="import-balance-row import-balance-total" data-testid="import-balance-total">
           <span>Grand total</span>
           <span />
-          <span className="num">
-            {formatMoneyUsd(Number(report.grandTotal))} {report.currency}
-          </span>
+          <span className="num">{formatMoney(Number(report.grandTotal), report.currency)}</span>
         </div>
       </div>
 
