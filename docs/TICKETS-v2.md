@@ -84,6 +84,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
 | **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
 | **T-40I** | **"Flagged only" no longer matches a charges_no_fuel-only stop** | T-40H | **9** | **done — merged (`987cc02`, PR #10)** |
+| **T-40J** | **Sort Transactions by date — newest or oldest first** | T-32, T-40, T-64 | **9** | **new** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **done — merged (`1b36ae7`, PR #12)** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **done — merged (`3ce1791`, PR #13)** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -107,7 +108,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **done — merged (`22496c8`, PR #16)** |
 | **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **done — merged (`043eee2`, PR #15)** |
 | **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **done — merged (`7c008b0`, PR #17)** |
-| **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **new** |
+| **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **done — merged (`cfff981`, PR #18)** |
 | **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
 | **T-66** | **Bank of Canada exchange rate on the CA invoice** | T-61 | **11** | **new** |
 
@@ -669,6 +670,35 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 - [x] A stop with `charges_no_fuel` plus another undismissed anomaly (e.g. `unit_mismatch`) still appears, with that other flag shown.
 - [x] Every other filter (`state`, `product`, `receiptStatus`, date range, etc.) composes with `anomalyOnly` exactly as before.
 - [x] `npm run verify` green.
+
+---
+
+## T-40J · Sort Transactions by date — newest or oldest first
+
+**Priority 40J — follow-up to T-40, from dispatcher review 2026-10-05 (raised during T-64).**
+
+**Goal.** The Transactions table's "Date · time" header toggles the row order between newest first (the default) and oldest first.
+
+**Why.** §A8.3 calls the screen "sortable", and `GET /transactions` has sorted since T-32 (`sortField` = `occurred_at` | `total`, `sortDirection` = `asc` | `desc`, default `occurred_at desc`), but T-40 never wired a control: the frontend sends neither param, so the rows only ever come in the API's default order. Reading a week from its first stop forward — reconciling against a driver's paper log, say — currently means scrolling to the bottom and reading up.
+
+**Design.**
+- The "Date · time" header becomes a button with a direction mark (`↓` newest first, `↑` oldest first) and `aria-sort` (`descending` / `ascending`). A click flips it.
+- The page sends `sortField: "occurred_at"` and `sortDirection` on the table's request; the order comes from the server, not a client-side re-sort, so it stays index-backed (T-32's DoD) and holds under every filter and under All invoices (T-64), where both invoices' rows interleave by time.
+- The direction round-trips through the URL like every other filter (T-40 DoD: a filtered view is linkable) — `sort=asc` when oldest first, absent for the default — and **Clear** resets it with the filters.
+- The free-text search (client-side) and the row keyboard navigation (↑/↓/Enter) keep working on the sorted rows; the active row resets to the first.
+
+**Files.** Modified: `frontend/src/components/TransactionsTable.tsx` (header button), `frontend/src/app/(app)/transactions/page.tsx` (sends the sort), `frontend/src/hooks/useTransactionFilters.ts` (the `sort` URL key), `frontend/src/App.css` (+ tests). No backend change.
+
+**Not in scope.** Sorting by total, or by any other column — the API offers `total`, but nobody has asked for it; adding it later is the same header pattern on the Total column. The filter-option seed fetch (`useTransactionFilterOptions`) is unsorted on purpose and stays so.
+
+**Dependencies.** T-32, T-40, T-64.
+
+**Definition of done.**
+- [ ] The table opens newest first with no sort param in the URL or the request (the API's default).
+- [ ] Clicking "Date · time" requests `sortField=occurred_at&sortDirection=asc`, writes `sort=asc` to the URL, and shows `↑` with `aria-sort="ascending"`; clicking again returns to newest first and removes `sort` from the URL — asserted against the request made.
+- [ ] A URL with `sort=asc` opens oldest first; **Clear** returns to newest first.
+- [ ] Under All invoices the request carries the sort and no `currency`, so both invoices' rows interleave by date.
+- [ ] `npm run verify` green.
 
 ---
 
