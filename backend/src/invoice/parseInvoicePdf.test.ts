@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { parseInvoiceCsv } from "./parseInvoiceCsv.js";
-import { parseInvoicePdf } from "./parseInvoicePdf.js";
+import { InvoicePdfFormatError, parseInvoicePdf } from "./parseInvoicePdf.js";
 import { groupByAuthCode } from "./groupByAuthCode.js";
 import { reconcile } from "./reconcile.js";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "./productCode.js";
@@ -103,6 +103,81 @@ describe("parseInvoicePdf — structural (synthetic fixture)", () => {
     await parseInvoicePdf(redacted(), DEFAULT_INVOICE_PRODUCT_CODES);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+// T-50: one committed PDF per failure mode, rendered from invented data by
+// generateSamplePdf.ts. Read inside each `it`, never at describe level.
+const edgePdf = (name: string) =>
+  readFileSync(fileURLToPath(new URL(`../../test/fixtures/invoices/${name}.pdf`, import.meta.url)));
+
+describe("parseInvoicePdf — edge-case fixtures (T-50)", () => {
+  it("edge-totals-mismatch: parses, but a grand total a dollar over its rows does not reconcile", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-totals-mismatch"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    // 694.67 priced + 15.00 scale + 53.00 express = 762.67, printed as 763.67.
+    expect(result.printedTotals.grandTotal).toBe("763.67");
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(false);
+  });
+
+  it("edge-changed-header: refuses a fuel table whose column header changed, rather than reading prices by position", async () => {
+    await expect(parseInvoicePdf(edgePdf("edge-changed-header"), DEFAULT_INVOICE_PRODUCT_CODES)).rejects.toThrow(
+      InvoicePdfFormatError,
+    );
+  });
+
+  it("refuses fuel rows when the header no longer opens with the expected column, instead of skipping it as a roll-up", async () => {
+    const { EDGE_CASES, FUEL_COLUMNS, renderInvoicePdf } = await import("../../test/fixtures/invoices/generateSamplePdf.js");
+    const renamed = { ...EDGE_CASES["edge-changed-header"], fuelColumns: ["Authorization", ...FUEL_COLUMNS.slice(1)] };
+    await expect(parseInvoicePdf(await renderInvoicePdf(renamed), DEFAULT_INVOICE_PRODUCT_CODES)).rejects.toThrow(
+      /a fuel row came before the fuel table's column header/,
+    );
+  });
+
+  it("edge-page-break: reads every line of a card that runs across a page, under 1-, 2- and 3-word driver names", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-page-break"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    expect(result.lines).toHaveLength(24);
+    expect(new Set(result.lines.map((l) => l.cardNumber))).toEqual(new Set(["1000001"]));
+    expect(new Set(result.lines.map((l) => l.driverNameRaw))).toEqual(new Set(["REMY", "DRIVER TWO", "ANA DE SOUSA"]));
+    expect(result.lines.every((l) => l.stationCity === "Sampleton" && l.unitRaw === "101")).toBe(true);
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(true);
+  });
+
+  it("edge-express-blanks: a blank driver, a blank tractor and both blank stay null, not shifted into each other", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-express-blanks"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.expressRows.map((r) => [r.expressCode, r.unitRaw, r.driverNameRaw])).toEqual([
+      ["9000001", "101", null],
+      ["9000002", null, "PAT LEE"],
+      ["9000003", null, null],
+    ]);
+    // A whole-dollar amount printed without cents.
+    expect(result.expressRows[0]).toMatchObject({ amount: "50.00", fee: "3.00", total: "53.00" });
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(true);
+  });
+
+  it("edge-thousands: strips the thousands separators the PDF prints, on lines, totals and express rows", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-thousands"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    expect(result.lines.map((l) => [l.authCode, l.amount])).toEqual([
+      ["B300001-TA", "1280.85"],
+      ["B300002-TA", "1094.60"],
+    ]);
+    expect(result.expressRows[0]).toMatchObject({ amount: "1200.00", total: "1203.00" });
+    expect(result.printedTotals.grandTotal).toBe("3578.45");
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(true);
+  });
+
+  it("edge-unmapped-product: quarantines the one line whose product code no mapping knows, and keeps the rest", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-unmapped-product"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([
+      expect.objectContaining({ authCode: "B400001-ZZ", code: "UNMAPPED_PRODUCT", rawProduct: "ZZ" }),
+    ]);
+    expect(result.lines.map((l) => l.authCode)).toEqual(["B100001-TA", "B100001-DF"]);
   });
 });
 

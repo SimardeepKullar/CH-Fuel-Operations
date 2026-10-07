@@ -355,6 +355,52 @@ const TOTALS_HEADER_RECORD = [
 const PRODUCT_CODE_LABELS = new Set(["TA", "TF", "DF", "S", "C", "AD", "O", "L"]);
 
 /**
+ * Each table's column header as the PDF prints it. Rows are read by position,
+ * so a reordered or renamed column would shift values silently into the
+ * wrong field; the printed header is checked instead (T-50). The express
+ * header prints "Payee" in mixed case.
+ */
+interface TableHeader {
+  table: "fuel" | "express" | "totals";
+  words: readonly string[];
+}
+
+const PRINTED_HEADERS: readonly TableHeader[] = [
+  { table: "fuel", words: FUEL_HEADER_RECORD.join(" ").split(" ") },
+  { table: "express", words: EXPRESS_HEADER_RECORD.map((c) => (c === "PAYEE" ? "Payee" : c)).join(" ").split(" ") },
+  { table: "totals", words: TOTALS_HEADER_RECORD.join(" ").split(" ") },
+];
+
+/** Around a page break pdf.js can extract the fuel header and the next card
+ * heading as one line (seen on 999217); the heading is printed again on its
+ * own line, which is the one read. */
+const MERGED_CARD_HEADING = /^Transactions for card \S+$/;
+
+/**
+ * Whether `tokens` is a printed column header. A line opening with a
+ * header's first two words is one, and must then be that header exactly —
+ * anything else throws rather than being skipped as a roll-up.
+ */
+function isColumnHeader(tokens: readonly string[], header: TableHeader): boolean {
+  const { words } = header;
+  if (tokens[0] !== words[0] || tokens[1] !== words[1]) {
+    return false;
+  }
+  const printed = tokens.slice(0, words.length).join(" ");
+  const tail = tokens.slice(words.length).join(" ");
+  if (printed !== words.join(" ") || (tail !== "" && !(header.table === "fuel" && MERGED_CARD_HEADING.test(tail)))) {
+    throw new InvoicePdfFormatError(
+      `the ${header.table} table's column header changed: expected "${words.join(" ")}", found "${tokens.join(" ")}"`,
+    );
+  }
+  return true;
+}
+
+function headerFor(table: TableHeader["table"]): TableHeader {
+  return PRINTED_HEADERS.find((h) => h.table === table)!;
+}
+
+/**
  * Parses the emailed BVD invoice PDF — the **fuller** of BVD's two exports.
  * It is the only one carrying the invoice's own header table (number, period,
  * invoice and due dates) and the only one carrying tractor, trailer, driver,
@@ -405,6 +451,16 @@ export async function parseInvoicePdf(
 
   let section: "fuel" | "express" | "totals" = "fuel";
   let seenCard = false;
+  /** Whether the current table's column header has been read and checked
+   * since its heading. Extraction order around a page break is not the
+   * printed order, so the header is not required on the very next line —
+   * only before the table's first row. */
+  let headerChecked = false;
+  const requireHeader = (): void => {
+    if (!headerChecked) {
+      throw new InvoicePdfFormatError(`a ${section} row came before the ${section} table's column header`);
+    }
+  };
 
   for (const line of lines.slice(fuelStart + 1)) {
     const tokens = tokenize(line);
@@ -413,11 +469,17 @@ export async function parseInvoicePdf(
     if (line === "Express Codes") {
       records.push(["Express Codes"], EXPRESS_HEADER_RECORD);
       section = "express";
+      headerChecked = false;
       continue;
     }
     if (line === "Grand Totals") {
       records.push(["Grand Totals"], TOTALS_HEADER_RECORD);
       section = "totals";
+      headerChecked = false;
+      continue;
+    }
+    if (isColumnHeader(tokens, headerFor(section))) {
+      headerChecked = true;
       continue;
     }
     // The tax registration lines and the product-code Legend follow the
@@ -435,11 +497,13 @@ export async function parseInvoicePdf(
           seenCard = true;
         }
         records.push(FUEL_HEADER_RECORD);
+        headerChecked = false;
         continue;
       }
       if (!FUEL_AUTH.test(tokens[0] ?? "")) {
         continue; // SUBTOTAL / Card # / Fuel Total / Sub Total roll-ups
       }
+      requireHeader();
       const cells = readFuelLine(tokens, line);
       if (!cells) {
         throw new InvoicePdfFormatError(`unparseable fuel line: ${JSON.stringify(line)}`);
@@ -456,6 +520,7 @@ export async function parseInvoicePdf(
       if (!DATE.test(tokens[0] ?? "")) {
         continue; // SUBTOTAL
       }
+      requireHeader();
       const record = readExpressLine(tokens, line);
       if (!record) {
         throw new InvoicePdfFormatError(`unparseable express line: ${JSON.stringify(line)}`);
@@ -466,6 +531,7 @@ export async function parseInvoicePdf(
 
     const totalsRecord = toTotalsRecord(tokens);
     if (totalsRecord) {
+      requireHeader();
       records.push(totalsRecord);
     }
   }
