@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CA_INVOICE, FIXTURES, caLineFigures, renderInvoicePdf } from "./generateSamplePdf.js";
 
@@ -111,9 +112,141 @@ describe("sample-ca.pdf's own figures (T-61 step 61.2)", () => {
     expect(CA_INVOICE.cards.every((c) => /^90000\d\d$/.test(c.card))).toBe(true);
   });
 
-  it.each(["ca", "us"] as const)("regenerates byte-for-byte identical to the committed %s fixture", async (key) => {
-    const committed = readFileSync(FIXTURES[key].file);
-    const regenerated = await renderInvoicePdf(FIXTURES[key].spec);
+});
+
+// ─── Layout: the samples against the real invoices (T-50) ────────────────
+
+/** A PDF's extracted lines, as parseInvoicePdf sees them, minus pdf-parse's
+ * own "-- 1 of 2 --" page markers. */
+async function extractedLines(file: string): Promise<string[]> {
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: readFileSync(file) });
+  try {
+    const { text } = await parser.getText();
+    return text
+      .split(/\r?\n/)
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter((l) => l !== "" && !/^-- \d+ of \d+ --$/.test(l));
+  } finally {
+    await parser.destroy();
+  }
+}
+
+/** Structural words kept as printed; every other token is masked to its
+ * shape, so no name, card number or amount survives into a comparison or a
+ * failure message. */
+const KEEP = new Set(
+  ("Invoice Number Date Start End Due Client info Address: Fuel Card Transactions for card SUBTOTAL # Total Sub " +
+    "Express Codes Grand Totals Page of Pages Legend Code Name TA TF DF S C AD O L US CN Manual HST# Trailer Tractor " +
+    "DEF Scale Cash Additive Oil Lubricant Auth Driver Unit Site City Prov/ST Prod QTY Retail Billed Pre Tax AMT HST " +
+    "GST PST QST Disc Rate Final CUR DATE EXP. CODE AUTH TRACTOR TRAILER DRIVER NAME/ID CDL TRIP AMOUNT CASHED FEE " +
+    "TOTAL Payee NOTES PRODUCT PRE TAX DISC RATE FINAL").split(" "),
+);
+
+function mask(line: string): string {
+  return line
+    .split(" ")
+    .map((t) => (KEEP.has(t) ? t : t.replace(/\d/g, "9").replace(/[A-Z]/g, "A").replace(/[a-z]/g, "a").replace(/9+/g, "9").replace(/A+/g, "A").replace(/a+/g, "a")))
+    .join(" ")
+    .replace(/9,9\.9/g, "9.9"); // grouping depends on the amount, not the layout
+}
+
+/** Each line's role in the layout, tracked by section. */
+type Section = "header" | "fuel" | "express" | "totals" | "legend";
+
+function lineKinds(lines: readonly string[]): Map<string, Set<string>> {
+  const kinds = new Map<string, Set<string>>();
+  let section: Section = "header";
+  let lastCard: string | null = null;
+  const note = (kind: string, line: string) => kinds.set(kind, (kinds.get(kind) ?? new Set()).add(mask(line)));
+  const rules: Record<Section, Array<[RegExp, string]>> = {
+    header: [
+      [/^Invoice$/, "title"], [/^Number Invoice Date Start Date End Date Due Date$/, "header-columns"],
+      [/^\d+ \d{4}-\d\d-\d\d$/, "header-number-date"], [/^\d{4}-\d\d-\d\d$/, "header-date"],
+      [/^\d\d:\d\d:\d\d$/, "header-time"], [/^Client info$/, "client-info"], [/./, "client-line"],
+    ],
+    fuel: [
+      [/^Auth Code /, "fuel-columns"], [/^[A-Z]\d+-[A-Z]{1,2} /, "fuel-line"], [/^SUBTOTAL TA /, "card-ta"],
+      [/^SUBTOTAL [\d,.]+ /, "stop-subtotal"], [/^Card # TF /, "card-tf"], [/^\d+ Fuel Total /, "card-fuel-total"],
+      [/^DF /, "card-df"], [/^S [\d,.]+ /, "card-scale"], [/^Sub Total /, "card-sub-total"],
+    ],
+    express: [[/^DATE EXP\. /, "express-columns"], [/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d /, "express-row"], [/^SUBTOTAL /, "express-subtotal"]],
+    totals: [
+      [/^PRODUCT /, "totals-columns"], [/^Grand Total /, "totals-grand"], [/^(TA|TF|DF) /, "totals-product"],
+      [/^S /, "totals-scale"], [/^Manual /, "totals-manual"], [/^Express /, "totals-express"], [/^[A-Z]+# /, "tax-registration"],
+    ],
+    legend: [[/^Code /, "legend-columns"], [/./, "legend-row"]],
+  };
+  for (const line of lines) {
+    if (/^Page \d+ of \d+ Pages$/.test(line)) { note("page-footer", line); continue; }
+    const heading: Record<string, Section> = { "Fuel Card Transactions": "fuel", "Express Codes": "express", "Grand Totals": "totals", Legend: "legend" };
+    if (heading[line]) { section = heading[line]!; note(`${section}-heading`, line); continue; }
+    const card = /^Transactions for card (\S+)$/.exec(line);
+    if (card) { note(card[1] === lastCard ? "card-heading-continued" : "card-heading", line); lastCard = card[1]!; continue; }
+    const rule = rules[section].find(([re]) => re.test(line));
+    note(rule ? rule[1] : `unclassified-${section}`, line);
+  }
+  return kinds;
+}
+
+/** Kinds whose masked shape is fixed by the layout, not by the data in it. */
+const STRUCTURAL = new Set([
+  "title", "header-columns", "header-number-date", "header-date", "header-time", "client-info", "fuel-heading",
+  "card-heading", "card-heading-continued", "fuel-columns", "stop-subtotal", "card-ta", "card-tf", "card-fuel-total",
+  "card-df", "card-scale", "card-sub-total", "express-heading", "express-columns", "express-subtotal", "totals-heading",
+  "totals-columns", "totals-product", "totals-scale", "totals-manual", "totals-express", "totals-grand",
+  "tax-registration", "legend-heading", "legend-columns", "legend-row", "page-footer",
+]);
+
+const REAL = {
+  us: fileURLToPath(new URL("../../../../data/bvd-invoices/BVD_invoice_999210.pdf", import.meta.url)),
+  ca: fileURLToPath(new URL("../../../../data/bvd-invoices/BVD_invoice_999217.pdf", import.meta.url)),
+} as const;
+
+describe("the samples reproduce the real invoice layout (T-50)", () => {
+  it.each(["us", "ca"] as const)("the %s sample prints every kind of line the layout has", async (key) => {
+    const kinds = lineKinds(await extractedLines(FIXTURES[key]!.file));
+    expect([...STRUCTURAL, "client-line", "fuel-line", "express-row"].filter((k) => !kinds.has(k))).toEqual([]);
+    expect([...kinds.keys()].filter((k) => k.startsWith("unclassified"))).toEqual([]);
+  });
+});
+
+/** Kinds a sample prints that its real invoice does not. 999217 had no
+ * express charges, so it prints no Express section; sample-ca keeps one row
+ * so CAD express parsing stays tested (T-61), in the layout the US sample
+ * is compared on against 999210. */
+const NOT_IN_REAL: Record<keyof typeof REAL, readonly string[]> = {
+  us: [],
+  ca: ["express-heading", "express-columns", "express-row", "express-subtotal"],
+};
+
+// Local only: data/bvd-invoices/ is gitignored. Only kind names and masked
+// shapes are compared or printed — never a value from the real file.
+describe.each(["us", "ca"] as const)("the %s sample against its real invoice (local fixture only)", (key) => {
+  it.skipIf(!existsSync(REAL[key]))("has exactly the real invoice's kinds of line", async () => {
+    const real = lineKinds(await extractedLines(REAL[key]));
+    const sample = lineKinds(await extractedLines(FIXTURES[key]!.file));
+    expect({
+      missingFromSample: [...real.keys()].filter((k) => !sample.has(k)),
+      notInRealInvoice: [...sample.keys()].filter((k) => !real.has(k)),
+    }).toEqual({ missingFromSample: [], notInRealInvoice: NOT_IN_REAL[key] });
+  });
+
+  it.skipIf(!existsSync(REAL[key]))("prints every structural line in a shape the real invoice prints", async () => {
+    const real = lineKinds(await extractedLines(REAL[key]));
+    const sample = lineKinds(await extractedLines(FIXTURES[key]!.file));
+    const unmatched = [...sample]
+      .filter(([kind]) => STRUCTURAL.has(kind) && !NOT_IN_REAL[key].includes(kind))
+      .flatMap(([kind, shapes]) => [...shapes].filter((s) => !real.get(kind)?.has(s)).map((s) => `${kind}: ${s}`));
+    expect(unmatched).toEqual([]);
+  });
+});
+
+describe("committed invoice fixtures", () => {
+  it.each(Object.keys(FIXTURES))("regenerates byte-for-byte identical to the committed %s fixture", async (key) => {
+    const { file, spec } = FIXTURES[key]!;
+    const committed = readFileSync(file);
+    const regenerated = await renderInvoicePdf(spec);
     expect(regenerated.equals(committed)).toBe(true);
   });
 });

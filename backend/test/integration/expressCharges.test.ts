@@ -8,6 +8,7 @@ import type { ExpressChargesResult } from "../../src/actuals/otherCharges.js";
 import { runImportInvoiceCli } from "../../src/cli/importInvoice.js";
 import { runMigrations } from "../../src/db/migrate.js";
 import { normalizeName } from "../../src/resolve/normalizeName.js";
+import { realName } from "../support/realNames.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(dirname, "../../../migrations/synthetic");
@@ -235,34 +236,34 @@ describe.skipIf(!hasDatabase || !hasRealFixtures)("GET /express-charges on 99921
     expect(blank.note).toBeNull();
   });
 
-  it("with no aliases seeded, only a name equal to a roster display name resolves: Mohinder does; rajinder and Gurjit do not", async () => {
+  it("with no aliases seeded, only a name equal to a roster display name resolves; the two express names spelled otherwise do not", async () => {
     const result = await importPdf();
     const byName = new Map(result.rows.map((r) => [r.driverNameRaw, r]));
 
-    expect(byName.get("Mohinder")).toMatchObject({
+    expect(byName.get(realName("expressCharges.rosterSpelledDriver"))).toMatchObject({
       matchStatus: "matched",
-      driver: { displayName: "MOHINDER" },
+      driver: { displayName: realName("expressCharges.rosterDisplayName") },
     });
-    expect(byName.get("rajinder")).toMatchObject({ matchStatus: "unmatched", driver: null, unitRaw: "1017", payee: "repair" });
-    expect(byName.get("Gurjit")).toMatchObject({ matchStatus: "unmatched", driver: null, unitRaw: "1019" });
+    expect(byName.get(realName("expressCharges.aliasedRawName"))).toMatchObject({ matchStatus: "unmatched", driver: null, unitRaw: "1017", payee: "repair" });
+    expect(byName.get(realName("pdf999210.expressDriver6552061"))).toMatchObject({ matchStatus: "unmatched", driver: null, unitRaw: "1019" });
   });
 
-  it("an alias added before import resolves rajinder; Gurjit stays flagged, and the raw text is untouched", async () => {
-    const { rows } = await scopedPool.query<{ id: string }>("SELECT id FROM drivers WHERE display_name = 'RAVINDER'");
+  it("an alias added before import resolves one of those names; the other stays flagged, and the raw text is untouched", async () => {
+    const { rows } = await scopedPool.query<{ id: string }>("SELECT id FROM drivers WHERE display_name = $1", [realName("expressCharges.aliasTargetDriver")]);
     await scopedPool.query(
       "INSERT INTO driver_aliases (alias_normalized, driver_id, source, confirmed_at) VALUES ($1, $2, 'test', now())",
-      [normalizeName("rajinder"), rows[0]!.id],
+      [normalizeName(realName("expressCharges.aliasedRawName")), rows[0]!.id],
     );
 
     const result = await importPdf();
     const byName = new Map(result.rows.map((r) => [r.driverNameRaw, r]));
 
-    expect(byName.get("rajinder")).toMatchObject({
-      driverNameRaw: "rajinder",
+    expect(byName.get(realName("expressCharges.aliasedRawName"))).toMatchObject({
+      driverNameRaw: realName("expressCharges.aliasedRawName"),
       matchStatus: "matched",
-      driver: { id: rows[0]!.id, displayName: "RAVINDER" },
+      driver: { id: rows[0]!.id, displayName: realName("expressCharges.aliasTargetDriver") },
     });
-    expect(byName.get("Gurjit")).toMatchObject({ matchStatus: "unmatched", driver: null });
+    expect(byName.get(realName("pdf999210.expressDriver6552061"))).toMatchObject({ matchStatus: "unmatched", driver: null });
   });
 
   it("a CSV import returns the same six rows and $1,543.13, with every truck and driver null — a property of the file", async () => {
