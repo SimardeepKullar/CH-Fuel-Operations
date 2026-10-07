@@ -6,6 +6,7 @@ import { InvoicePdfFormatError, parseInvoicePdf } from "./parseInvoicePdf.js";
 import { groupByAuthCode } from "./groupByAuthCode.js";
 import { reconcile } from "./reconcile.js";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "./productCode.js";
+import { realName } from "../../test/support/realNames.js";
 
 // Synthetic, invented data — committed, runs on a fresh clone and in CI.
 // Regenerate with test/fixtures/invoices/generateSamplePdf.ts. It describes
@@ -208,8 +209,8 @@ describe.skipIf(!hasRealFixture)("parseInvoicePdf — real invoice 999210 (local
   it("parses multi-word driver names and cities without mis-splitting the row", async () => {
     const result = await parseInvoicePdf(readFileSync(REAL_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
     const drivers = new Set(result.lines.map((l) => l.driverNameRaw));
-    expect(drivers).toContain("KULWANT SINGH BAL");
-    expect(drivers).toContain("JUGRAJ SINGH SAMRA");
+    expect(drivers).toContain(realName("pdf999210.multiWordDriverA"));
+    expect(drivers).toContain(realName("pdf999210.multiWordDriverB"));
     expect(result.lines.some((l) => l.stationCity === "Sulphur Springs")).toBe(true);
   });
 
@@ -246,10 +247,10 @@ describe.skipIf(!hasRealFixture)("parseInvoicePdf — real invoice 999210 (local
     // Every real express row carries a tractor; only the driver is ever blank.
     expect(result.expressRows.every((r) => r.unitRaw !== null)).toBe(true);
     const byCode = Object.fromEntries(result.expressRows.map((r) => [r.expressCode, r]));
-    expect(byCode["6552061"]).toMatchObject({ unitRaw: "1019", driverNameRaw: "Gurjit", total: "243.35" });
-    expect(byCode["6570949"]).toMatchObject({ unitRaw: "064", driverNameRaw: "Jugraj", total: "460.60" });
+    expect(byCode["6552061"]).toMatchObject({ unitRaw: "1019", driverNameRaw: realName("pdf999210.expressDriver6552061"), total: "243.35" });
+    expect(byCode["6570949"]).toMatchObject({ unitRaw: "064", driverNameRaw: realName("pdf999210.expressDriver6570949"), total: "460.60" });
     expect(byCode["6571780"]).toMatchObject({ unitRaw: "073", driverNameRaw: null, total: "203.00" });
-    expect(byCode["6551741"]).toMatchObject({ unitRaw: "066", driverNameRaw: "Gurshiv", payee: "lumper fees" });
+    expect(byCode["6551741"]).toMatchObject({ unitRaw: "066", driverNameRaw: realName("pdf999210.expressDriver6551741"), payee: "lumper fees" });
   });
 });
 

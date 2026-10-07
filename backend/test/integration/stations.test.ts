@@ -294,9 +294,9 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /stations/{id}/billed-pric
    * Measured, not copied from A6.5. The scope says "five drivers at LOVES #313 on
    * 9/7 and 9/9 were all billed 5.5208"; the invoice has FIVE diesel rows at
    * this site in total, split 1 / 3 / 1 across 9/3, 9/7 and 9/9:
-   *   09-03  DHNESH KUMAR                                  5.6593
-   *   09-07  DHNESH KUMAR, RAJVEER RANA, JATINDER          5.5208  (3 cards)
-   *   09-09  DHNESH KUMAR                                  5.5208  (1 card)
+   *   09-03  driver A                                  5.6593
+   *   09-07  driver A, driver B, driver C          5.5208  (3 cards)
+   *   09-09  driver A                                  5.5208  (1 card)
    * The finding itself holds — one billed price per site per day, the same
    * price for every card on 9/7 — but on 4 stops and 3 cards, not 5.
    * The same holds fleet-wide: of 54 site-days in the invoice, none carries

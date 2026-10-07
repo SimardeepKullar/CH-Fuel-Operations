@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp, type App } from "../../src/api/app.js";
 import { runMigrations } from "../../src/db/migrate.js";
+import { realName } from "../support/realNames.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(dirname, "../../../migrations/synthetic");
@@ -241,7 +242,7 @@ describe.skipIf(!hasDatabase || !hasRealFixtures)("POST /invoices/import — the
     const { rows: named } = await scopedPool.query<{ driver_name_raw: string | null }>(
       "SELECT driver_name_raw FROM express_charges WHERE express_code = '6551741'",
     );
-    expect(named[0]?.driver_name_raw).toBe("Gurshiv");
+    expect(named[0]?.driver_name_raw).toBe(realName("pdf999210.expressDriver6551741"));
   });
 
   it("treats the CSV of the same invoice as a conflict — same number, different bytes", async () => {
