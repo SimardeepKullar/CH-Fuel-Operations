@@ -16,10 +16,10 @@ const migrationsDir = path.join(dirname, "../../../migrations/synthetic");
 const fixturesDir = path.join(dirname, "../fixtures/invoices");
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
-const BALANCED_CSV = readFileSync(path.join(fixturesDir, "sample-redacted.csv"));
-const IMBALANCED_CSV = readFileSync(path.join(fixturesDir, "sample-redacted-imbalanced.csv"));
-const BALANCED_CSV_2 = readFileSync(path.join(fixturesDir, "sample-redacted-2.csv"));
-const BALANCED_PDF = readFileSync(path.join(fixturesDir, "sample-redacted.pdf"));
+const BALANCED_CSV = () => readFileSync(path.join(fixturesDir, "sample-redacted.csv"));
+const IMBALANCED_CSV = () => readFileSync(path.join(fixturesDir, "sample-redacted-imbalanced.csv"));
+const BALANCED_CSV_2 = () => readFileSync(path.join(fixturesDir, "sample-redacted-2.csv"));
+const BALANCED_PDF = () => readFileSync(path.join(fixturesDir, "sample-redacted.pdf"));
 
 function writeTempDir(files: Array<{ name: string; contents: Buffer }>): string {
   const dir = mkdtempSync(path.join(tmpdir(), "ch-backfill-invoices-"));
@@ -71,9 +71,9 @@ describe.skipIf(!hasDatabase)("backfillInvoiceFiles (integration)", () => {
 
   it("completes the batch with 2 imported and 1 quarantined when the middle invoice imbalances", async () => {
     const dir = writeTempDir([
-      { name: "invoice_100001.csv", contents: BALANCED_CSV },
-      { name: "invoice_100002.csv", contents: IMBALANCED_CSV },
-      { name: "invoice_100003.csv", contents: BALANCED_CSV_2 },
+      { name: "invoice_100001.csv", contents: BALANCED_CSV() },
+      { name: "invoice_100002.csv", contents: IMBALANCED_CSV() },
+      { name: "invoice_100003.csv", contents: BALANCED_CSV_2() },
     ]);
     const files: BackfillInvoiceFile[] = [
       { filename: "invoice_100001.csv", path: path.join(dir, "invoice_100001.csv") },
@@ -99,7 +99,7 @@ describe.skipIf(!hasDatabase)("backfillInvoiceFiles (integration)", () => {
   });
 
   it("keeps the quarantined invoice's report and rejections, queued for review", async () => {
-    const dir = writeTempDir([{ name: "invoice_100002.csv", contents: IMBALANCED_CSV }]);
+    const dir = writeTempDir([{ name: "invoice_100002.csv", contents: IMBALANCED_CSV() }]);
     const files: BackfillInvoiceFile[] = [
       { filename: "invoice_100002.csv", path: path.join(dir, "invoice_100002.csv") },
     ];
@@ -119,9 +119,9 @@ describe.skipIf(!hasDatabase)("backfillInvoiceFiles (integration)", () => {
 
   it("produces identical database state regardless of processing order", async () => {
     const dir = writeTempDir([
-      { name: "invoice_100001.csv", contents: BALANCED_CSV },
-      { name: "invoice_100002.csv", contents: IMBALANCED_CSV },
-      { name: "invoice_100003.csv", contents: BALANCED_CSV_2 },
+      { name: "invoice_100001.csv", contents: BALANCED_CSV() },
+      { name: "invoice_100002.csv", contents: IMBALANCED_CSV() },
+      { name: "invoice_100003.csv", contents: BALANCED_CSV_2() },
     ]);
     const inOrder: BackfillInvoiceFile[] = [
       { filename: "invoice_100001.csv", path: path.join(dir, "invoice_100001.csv") },
@@ -158,7 +158,7 @@ describe.skipIf(!hasDatabase)("backfillInvoiceFiles (integration)", () => {
 
   it("records a per-file failure without sinking the batch", async () => {
     const dir = writeTempDir([
-      { name: "invoice_100001.csv", contents: BALANCED_CSV },
+      { name: "invoice_100001.csv", contents: BALANCED_CSV() },
       { name: "not-an-invoice.txt", contents: Buffer.from("nonsense", "utf8") },
     ]);
     const files: BackfillInvoiceFile[] = [
@@ -174,13 +174,13 @@ describe.skipIf(!hasDatabase)("backfillInvoiceFiles (integration)", () => {
   });
 
   it("reports a conflict distinctly from a failure or a duplicate", async () => {
-    const dir = writeTempDir([{ name: "invoice_100001.csv", contents: BALANCED_CSV }]);
+    const dir = writeTempDir([{ name: "invoice_100001.csv", contents: BALANCED_CSV() }]);
     await backfillInvoiceFiles(scopedPool, [
       { filename: "invoice_100001.csv", path: path.join(dir, "invoice_100001.csv") },
     ]);
 
     const differentBytes = Buffer.from(
-      BALANCED_CSV.toString("utf8").replace(
+      BALANCED_CSV().toString("utf8").replace(
         "DF,5.00,22.50,0,0,0,0,0,0,22.50,US,",
         "DF,5.00,22.51,0,0,0,0,0,0,22.51,US,",
       ),
@@ -214,8 +214,8 @@ describe.skipIf(!hasDatabase)("backfillInvoiceDirectory (integration)", () => {
 
   it("prefers the PDF over the CSV for the same invoice key, and reports the CSV as skipped rather than a conflict", async () => {
     const dir = writeTempDir([
-      { name: "invoice_100001.csv", contents: BALANCED_CSV },
-      { name: "invoice_100001.pdf", contents: BALANCED_PDF },
+      { name: "invoice_100001.csv", contents: BALANCED_CSV() },
+      { name: "invoice_100001.pdf", contents: BALANCED_PDF() },
     ]);
 
     const result = await backfillInvoiceDirectory(scopedPool, dir);
@@ -235,9 +235,9 @@ describe.skipIf(!hasDatabase)("backfillInvoiceDirectory (integration)", () => {
 
   it("processes an unpaired CSV normally alongside a paired PDF/CSV", async () => {
     const dir = writeTempDir([
-      { name: "invoice_100001.csv", contents: BALANCED_CSV },
-      { name: "invoice_100001.pdf", contents: BALANCED_PDF },
-      { name: "invoice_100003.csv", contents: BALANCED_CSV_2 },
+      { name: "invoice_100001.csv", contents: BALANCED_CSV() },
+      { name: "invoice_100001.pdf", contents: BALANCED_PDF() },
+      { name: "invoice_100003.csv", contents: BALANCED_CSV_2() },
     ]);
 
     const result = await backfillInvoiceDirectory(scopedPool, dir);
@@ -254,7 +254,7 @@ describe.skipIf(!hasDatabase)("backfillInvoiceDirectory (integration)", () => {
 
   it("ignores files that are neither .csv nor .pdf", async () => {
     const dir = writeTempDir([
-      { name: "invoice_100001.csv", contents: BALANCED_CSV },
+      { name: "invoice_100001.csv", contents: BALANCED_CSV() },
       { name: "README.md", contents: Buffer.from("not an invoice", "utf8") },
     ]);
 
