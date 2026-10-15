@@ -2,6 +2,8 @@
 # Fast gate: no database. Full verify runs at pre-push instead.
 set -e
 
+# Node must match .nvmrc's major: Node 24 aborts Windows test workers (T-50).
+node scripts/check-node.mjs
 npm run typecheck
 npm run lint
 npm run test:unit

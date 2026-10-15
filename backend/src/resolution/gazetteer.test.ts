@@ -91,7 +91,7 @@ describe("isCityTierEligible", () => {
   });
 });
 
-const operatorRows: OperatorExportRow[] = JSON.parse(
+const operatorRows = (): OperatorExportRow[] => JSON.parse(
   readFileSync(path.join(fixturesDir, "operator_export.json"), "utf8"),
 );
 
@@ -120,7 +120,7 @@ function ambiguousPairsResolveByStoreNumber(
       nameRaw: row.name,
       stateUsps: row.state,
     }));
-    const result = matchStationsToOperatorExport(stations, operatorRows);
+    const result = matchStationsToOperatorExport(stations, operatorRows());
     const matchedById = new Map(result.matched.map((m) => [m.stationId, m]));
 
     for (const row of all.filter(inAmbiguousPair)) {

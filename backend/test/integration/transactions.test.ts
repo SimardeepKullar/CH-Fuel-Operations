@@ -7,6 +7,7 @@ import { createApp } from "../../src/api/app.js";
 import { getTransactionById, listTransactions } from "../../src/actuals/transactions.js";
 import { runImportInvoiceCli } from "../../src/cli/importInvoice.js";
 import { runMigrations } from "../../src/db/migrate.js";
+import { realName } from "../support/realNames.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(dirname, "../../../migrations/synthetic");
@@ -64,7 +65,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     await adminPool.end();
   });
 
-  async function navjotStopId(): Promise<string> {
+  async function driverStopId(): Promise<string> {
     const { rows } = await scopedPool.query<{ id: string }>(
       "SELECT id FROM fuel_stops WHERE base_auth_code = 'A252014353'",
     );
@@ -99,8 +100,8 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     );
     const row = result.rows.find((r) => r.baseAuthCode === "A252014353")!;
     expect(row.truck).toEqual({ resolved: "072", raw: "072", agrees: true });
-    expect(row.driver.resolved).toBe("NAVJOT");
-    expect(row.driver.raw).toBe("NAVJOT");
+    expect(row.driver.resolved).toBe(realName("transactions.driverA252014353"));
+    expect(row.driver.raw).toBe(realName("transactions.driverA252014353"));
     expect(row.driver.agrees).toBe(true);
   });
 
@@ -126,20 +127,20 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     expect(all.total).toBeGreaterThanOrEqual(60);
 
     const { rows: driverRows } = await scopedPool.query<{ id: string }>(
-      "SELECT id FROM drivers WHERE display_name = 'NAVJOT'",
+      "SELECT id FROM drivers WHERE display_name = $1", [realName("transactions.driverA252014353")],
     );
-    const navjotId = driverRows[0]!.id;
+    const driverId = driverRows[0]!.id;
 
     const byDriver = await listTransactions(
       scopedPool,
-      { driverId: navjotId },
+      { driverId },
       { field: "occurred_at", direction: "desc" },
       { page: 1, pageSize: 200 },
     );
     expect(byDriver.total).toBeGreaterThan(0);
     expect(byDriver.total).toBeLessThan(all.total);
     for (const row of byDriver.rows) {
-      expect(row.driver.resolved).toBe("NAVJOT");
+      expect(row.driver.resolved).toBe(realName("transactions.driverA252014353"));
     }
 
     const byProduct = await listTransactions(
@@ -152,7 +153,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
 
     const combined = await listTransactions(
       scopedPool,
-      { driverId: navjotId, product: "DF", receiptStatus: "pending" },
+      { driverId, product: "DF", receiptStatus: "pending" },
       { field: "occurred_at", direction: "desc" },
       { page: 1, pageSize: 200 },
     );
@@ -213,7 +214,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
   });
 
   it("GET /transactions/{id}: full record with resolution source, invoice link, and no plan link", async () => {
-    const id = await navjotStopId();
+    const id = await driverStopId();
     const detail = await getTransactionById(scopedPool, id);
     expect(detail).not.toBeNull();
     expect(detail!.lines.map((l) => l.productCode).sort()).toEqual(["DF", "TA"]);
@@ -274,7 +275,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
   });
 
   it("a dispatched plan for the same truck and price_as_of date is linked; a non-dispatched one is not", async () => {
-    const id = await navjotStopId();
+    const id = await driverStopId();
     const { rows: stopRows } = await scopedPool.query<{ occurred_at: Date; truck_id: string }>(
       "SELECT occurred_at, truck_id FROM fuel_stops WHERE id = $1",
       [id],

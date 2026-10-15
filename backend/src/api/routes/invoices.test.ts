@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { handleImportInvoice } from "./invoices.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const routeSource = readFileSync(path.join(dirname, "invoices.ts"), "utf8");
+const routeSource = () => readFileSync(path.join(dirname, "invoices.ts"), "utf8");
 
 /** A pool that fails the test the moment anything on it is called — the 415
  * path (and any other pre-database rejection) must never touch the database. */
@@ -21,7 +21,7 @@ const untouchedPool = new Proxy(
 
 describe("invoices route module", () => {
   it("imports no parser internals — only importInvoice.js and parseInvoicePdf.js from invoice/", () => {
-    const specifiers = [...routeSource.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]!);
+    const specifiers = [...routeSource().matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]!);
     const invoiceModuleImports = specifiers.filter((s) => s.includes("/invoice/"));
 
     // The route dispatches CSV-vs-PDF and maps HTTP — it never implements

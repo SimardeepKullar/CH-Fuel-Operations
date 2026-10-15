@@ -105,7 +105,7 @@ describe("matchStationsToOperatorExport", () => {
   });
 });
 
-const operatorRows: OperatorExportRow[] = JSON.parse(
+const operatorRows = (): OperatorExportRow[] => JSON.parse(
   readFileSync(path.join(fixturesDir, "operator_export.json"), "utf8"),
 );
 
@@ -121,7 +121,7 @@ describe("the committed operator-export fixture", () => {
       "bulkdef",
       "price",
     ];
-    for (const row of operatorRows) {
+    for (const row of operatorRows()) {
       const keys = Object.keys(row).map((k) => k.toLowerCase());
       for (const forbidden of priceLikeKeys) {
         expect(keys).not.toContain(forbidden);
@@ -142,7 +142,7 @@ function operatorExportResolves(
       nameRaw: row.name,
       stateUsps: row.state,
     }));
-    return matchStationsToOperatorExport(stations, operatorRows);
+    return matchStationsToOperatorExport(stations, operatorRows());
   };
 
   it("matches every station but the one the export does not carry", () => {

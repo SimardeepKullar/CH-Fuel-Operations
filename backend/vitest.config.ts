@@ -4,14 +4,17 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
-    // Each integration test file opens two `pg.Pool`s (an admin pool and a
-    // schema-scoped one). Vitest's default worker count runs enough files
-    // at once that their combined connections can exhaust Postgres faster
-    // than it reclaims them, crashing a worker outright rather than failing
-    // a single test — observed locally as an intermittent "Worker exited
-    // unexpectedly". Capping fork concurrency keeps the full suite
-    // (`npm test`, unit + integration) reliably green; unit tests are cheap
-    // enough that the reduced parallelism costs nothing noticeable.
+    // A worker that dies mid-file never reaches its afterEach, so its
+    // throwaway schema outlives the run. Sweep them before any file starts.
+    globalSetup: ["test/support/sweepStaleSchemas.ts"],
+    // The intermittent "Worker exited unexpectedly" (T-50) was not Postgres
+    // connection exhaustion: Postgres logged no FATAL, and max_connections
+    // is 100. The workers were aborting natively (exit 0xC0000409) under
+    // Node 24 on Windows — 9 of 13 full runs — and never under Node 22, the
+    // version .nvmrc and CI pin (0 of 10). scripts/check-node.mjs now fails
+    // the git hooks on a mismatch. Two forks is what that clean Node 22
+    // measurement ran with; unit tests are cheap enough that the cap costs
+    // nothing noticeable.
     pool: "forks",
     poolOptions: {
       forks: {

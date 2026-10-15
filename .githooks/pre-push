@@ -2,4 +2,6 @@
 # Full gate, same as CI: typecheck && lint && test (needs a live database).
 set -e
 
+# Node must match .nvmrc's major: Node 24 aborts Windows test workers (T-50).
+node scripts/check-node.mjs
 npm run verify
