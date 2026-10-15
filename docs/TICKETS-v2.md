@@ -94,7 +94,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-47** | **Settings — assignments, aliases, thresholds** | T-26, T-30, T-39 | **9** | **new** |
 | **T-48** | **Historical invoice backfill** | T-31 | **10** | **done — merged (`f4c94a5`, PR #26)** |
 | **T-49** | **Deploy v2** | T-40…T-47, T-50, T-51, T-60…T-66 | **10** | **new** |
-| **T-50** | **Invoice fixtures, the test-worker crash, and real data out of history (before ship)** | T-40…T-47 | **10** | **new — deliberately deferred; lands before T-49** |
+| **T-50** | **Invoice fixtures, the test-worker crash, and real data out of history (before ship)** | T-40…T-47 | **10** | **done — PR #19; crash was Node 24, history left as is** |
 | **T-51** | **BVD price-sheet fixtures; `data/bvd-prices/` out of the repo** | — | **10** | **done — merged (`3fdeac0`, PR #33; `d536409`, PR #34)** |
 | **T-52** | **Distances in miles end to end** | T-11, T-12 | **3** | **done — merged (`15181bf`, PR #37)** · landed before T-13/T-14 |
 | **T-53** | **Migrations organised by domain (squash, pre-deploy)** | — | **3** | **done — merged (`c4c2ef9`, PR #40)** · landed before T-13 and T-49 |
@@ -102,7 +102,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-55** | **Whole seconds when a plan is saved — `POST /plans` 500s on a real lane** | T-16 | **4** | **done — merged (`2571081`, PR #68)** |
 | **T-56** | **Collapse `trucks` + `truck_profiles` into one table** | T-25, T-26 | **4** | **done — merged (`6f8d454`, PR #77)** |
 | **T-57** | **"Show all sheet stations" silently does nothing on a failed fetch** | T-23 | **5** | **done — merged (`3c8e56f`, PR #79)** |
-| **T-58** | **Real data out of the working tree — synthetic fleet roster, before the repo goes public** | T-25, T-51 | **10** | **in progress — working tree clean (T-50 removed the last real driver names); public-history rewrite open under T-50** |
+| **T-58** | **Real data out of the working tree — synthetic fleet roster, before the repo goes public** | T-25, T-51 | **10** | **done — working tree clean (T-50 removed the last real driver names); history left as is (T-50)** |
 | **T-59** | **"Show all sheet stations" dots vanish on a re-plan** | T-23 | **5** | **done — PR pending** |
 | **T-60** | **Canadian stations from BVD's travel-centre directory** | T-08 | **11** | **done — merged (`13e7c88`, PR #14)** |
 | **T-61** | **Currency and native units at invoice import — the CA invoice** | T-31, T-62 | **11** | **done — merged (`22496c8`, PR #16)** |
@@ -911,7 +911,7 @@ both `adherencePct` formulas, all 1:1 down to the worked numbers).
 - [x] The sample PDF reproduces the real layout from invented data only; edge-case PDFs each cover one failure mode.
 - [x] A test that reads a file at `describe` level is a bug: a skipped suite's factory still runs. Read inside `it`.
 - [x] Ten consecutive full backend runs with no worker exit, or the crash is shown not to occur; stale `test_*` schemas are swept at the start of a run.
-- [ ] The history decision is made and recorded. *(Open: see "History", below. The working tree is scrubbed; rewriting public history is still to decide.)*
+- [x] The history decision is made and recorded. *(Leave public history as it is; see "History", below.)*
 - [x] `npm run verify` is green with `data/bvd-invoices/` absent, and with it present.
 
 **Not in scope.** Changing what any test asserts. Parser changes, unless a new fixture exposes a bug — then the test comes first, per CLAUDE.md.
@@ -921,11 +921,11 @@ both `adherencePct` formulas, all 1:1 down to the worked numbers).
 - **A new fixture exposed a parser bug.** The PDF reader never checked printed column headers, so `edge-changed-header.pdf` (Retail and Billed swapped) imported with the prices swapped. It now checks each table's header (test first).
 - **One departure from the scope text.** The 1-, 2- and 3-word driver names are carried by `edge-page-break.pdf`, not the sample. Tests assert the sample's names, and changing an assertion is out of scope.
 
-**History (2026-10-07): the working tree is scrubbed; rewriting public history is still to decide.**
+**History (decided 2026-10-15): the working tree is scrubbed; public history is left as it is.**
 - **The price sheets and card numbers were never in the public repository.** `CH-Fuel-Operations` was cut from a fresh squashed root (`ac26820`). None of its commits ever held a price sheet, a real invoice, a real card number (`295xxxx`/`296xxxx`) or the design HTML, and no branch, tag or PR ref on it reaches the old history. That old history (the 32 sheets in `4668db0`, the real roster) survives only in the **private** `CH-Fuel-Planner` repository (with its PR refs) and in local clones.
 - **Real driver names were in it, though.** Item 3 was written about the price sheets, but a scan against the local real roster and invoices found real driver names in every public commit from `ac26820` on. They sat on about 20 lines of local-only real-invoice tests (`parseInvoicePdf`, `expressCharges`, `invoicesRoute`, `stations`, `transactions`): expected values, two test titles, a comment table, two identifiers and two SQL strings. One more sat in §T-40F's correction note. T-58 had kept those tests for their real *totals* and missed the names in them.
 - **T-50 moved them out of the tree.** The expected names now live in gitignored `data/bvd-invoices/real-names.json`, read inside each test through `backend/test/support/realNames.ts`. Titles, comments and the T-40F note are worded neutrally, and the two SQL strings are parameterised. No assertion changed, and the real-invoice tests still pass against the same values.
-- **Still to decide: whether to rewrite public history to remove the names.** That means `git filter-repo --replace-text` over all public commits plus a force-push of `main`. Costs: every SHA changes; the `merged (sha)` notes in sixteen commit messages go stale; GitHub keeps `refs/pull/*` on the old commits until GitHub Support purges them; every clone must re-clone. The repository has 0 forks. The alternative is to accept that the names stay in public history (and in any copy already taken), with every future commit clean.
+- **Decision: no rewrite.** The alternative was `git filter-repo --replace-text` over all public commits plus a force-push of `main`. Its costs: every SHA changes; the `merged (sha)` notes in sixteen commit messages go stale; GitHub keeps `refs/pull/*` on the old commits until GitHub Support purges them; every clone must re-clone. Against that, what the history exposes is limited: about ten people, mostly first names (a few full names), each beside a unit number or an invoice line, plus three billed per-gallon prices at one site and on one stop (5.6593, 5.5208, 5.2395). No card numbers, price sheets, invoice files, addresses or licence numbers. The names therefore stay in public history, and in any copy already taken; every future commit is clean, and CLAUDE.md's testing rule keeps it so. The three billed prices are real contract figures and stay too. **Revisit if** the repository is shared more widely than today, or if those prices are judged sensitive; a rewrite stays available later, at the same cost.
 
 ---
 
@@ -1222,7 +1222,7 @@ Matrix is the binding limit, and 25 plans a day is *exactly* ORS's daily matrix 
 
 **Not in scope.** The git-history rewrite — T-50's original decision item (32 real BVD price-sheet CSVs committed in `4668db0`). This ticket's own edits needed to survive that rewrite, not precede it into a squashed history that then got rewritten again.
 
-**History (found under T-50, 2026-10-07).** `4668db0` is not reachable from the public repository's `main`, contrary to the paragraph above as first written. `CH-Fuel-Operations` starts from a fresh squashed root (`ac26820`) that already carries this ticket's synthetic roster, and none of its commits holds a real card number or price sheet. It did hold real driver names, though: about 20 lines of the local-only real-invoice tests "left alone, on purpose" above asserted names as well as totals, and one line of §T-40F named a driver. T-50 moved them to gitignored `data/bvd-invoices/real-names.json`, so the working tree is clean. Whether to rewrite public history to remove them is open under T-50.
+**History (found under T-50, 2026-10-07).** `4668db0` is not reachable from the public repository's `main`, contrary to the paragraph above as first written. `CH-Fuel-Operations` starts from a fresh squashed root (`ac26820`) that already carries this ticket's synthetic roster, and none of its commits holds a real card number or price sheet. It did hold real driver names, though: about 20 lines of the local-only real-invoice tests "left alone, on purpose" above asserted names as well as totals, and one line of §T-40F named a driver. T-50 moved them to gitignored `data/bvd-invoices/real-names.json`, so the working tree is clean. T-50 decided not to rewrite public history (2026-10-15), so they stay there.
 
 ---
 
