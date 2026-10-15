@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import { isUuid } from "../../actuals/ids.js";
-import { fxRateProblem } from "../../actuals/units.js";
+import { fxRateProblem, type InvoiceFx } from "../../actuals/units.js";
 import type { InvoiceCurrency } from "../../db/types.js";
 import { detectInvoiceFormat } from "../../invoice/detectFormat.js";
 import { importInvoice, type ImportInvoiceMeta, type ImportInvoiceResult } from "../../invoice/importInvoice.js";
@@ -124,13 +124,8 @@ interface InvoiceListRow {
   fx_entered_at: Date | null;
 }
 
-/** D27 (as amended): the exchange rate a dispatcher entered on a CA invoice —
- * `rate` is CAD per 1 USD; `enteredAt` is when it last changed. Named by what
- * it is, not by a currency suffix: no response key carries `Usd` (T-63). */
-export interface InvoiceFx {
-  rate: number;
-  enteredAt: string;
-}
+/** D27 (as amended): the exchange rate a dispatcher entered on a CA invoice. */
+export type { InvoiceFx };
 
 export interface InvoiceListItem {
   id: string;

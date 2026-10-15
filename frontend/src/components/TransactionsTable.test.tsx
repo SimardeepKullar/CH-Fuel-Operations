@@ -33,6 +33,8 @@ function stop(overrides: Partial<TransactionListItem> = {}): TransactionListItem
     billedPerUnit: 5.499,
     total: 238.26,
     currency: "USD",
+    // What BVD billed; the same as `currency` unless a conversion says otherwise.
+    invoiceCurrency: overrides.invoiceCurrency ?? overrides.currency ?? "USD",
     receiptStatus: "confirmed",
     flags: [],
     lines: [
@@ -299,14 +301,45 @@ describe("TransactionsTable", () => {
     expect(document.querySelector(".tx-caption")!.textContent).toContain("each invoice's own currency");
   });
 
-  it("All invoices in one unit (after the toggle): quantity sums, money and the weighted prices stay apart", () => {
-    const rows = [stop(), caStop({ qty: 26.42, qtyUnit: "gal", billedPerUnit: 7.2093, retailPerUnit: 7.5708 })];
-    render(<TransactionsTable {...baseProps(rows)} conversion="USD/gal" />);
+  it("All invoices converted to USD/gal at an entered rate: everything is one currency and unit, so it all sums (T-66)", () => {
+    const fx = { rate: 1.3712, enteredAt: "2026-10-06T16:00:00.000Z" };
+    const caInUsd = caStop({ currency: "USD", invoiceCurrency: "CAD", fx, qty: 26.42, qtyUnit: "gal", billedPerUnit: 5.2577, retailPerUnit: 5.5213, total: 156.96 });
+    caInUsd.lines = caInUsd.lines!.map((l) => ({ ...l, currency: "USD", amount: 156.96, preTaxAmount: 138.9, hst: 18.06 }));
+    render(<TransactionsTable {...baseProps([stop(), caInUsd])} showInvoice week="2026-09-09" />);
+
+    const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
+    expect(cells[0]).toBe("66.42");
+    expect(cells[3]).toBe("US$395.22");
+    expect(cells[1]).not.toBe("—");
+    const head = document.querySelector(".tx-head-row")!.textContent!;
+    expect(head).toContain("Billed USD/gal");
+    expect(head).toContain("Total USD");
+    expect(document.querySelector(".tx-caption")!.textContent).toContain("All amounts USD.");
+    expect(screen.getByTestId("fx-rate-line").textContent).toContain("Converted at 1.3712 CAD per USD, entered Oct 6, 2026");
+    expect(screen.queryByTestId("conversion-pending")).toBeNull();
+    // The converted row still names the invoice BVD billed it on.
+    expect(screen.getAllByTestId("tx-invoice-tag").map((t) => t.textContent)).toEqual(["🇺🇸 999210", "🇨🇦 999217"]);
+  });
+
+  it("a rate-pending row shows 'rate pending' in its money cells, withholds the totals, and links to the Overview to enter it", () => {
+    const pending = caStop({ currency: "USD", invoiceCurrency: "CAD", ratePending: true, qty: 26.42, qtyUnit: "gal", billedPerUnit: null, retailPerUnit: null, total: null });
+    pending.lines = pending.lines!.map((l) => ({ ...l, currency: "USD", amount: null, preTaxAmount: null, hst: null, gst: null, pst: null, qst: null, retailPerUnit: null, billedPerUnit: null }));
+    render(<TransactionsTable {...baseProps([stop(), pending])} week="2026-09-09" />);
+
+    const caRowText = document.querySelectorAll(".tx-row")[1]!.textContent!;
+    expect(caRowText).toContain("rate pending");
+    expect(caRowText).not.toContain("1.00");
     const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
     expect(cells).toEqual(["66.42", "—", "—", "—"]);
-    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Gallons");
-    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Billed per gal");
-    expect(screen.getByTestId("conversion-pending").textContent).toContain("CAD amounts stay in CAD");
+    expect(screen.getByTestId("conversion-pending").textContent).toContain("rate pending — enter the exchange rate on the Overview");
+    expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?week=2026-09-09");
+    expect(screen.queryByTestId("fx-rate-line")).toBeNull();
+
+    fireEvent.click(document.querySelectorAll(".tx-row")[1]!);
+    // Still a CA stop: its tax columns stay, every one pending.
+    expect(screen.getByTestId("stop-hst").textContent).toBe("rate pending");
+    expect(screen.getByTestId("stop-total").textContent).toBe("rate pending");
+    expect(screen.getByText("Invoice 999217")).toBeTruthy();
   });
 
   it("the Source row names each row's own invoice", () => {
@@ -315,9 +348,10 @@ describe("TransactionsTable", () => {
     expect(screen.getByText("Invoice 999217")).toBeTruthy();
   });
 
-  it("no pending note when the conversion matches the rows' currency", () => {
-    render(<TransactionsTable {...baseProps([caStop()])} conversion="CAD/L" />);
+  it("rows as printed carry no rate line and no pending note", () => {
+    render(<TransactionsTable {...baseProps([caStop()])} />);
     expect(screen.queryByTestId("conversion-pending")).toBeNull();
+    expect(screen.queryByTestId("fx-rate-line")).toBeNull();
   });
 
   it("under All invoices each row is tagged with its invoice and country", () => {

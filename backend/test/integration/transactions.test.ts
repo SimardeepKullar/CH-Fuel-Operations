@@ -85,7 +85,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     const row = result.rows.find((r) => r.baseAuthCode === "A252014353");
     expect(row).toBeDefined();
     expect(row!.total).toBe(255.13);
-    const lineSum = row!.lines!.reduce((sum, l) => sum + l.amount, 0);
+    const lineSum = row!.lines!.reduce((sum, l) => sum + l.amount!, 0);
     expect(Math.round(lineSum * 100) / 100).toBe(255.13);
     // Never derived from the TA line alone (CLAUDE.md) — DF must be present too.
     expect(row!.lines!.map((l) => l.productCode).sort()).toEqual(["DF", "TA"]);

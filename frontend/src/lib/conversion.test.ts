@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choiceCurrency, choiceUnit, conversionParams, moneyConversionPending, nativeChoice } from "./conversion";
+import { choiceCurrency, choiceUnit, conversionParams, formatFxEnteredAt, nativeChoice } from "./conversion";
 
 describe("the USD/gal | CAD/L conversion (T-64)", () => {
   it("each invoice's default is the format it came in", () => {
@@ -14,16 +14,13 @@ describe("the USD/gal | CAD/L conversion (T-64)", () => {
     expect(choiceUnit("USD/gal")).toBe("gal");
   });
 
-  it("asks the API for units only — no money conversion until T-66 — and nothing for as-printed", () => {
+  it("asks the API for the unit and the currency (T-66) — and nothing for as-printed", () => {
     expect(conversionParams(null)).toEqual({});
-    expect(conversionParams("USD/gal")).toEqual({ units: "imperial" });
-    expect(conversionParams("CAD/L")).toEqual({ units: "metric" });
+    expect(conversionParams("USD/gal")).toEqual({ units: "imperial", convertTo: "USD" });
+    expect(conversionParams("CAD/L")).toEqual({ units: "metric", convertTo: "CAD" });
   });
 
-  it("flags money that would need the exchange rate", () => {
-    expect(moneyConversionPending("USD/gal", "CAD")).toBe(true);
-    expect(moneyConversionPending("CAD/L", "USD")).toBe(true);
-    expect(moneyConversionPending("USD/gal", "USD")).toBe(false);
-    expect(moneyConversionPending(null, "CAD")).toBe(false);
+  it("formats when a rate was entered as a date with its year", () => {
+    expect(formatFxEnteredAt("2026-10-06T16:00:00.000Z")).toContain("Oct 6, 2026");
   });
 });

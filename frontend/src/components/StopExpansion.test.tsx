@@ -23,6 +23,7 @@ const A900000001: TransactionListItem = {
   billedPerUnit: 5.499,
   total: 238.26,
   currency: "USD",
+  invoiceCurrency: "USD",
   receiptStatus: "confirmed",
   flags: [],
   lines: [
@@ -42,6 +43,7 @@ const CA_STOP: TransactionListItem = {
   billedPerUnit: 2.1522,
   total: 215.22,
   currency: "CAD",
+  invoiceCurrency: "CAD",
   lines: [
     { productCode: "TA", qty: 100, retailPerUnit: 2.0, billedPerUnit: 2.1522, amount: 215.22, preTaxAmount: 190.46, hst: 24.76, gst: 0, pst: 0, qst: 0, qtyUnit: "L", currency: "CAD" },
   ],

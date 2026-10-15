@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { InvoiceCurrency } from "@ch/core/db/types";
-import { formatPricePerUnit } from "../lib/formatMoney";
+import { RATE_PENDING, formatPricePerUnit } from "../lib/formatMoney";
 
 interface BilledPriceProps {
   /** Per gallon or per litre, whichever the row is in; the column header names
@@ -10,6 +10,8 @@ interface BilledPriceProps {
   retailPerUnit: number | null;
   /** The row's own currency — a CA row is not dollars of the US kind (D28). */
   currency: InvoiceCurrency;
+  /** The row asked for a conversion whose rate is not entered (T-66): "rate pending", not "—". */
+  ratePending?: boolean;
 }
 
 // Inline, not a CSS class: BUILD-PLAN-v2 Step 40.1 asserts the size
@@ -39,13 +41,13 @@ const discountStyle: CSSProperties = {
  * small and muted (rendered by the caller — this component only owns the
  * billed+discount pairing); discount is a subline, never coloured as a win.
  */
-export default function BilledPrice({ billedPerUnit, retailPerUnit, currency }: BilledPriceProps) {
+export default function BilledPrice({ billedPerUnit, retailPerUnit, currency, ratePending = false }: BilledPriceProps) {
   const discountPerUnit = billedPerUnit === null || retailPerUnit === null ? null : retailPerUnit - billedPerUnit;
 
   return (
     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
       <span data-testid="billed-price-value" style={valueStyle}>
-        {billedPerUnit === null ? "—" : formatPricePerUnit(billedPerUnit, currency)}
+        {billedPerUnit === null ? (ratePending ? RATE_PENDING : "—") : formatPricePerUnit(billedPerUnit, currency)}
       </span>
       <span data-testid="billed-price-discount" style={discountStyle}>
         disc {discountPerUnit === null ? "—" : formatPricePerUnit(discountPerUnit, currency)}

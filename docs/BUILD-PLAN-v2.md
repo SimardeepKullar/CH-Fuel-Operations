@@ -1289,7 +1289,7 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 
 **Goal.** A CA invoice carries the rate the dispatcher entered; nothing is fetched.
 
-**Files.** Modified: `0003_actuals_schema.sql` (both sets: `fx_cad_per_usd numeric(10,6)`, `fx_entered_at timestamptz`, CHECK null on USD), `backend/src/api/routes/invoices.ts` (`PATCH` accepts `fxCadPerUsd`; list and detail return `fxCadPerUsd`, `fxEnteredAt`), `importInvoice.ts` and the import CLI (`--fx-rate`) (+ tests).
+**Files.** Modified: `0003_actuals_schema.sql` (both sets: `fx_cad_per_usd numeric(10,6)`, `fx_entered_at timestamptz`, CHECK null on USD), `backend/src/api/routes/invoices.ts` (`PATCH` accepts `fxCadPerUsd`; list and detail return `fx: { rate, enteredAt } | null` — no response key contains `Usd`), `periods.ts` (each invoice carries `fx`), `importInvoice.ts` and the import CLI (`--fx-rate`) (+ tests).
 
 **Tests.** `PATCH { fxCadPerUsd: 1.3712 }` on a CA invoice stores it and `fx_entered_at`; a second value replaces it; `null` clears both; on a USD invoice → 400; `0`, `-1`, `0.4`, `3.1`, a string → 400 with nothing changed; `{ billingWeekEnd, fxCadPerUsd }` together applies both or neither. `--fx-rate 1.3712` on a CA file stores it; on a USD file it fails before any row is written. The drift test sees the new columns in both migration sets.
 **Pass:** all, with no network.

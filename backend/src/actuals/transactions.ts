@@ -3,7 +3,16 @@ import { normalizeName } from "../resolve/normalizeName.js";
 import { parseStoreName } from "../resolution/storeNumber.js";
 import type { AnomalySeverity, InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "../db/types.js";
 import { buildTransactionFilterClause, type TransactionFilters } from "./transactionQuery.js";
-import { convertNullable, qtyConverter, type RequestedUnits } from "./units.js";
+import {
+  convertNullable,
+  moneyConverter,
+  qtyConverter,
+  type InvoiceFx,
+  type MoneyConverter,
+  type RequestedCurrency,
+  type RequestedUnits,
+  type StoredFx,
+} from "./units.js";
 
 export type TransactionSortField = "occurred_at" | "total";
 export interface TransactionSort {
@@ -42,20 +51,23 @@ export interface AnomalyFlag {
 
 /** One product line, as BVD printed it: `qty` in `qtyUnit`, per-unit prices in
  * `currency` per `qtyUnit`, `amount` the Final AMT (tax included) and the five
- * tax columns beside it (zero on a US invoice, D28). Money is never converted. */
+ * tax columns beside it (zero on a US invoice, D28). Money is in the invoice's
+ * own currency unless `?convertTo=` converted the row (T-66); then `currency`
+ * is the target, and every money figure and price is `null` while the rate is
+ * pending — never computed at 1.0. */
 export interface TransactionLine {
   productCode: string;
   qty: number;
   qtyUnit: InvoiceQtyUnit;
-  retailPerUnit: number;
-  billedPerUnit: number;
-  amount: number;
+  retailPerUnit: number | null;
+  billedPerUnit: number | null;
+  amount: number | null;
   /** Pre Tax AMT; `null` where the invoice printed none. */
   preTaxAmount: number | null;
-  hst: number;
-  gst: number;
-  pst: number;
-  qst: number;
+  hst: number | null;
+  gst: number | null;
+  pst: number | null;
+  qst: number | null;
   currency: InvoiceCurrency;
 }
 
@@ -74,9 +86,17 @@ export interface TransactionListItem {
   qtyUnit: InvoiceQtyUnit;
   retailPerUnit: number | null;
   billedPerUnit: number | null;
-  total: number;
-  /** The invoice's currency; a week's two sides can both be on one page. */
+  /** `null` only while a requested conversion's rate is pending. */
+  total: number | null;
+  /** The currency every money figure on the row is in: the invoice's, unless
+   * `?convertTo=` asked for the other one. A week's two sides can both be on one page. */
   currency: InvoiceCurrency;
+  /** The currency BVD billed the row in — what names its invoice (T-66). */
+  invoiceCurrency: InvoiceCurrency;
+  /** The entered rate the row's money was converted at; only on a converted row. */
+  fx?: InvoiceFx;
+  /** `?convertTo=` asked for a conversion and no rate is entered: money is `null`. */
+  ratePending?: true;
   receiptStatus: ReceiptStatus;
   flags: AnomalyFlag[];
   lines?: TransactionLine[];
@@ -93,6 +113,8 @@ export interface ListTransactionsOptions {
   includeLines?: boolean;
   /** `?units=`; absent means as printed. */
   units?: RequestedUnits;
+  /** `?convertTo=` (T-66); absent means each row in its invoice's own currency. */
+  convertTo?: RequestedCurrency;
 }
 
 interface TransactionRow {
@@ -118,6 +140,12 @@ interface TransactionRow {
   qty_unit: InvoiceQtyUnit;
 }
 
+/** `BASE_SELECT`'s row: a `TransactionRow` plus the rate of its billing week's CA invoice. */
+interface ListRow extends TransactionRow {
+  fx_cad_per_usd: string | null;
+  fx_entered_at: Date | null;
+}
+
 const SORT_COLUMNS: Record<TransactionSortField, string> = {
   occurred_at: "fs.occurred_at",
   total: "fs.total",
@@ -132,7 +160,8 @@ const BASE_SELECT = `
          s.id AS station_id, s.name_raw AS station_name_raw,
          s.city_raw AS station_city_raw, s.state_usps AS station_state_usps,
          ta.qty AS ta_qty, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed,
-         i.currency, i.qty_unit
+         i.currency, i.qty_unit,
+         fx.fx_cad_per_usd, fx.fx_entered_at
   FROM fuel_stops fs
   JOIN invoices i ON i.id = fs.invoice_id
   JOIN fuel_cards fc ON fc.id = fs.card_id
@@ -145,6 +174,14 @@ const BASE_SELECT = `
     WHERE fuel_stop_id = fs.id AND product_code = 'TA'
     LIMIT 1
   ) ta ON true
+  -- T-66: the rate any conversion of this row uses — the one entered on its
+  -- billing week's CA invoice (a CA row's own; a US row's week-mate). One
+  -- imported invoice per currency per week (D26), so at most one row.
+  LEFT JOIN LATERAL (
+    SELECT ca.fx_cad_per_usd, ca.fx_entered_at
+    FROM invoices ca
+    WHERE ca.billing_week_end = i.billing_week_end AND ca.currency = 'CAD' AND ca.status = 'imported'
+  ) fx ON true
 `;
 
 /**
@@ -188,13 +225,26 @@ export function stationSummary(
   };
 }
 
+/** The row's money converter: the requested currency at its week's entered rate. */
+function rowMoney(row: ListRow, units: RequestedUnits, convertTo: RequestedCurrency): MoneyConverter {
+  const fx: StoredFx | null =
+    row.fx_cad_per_usd === null || row.fx_entered_at === null ? null : { rate: row.fx_cad_per_usd, enteredAt: row.fx_entered_at };
+  return moneyConverter(row.currency, convertTo, fx, row.qty_unit, units);
+}
+
+/** Stays as printed — `getTransactionById` takes no `convertTo`. */
+function asPrinted(row: TransactionRow, units: RequestedUnits): MoneyConverter {
+  return moneyConverter(row.currency, null, null, row.qty_unit, units);
+}
+
 function toListItem(
   row: TransactionRow,
   flagsByStop: ReadonlyMap<string, AnomalyFlag[]>,
   units: RequestedUnits,
+  money: MoneyConverter,
 ): TransactionListItem {
   const conv = qtyConverter(row.qty_unit, units);
-  return {
+  const item: TransactionListItem = {
     id: row.id,
     baseAuthCode: row.base_auth_code,
     occurredAt: row.occurred_at.toISOString(),
@@ -204,13 +254,17 @@ function toListItem(
     station: stationSummary(row),
     qty: convertNullable(conv.qty, row.ta_qty === null ? null : Number(row.ta_qty)),
     qtyUnit: conv.qtyUnit,
-    retailPerUnit: convertNullable(conv.perUnit, row.ta_retail === null ? null : Number(row.ta_retail)),
-    billedPerUnit: convertNullable(conv.perUnit, row.ta_billed === null ? null : Number(row.ta_billed)),
-    total: Number(row.total),
-    currency: row.currency,
+    retailPerUnit: row.ta_retail === null ? null : money.perUnit(row.ta_retail),
+    billedPerUnit: row.ta_billed === null ? null : money.perUnit(row.ta_billed),
+    total: money.money(row.total),
+    currency: money.currency,
+    invoiceCurrency: row.currency,
     receiptStatus: row.receipt_status,
     flags: flagsByStop.get(row.id) ?? [],
   };
+  if (money.fx !== null) item.fx = money.fx;
+  if (money.ratePending) item.ratePending = true;
+  return item;
 }
 
 interface AnomalyFlagRow {
@@ -261,6 +315,7 @@ async function loadLines(
   pool: Pool,
   stopIds: readonly string[],
   units: RequestedUnits,
+  moneyByStop: ReadonlyMap<string, MoneyConverter>,
 ): Promise<Map<string, TransactionLine[]>> {
   const byStop = new Map<string, TransactionLine[]>();
   if (stopIds.length === 0) {
@@ -278,19 +333,21 @@ async function loadLines(
   );
   for (const row of rows) {
     const conv = qtyConverter(row.qty_unit, units);
+    // The stop's own converter, so a line and its stop convert at one rate.
+    const money = moneyByStop.get(row.fuel_stop_id) ?? moneyConverter(row.currency, null, null, row.qty_unit, units);
     const line: TransactionLine = {
       productCode: row.product_code,
       qty: conv.qty(Number(row.qty)),
       qtyUnit: conv.qtyUnit,
-      retailPerUnit: conv.perUnit(Number(row.retail_per_unit)),
-      billedPerUnit: conv.perUnit(Number(row.billed_per_unit)),
-      amount: Number(row.amount),
-      preTaxAmount: row.pre_tax_amount === null ? null : Number(row.pre_tax_amount),
-      hst: Number(row.hst),
-      gst: Number(row.gst),
-      pst: Number(row.pst),
-      qst: Number(row.qst),
-      currency: row.currency,
+      retailPerUnit: money.perUnit(row.retail_per_unit),
+      billedPerUnit: money.perUnit(row.billed_per_unit),
+      amount: money.money(row.amount),
+      preTaxAmount: row.pre_tax_amount === null ? null : money.money(row.pre_tax_amount),
+      hst: money.money(row.hst),
+      gst: money.money(row.gst),
+      pst: money.money(row.pst),
+      qst: money.money(row.qst),
+      currency: money.currency,
     };
     const existing = byStop.get(row.fuel_stop_id);
     if (existing) {
@@ -318,6 +375,7 @@ export async function listTransactions(
   options: ListTransactionsOptions = {},
 ): Promise<ListTransactionsResult> {
   const units = options.units ?? null;
+  const convertTo = options.convertTo ?? null;
   const { whereSql, params } = buildTransactionFilterClause(filters);
   const sortColumn = SORT_COLUMNS[sort.field];
   const direction = sort.direction === "asc" ? "ASC" : "DESC";
@@ -326,7 +384,7 @@ export async function listTransactions(
   const offsetParamIndex = params.length + 2;
   const pageParams = [...params, pagination.pageSize, (pagination.page - 1) * pagination.pageSize];
 
-  const { rows } = await pool.query<TransactionRow>(
+  const { rows } = await pool.query<ListRow>(
     `${BASE_SELECT}
      ${whereSql}
      ORDER BY ${sortColumn} ${direction}, fs.id ASC
@@ -342,11 +400,12 @@ export async function listTransactions(
 
   const stopIds = rows.map((r) => r.id);
   const flagsByStop = await loadFlags(pool, stopIds);
-  const linesByStop = options.includeLines ? await loadLines(pool, stopIds, units) : undefined;
+  const moneyByStop = new Map(rows.map((row) => [row.id, rowMoney(row, units, convertTo)]));
+  const linesByStop = options.includeLines ? await loadLines(pool, stopIds, units, moneyByStop) : undefined;
 
   return {
     rows: rows.map((row) => {
-      const item = toListItem(row, flagsByStop, units);
+      const item = toListItem(row, flagsByStop, units, moneyByStop.get(row.id)!);
       if (linesByStop) {
         item.lines = linesByStop.get(row.id) ?? [];
       }
@@ -476,12 +535,12 @@ export async function getTransactionById(
 
   const [flagsByStop, linesByStop, receiptCheck, planId] = await Promise.all([
     loadFlags(pool, [row.id]),
-    loadLines(pool, [row.id], units),
+    loadLines(pool, [row.id], units, new Map([[row.id, asPrinted(row, units)]])),
     loadLatestReceiptCheck(pool, row.id),
     findDispatchedPlanId(pool, row.truck_id, row.occurred_at),
   ]);
 
-  const base = toListItem(row, flagsByStop, units);
+  const base = toListItem(row, flagsByStop, units, asPrinted(row, units));
   const station =
     base.station === null
       ? null

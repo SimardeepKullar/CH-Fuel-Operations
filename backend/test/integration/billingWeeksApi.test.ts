@@ -123,7 +123,7 @@ describe.skipIf(!hasDatabase)("period-scoped routes over a US + CA week (integra
 
     it("sorts on `total`, the renamed sort value", async () => {
       const body = await get<ListTransactionsResult>(`/transactions?${w}&currency=CAD&pageSize=200&sortField=total&sortDirection=desc`);
-      const totals = body.rows.map((r) => r.total);
+      const totals = body.rows.map((r) => r.total!);
       expect(totals).toEqual([...totals].sort((a, b) => b - a));
       await get("/transactions?sortField=total_usd", 400);
     });

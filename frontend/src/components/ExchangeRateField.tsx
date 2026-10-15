@@ -4,17 +4,7 @@ import { useState } from "react";
 import type { InvoiceFx } from "@ch/core/api/routes/invoices";
 import type { PeriodInvoice } from "@ch/core/api/routes/periods";
 import { ApiError, patchInvoiceFx } from "../lib/api";
-
-/** `2026-10-06T14:05:00Z` -> `"Oct 6, 2026, 10:05 AM"`, in the dispatcher's own time zone. */
-export function formatFxEnteredAt(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatFxEnteredAt } from "../lib/conversion";
 
 /** A plain decimal, as typed — `Number("")` is 0 and `Number("0x1")` is 1, so `Number` alone won't do. */
 const DECIMAL = /^\d+(\.\d+)?$/;

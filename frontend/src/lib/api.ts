@@ -189,8 +189,10 @@ export interface ListTransactionsParams {
   week?: string;
   /** One side of the week; the server serves both when omitted, so a screen reading one side says which. */
   currency?: "USD" | "CAD";
-  /** Converts quantities and per-unit prices (never money, D25); absent means as BVD printed them. */
+  /** Converts quantities and per-unit prices; absent means as BVD printed them. */
   units?: "imperial" | "metric";
+  /** Converts money and per-unit prices at the week's entered rate (T-66); absent means each row's own currency. */
+  convertTo?: "USD" | "CAD";
   page?: number;
   pageSize?: number;
   sortField?: TransactionSortField;

@@ -457,7 +457,7 @@ before there is anywhere to put them.
 
 ---
 
-## 9. Actuals — billing weeks, currency and units (T-63)
+## 9. Actuals — billing weeks, currency and units (T-63, T-66)
 
 What every period-scoped Actuals screen reads, after D24–D28. Plan screens carry
 no week (A7) and are unaffected; **Plan vs Actual stays US-only**, since plans
@@ -465,7 +465,7 @@ are, and takes `?week=` alone.
 
 **The key is a billing week.** `GET /periods` lists weeks, newest first —
 `{ weeks: [{ weekEnd, invoices: [{ id, invoiceNumber, currency, printedStart,
-printedEnd, actualStart, actualEnd, datesDiffer }] }] }` — USD invoice first,
+printedEnd, actualStart, actualEnd, datesDiffer, fx }] }] }` — USD invoice first,
 then CAD, at most one of each, imported invoices only. `datesDiffer` is the
 amber note ("Printed Aug 1 – Sep 9; transactions Sep 3 – Sep 10"): printed range
 ≠ actual range, where *actual* is the first and last transaction's UTC date. It
@@ -474,13 +474,26 @@ invoice to another week; moving onto an occupied week of the same currency is a
 409. `GET /health`'s `latestInvoicePeriod` is the newest week with an imported
 invoice on either side.
 
+**The exchange rate is entered, per CA invoice (T-66, D27).** `PATCH
+/invoices/{id}` also takes `{ fxCadPerUsd }` — CAD per 1 USD, up to 6 dp, or
+`null` to clear it back to "rate pending" — alone or beside `billingWeekEnd`, and
+applies both or neither. On a USD invoice, or ≤ 0, or outside 0.5–3.0 (a typo
+guard), it is a 400 whose `detail` says why, and nothing changes. Responses carry
+the rate as `fx: { rate, enteredAt } | null` — on `GET /invoices`, `GET
+/invoices/{id}`, the `PATCH` response and each `/periods` invoice — `null` until
+entered and always on a USD invoice; `enteredAt` moves only when the rate does.
+The request key is `fxCadPerUsd`; no *response* key carries `Usd`. The Overview
+is the one screen that enters it (T-65 moves the field into the combined panel);
+the Import screen never asks for it.
+
 **Query parameters**, on every period-scoped route:
 
 | Param | Rule |
 |---|---|
 | `week` | `YYYY-MM-DD`, a real date. **Required** on `/overview`, `/drivers`, `/drivers/{id}`, `/trucks/{id}`, `/express-charges`, `/plan-actual`; a missing or malformed one is a 400 problem+json. **Optional** where the screen has no week of its own — `/trucks` (omitted: the plain roster, D23), `/transactions` (a driver's or truck's history spans weeks), `/receipt-queue` (a standing worklist) — but a malformed one is still a 400. |
 | `currency` | `USD` or `CAD`; anything else is a 400. On the one-sided screens (`/drivers`, `/trucks`, `/express-charges` and their details) an omitted `currency` is `USD` and the response says so: gallons and litres cannot be summed. On `/transactions` and `/receipt-queue` an omitted `currency` is *both* sides, each row carrying its own. `/overview` takes the week alone and serves the US side (T-65 shapes the rest); `/stations/{id}/billed-prices` defaults to the station's own country. |
-| `units` | `imperial` or `metric`; anything else is a 400. Absent means as BVD printed it — gallons on a US invoice, litres on a CA one. Converts **quantity and per-unit prices only**, at the API (D25): CAD/L × 3.785411784 is CAD/gal. Money never changes, and nothing converted is stored. |
+| `units` | `imperial` or `metric`; anything else is a 400. Absent means as BVD printed it — gallons on a US invoice, litres on a CA one. Converts **quantity and per-unit prices only**, at the API (D25): CAD/L × 3.785411784 is CAD/gal. Money is never converted by `units`, and nothing converted is stored. |
+| `convertTo` | `/transactions` only (T-66). `USD` or `CAD`; anything else is a 400. Absent means each row in the currency its invoice was billed in. Converts **money and per-unit prices** at the rate entered on the row's billing week's CA invoice: CAD → USD divides by it, USD → CAD multiplies. Each stored figure is converted on its own, exactly, and rounded once half away from zero — money to the cent, prices to 4 dp (a price whose unit also changes takes the unit factor inside that one rounding) — so a converted stop total need not equal the sum of its converted lines to the cent. A converted row's `currency` is the target; every row carries `invoiceCurrency` (what BVD billed — what names its invoice); a converted row carries `fx: { rate, enteredAt }`. **No entered rate → every money figure and price on the row and its lines is `null` and the row has `ratePending: true`; never a 1.0 rate.** A row already in the target currency is unchanged. Nothing converted is stored, so a corrected rate re-converts on the next read. |
 
 **Field names carry no currency or unit.** `…Usd` is gone from every Actuals
 response (the Plan screens' `unitPriceUsd`-style fields are USD by construction
@@ -497,7 +510,10 @@ and `productTotals[].gallons/amountUsd/discountUsd` are `grandTotal` and
 `qtyUnit`, `"gal"` or `"L"`, for the quantities) either on the object that holds
 the money or on an ancestor — at the root for `/drivers`, `/trucks`,
 `/express-charges`, `/overview` and the station series; per row for
-`/transactions` and `/receipt-queue`, whose rows can come from either side. A
+`/transactions` and `/receipt-queue`, whose rows can come from either side —
+on `/transactions` that is the currency the row is *shown* in, the target of any
+`convertTo`. Under All invoices the money totals become summable only when every
+row is in one currency at an entered rate; a `ratePending` row withholds them. A
 transaction line carries `preTaxAmount`, `hst`, `gst`, `pst`, `qst` beside
 `amount` (the printed Final AMT, tax included) for the Canadian detail view (D28).
 

@@ -43,7 +43,7 @@ export function formatGallons2dp(gallons: number): string {
  */
 const CURRENCY_PREFIX: Record<InvoiceCurrency, string> = { USD: "US$", CAD: "CA$" };
 
-/** `255.13, "CAD"` -> `"CA$255.13"` — money at 2dp, never converted. */
+/** `255.13, "CAD"` -> `"CA$255.13"` — money at 2dp; it formats, it never converts (the API does, T-66). */
 export function formatMoney(amount: number, currency: InvoiceCurrency): string {
   const sign = amount < 0 ? "-" : "";
   return `${sign}${CURRENCY_PREFIX[currency]}${Math.abs(amount).toFixed(2)}`;
@@ -66,6 +66,19 @@ export const QTY_UNIT_NAMES: Record<InvoiceQtyUnit, string> = { gal: "Gallons", 
 /** What BVD prints a side in, absent `?units=` (D25). */
 export function nativeQtyUnit(currency: InvoiceCurrency): InvoiceQtyUnit {
   return currency === "CAD" ? "L" : "gal";
+}
+
+/** What a money cell shows while a conversion's exchange rate has not been entered (D27). */
+export const RATE_PENDING = "rate pending";
+
+/** `formatMoney`, or "rate pending" for the `null` a pending conversion returns — never 0. */
+export function formatMoneyOrPending(amount: number | null, currency: InvoiceCurrency): string {
+  return amount === null ? RATE_PENDING : formatMoney(amount, currency);
+}
+
+/** `formatPricePerUnit`, or "rate pending". */
+export function formatPriceOrPending(price: number | null, currency: InvoiceCurrency): string {
+  return price === null ? RATE_PENDING : formatPricePerUnit(price, currency);
 }
 
 /** Sums money in integer cents, so a column of 2dp amounts does not drift by a float's error. */
