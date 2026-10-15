@@ -110,7 +110,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **done — merged (`7c008b0`, PR #17)** |
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **done — merged (`cfff981`, PR #18)** |
 | **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
-| **T-66** | **Exchange rate on the CA invoice, entered by the dispatcher** | T-61, T-64 | **11** | **new** |
+| **T-66** | **Exchange rate on the CA invoice, entered by the dispatcher** | T-61, T-64 | **11** | **done — merged (`13475b8`, PR #20)** |
 
 **Phase 11 (Canada invoices)** lands before T-49: T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place, which D21 allows only until the first deploy. Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. Decisions D24–D30 (PROJECT-SCOPE-v2 §A15) govern all seven.
 
@@ -1456,9 +1456,9 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Dependencies.** T-61, T-64.
 
 **Definition of done.**
-- [ ] `PATCH /invoices/{id}` `{ fxCadPerUsd: 1.3712 }` on a CA invoice stores it with `fx_entered_at`; a second `PATCH` corrects it; `null` clears it back to pending; on a USD invoice, or ≤ 0, or outside 0.5–3.0, it is a 400 and nothing changes.
-- [ ] `--fx-rate` sets the rate at import; on a USD invoice it fails before any write.
-- [ ] The Overview shows the selected week's CA rate (or "rate pending"), enters and corrects it through `PATCH`, and shows a 400's reason; a week with no CA invoice has no rate field; the Import screen has none.
-- [ ] `GET /transactions?convertTo=USD` on 999217's week returns each CAD money field ÷ the entered rate, rounded once to the cent, with `fx` and `invoiceCurrency` on the row; with no rate, money is `null` and `ratePending: true`; a USD row is unchanged; correcting the rate changes the next read and nothing stored.
-- [ ] On Transactions, `USD/gal` on the CA invoice shows USD money and the rate line; with no rate, "rate pending" and a link to enter it.
-- [ ] The full suite runs with no network.
+- [x] `PATCH /invoices/{id}` `{ fxCadPerUsd: 1.3712 }` on a CA invoice stores it with `fx_entered_at`; a second `PATCH` corrects it; `null` clears it back to pending; on a USD invoice, or ≤ 0, or outside 0.5–3.0, it is a 400 and nothing changes.
+- [x] `--fx-rate` sets the rate at import; on a USD invoice it fails before any write.
+- [x] The Overview shows the selected week's CA rate (or "rate pending"), enters and corrects it through `PATCH`, and shows a 400's reason; a week with no CA invoice has no rate field; the Import screen has none.
+- [x] `GET /transactions?convertTo=USD` on 999217's week returns each CAD money field ÷ the entered rate, rounded once to the cent, with `fx` and `invoiceCurrency` on the row; with no rate, money is `null` and `ratePending: true`; a USD row is unchanged; correcting the rate changes the next read and nothing stored.
+- [x] On Transactions, `USD/gal` on the CA invoice shows USD money and the rate line; with no rate, "rate pending" and a link to enter it.
+- [x] The full suite runs with no network.
