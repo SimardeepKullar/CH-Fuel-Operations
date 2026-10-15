@@ -45,6 +45,7 @@ function invoice(overrides: Partial<PeriodInvoice>): PeriodInvoice {
     actualStart: "2026-09-03",
     actualEnd: "2026-09-09",
     datesDiffer: false,
+    fx: null,
     ...overrides,
   };
 }

@@ -26,6 +26,8 @@ const querySchema = z.object({
   week: isoDateSchema.optional(),
   currency: currencySchema.optional(),
   units: unitsSchema.optional(),
+  /** T-66: money in this currency, at the entered rate; absent, each row's own. */
+  convertTo: currencySchema.optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
   driverId: z.string().optional(),
@@ -52,6 +54,7 @@ function parseQueryParams(searchParams: URLSearchParams): z.infer<typeof querySc
     "week",
     "currency",
     "units",
+    "convertTo",
     "dateFrom",
     "dateTo",
     "driverId",
@@ -112,7 +115,11 @@ export async function handleListTransactions(pool: Pool, url: URL): Promise<Resp
     anomalyOnly: query.anomalyOnly,
   };
   const sort: TransactionSort = { field: query.sortField, direction: query.sortDirection };
-  const options: ListTransactionsOptions = { includeLines: query.includeLines, units: query.units ?? null };
+  const options: ListTransactionsOptions = {
+    includeLines: query.includeLines,
+    units: query.units ?? null,
+    convertTo: query.convertTo ?? null,
+  };
 
   const result = await listTransactions(
     pool,

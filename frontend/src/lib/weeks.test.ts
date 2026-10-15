@@ -22,6 +22,7 @@ function invoice(currency: "USD" | "CAD"): PeriodInvoice {
     actualStart: "2026-09-03",
     actualEnd: "2026-09-10",
     datesDiffer: true,
+    fx: null,
   };
 }
 

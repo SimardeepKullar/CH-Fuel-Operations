@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
@@ -12,7 +13,10 @@ import {
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(dirname, "../../../migrations/synthetic");
+/** Gitignored (T-58): present on the dev machine, absent in CI and a fresh clone. */
+const realMigrationsDir = path.join(dirname, "../../../migrations/real");
 const hasDatabase = Boolean(process.env.DATABASE_URL);
+const hasRealMigrations = existsSync(realMigrationsDir);
 
 /** PostGIS installs this itself; it is not ours to mirror. */
 const NOT_OURS = new Set(["spatial_ref_sys"]);
@@ -95,6 +99,27 @@ async function readActualSchema(
   return [...tables.values()];
 }
 
+/** T-66's columns and CHECKs on `invoices`, read back from one migrated schema. */
+function fxShape(tables: TableDescriptor[]): { columns: ColumnDescriptor[]; checks: string[] } {
+  const invoices = tables.find((t) => t.name === "invoices");
+  return {
+    columns: (invoices?.columns ?? []).filter((c) => c.name.startsWith("fx_")),
+    checks: (invoices?.checks ?? []).filter((c) => c.includes("fx_")).sort(),
+  };
+}
+
+const FX_SHAPE = {
+  columns: [
+    { name: "fx_cad_per_usd", type: "numeric", nullable: true },
+    { name: "fx_entered_at", type: "timestamptz", nullable: true },
+  ],
+  checks: [
+    "CHECK (((currency = 'CAD'::text) OR ((fx_cad_per_usd IS NULL) AND (fx_entered_at IS NULL))))",
+    "CHECK (((fx_cad_per_usd IS NULL) = (fx_entered_at IS NULL)))",
+    "CHECK ((fx_cad_per_usd > (0)::numeric))",
+  ].sort(),
+};
+
 describe.skipIf(!hasDatabase)("schema drift (integration)", () => {
   let adminPool: Pool;
   let scopedPool: Pool;
@@ -130,6 +155,10 @@ describe.skipIf(!hasDatabase)("schema drift (integration)", () => {
 
   it("descriptor matches information_schema exactly", () => {
     expect(diffSchema(SCHEMA, actual)).toEqual([]);
+  });
+
+  it("invoices carries the entered exchange rate, nullable, with its CHECKs (T-66)", () => {
+    expect(fxShape(actual)).toEqual(FX_SHAPE);
   });
 
   it("detects a wrong nullability in the descriptor", () => {
@@ -218,5 +247,42 @@ describe.skipIf(!hasDatabase)("schema drift (integration)", () => {
     expect(diffSchema(tampered, actual)).toEqual([
       "express_charges.driver_id: descriptor uuid NOT NULL, database uuid NULL",
     ]);
+  });
+});
+
+// The real set (T-58) differs from the synthetic one only in 0005's roster
+// rows, so its schema must match the same descriptor. Runs where
+// migrations/real exists — the dev machine — and skips in CI.
+describe.skipIf(!hasDatabase || !hasRealMigrations)("schema drift, migrations/real (integration)", () => {
+  let adminPool: Pool;
+  let scopedPool: Pool;
+  let schema: string;
+  let actual: TableDescriptor[];
+
+  beforeAll(async () => {
+    schema = `test_drift_real_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    adminPool = new Pool({ connectionString: process.env.DATABASE_URL });
+    await adminPool.query(`CREATE SCHEMA "${schema}"`);
+    scopedPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      options: `-c search_path=${schema},public`,
+    });
+    await runMigrations(scopedPool, realMigrationsDir);
+    actual = await readActualSchema(scopedPool, schema);
+  });
+
+  afterAll(async () => {
+    await scopedPool.end();
+    await adminPool.query(`DROP SCHEMA "${schema}" CASCADE`);
+    await adminPool.end();
+  });
+
+  it("descriptor matches information_schema exactly", () => {
+    expect(actual.length).toBe(SCHEMA.length);
+    expect(diffSchema(SCHEMA, actual)).toEqual([]);
+  });
+
+  it("invoices carries the entered exchange rate, nullable, with its CHECKs (T-66)", () => {
+    expect(fxShape(actual)).toEqual(FX_SHAPE);
   });
 });

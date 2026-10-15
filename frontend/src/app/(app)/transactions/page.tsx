@@ -60,7 +60,7 @@ export default function TransactionsPage() {
   // Choosing the invoice's own format is the same as choosing nothing — no params.
   const conversion = chosen === native ? null : chosen;
   const shown = conversion ?? native;
-  const { units } = conversionParams(conversion);
+  const { units, convertTo } = conversionParams(conversion);
 
   const invoiceNumbers = useMemo(
     () => Object.fromEntries((weekEntry?.invoices ?? []).map((invoice) => [invoice.currency, invoice.invoiceNumber])),
@@ -88,6 +88,7 @@ export default function TransactionsPage() {
       week: period,
       currency,
       units,
+      convertTo,
       pageSize: 200,
       includeLines: true,
       driverId: filters.driverId || undefined,
@@ -117,6 +118,7 @@ export default function TransactionsPage() {
     periodLoading,
     currency,
     units,
+    convertTo,
     filters.driverId,
     filters.truckId,
     filters.cardId,
@@ -140,7 +142,7 @@ export default function TransactionsPage() {
         error={error}
         invoiceNumbers={invoiceNumbers}
         showInvoice={selection.kind === "all"}
-        conversion={conversion}
+        week={period}
         currency={shown === null ? "USD" : choiceCurrency(shown)}
         qtyUnit={shown === null ? "gal" : choiceUnit(shown)}
         filters={filters}

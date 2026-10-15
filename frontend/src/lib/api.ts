@@ -168,6 +168,16 @@ export function patchInvoiceWeek(id: string, billingWeekEnd: string): Promise<In
   });
 }
 
+/** `PATCH /invoices/{id}` `{ fxCadPerUsd }` (T-66, D27) — enters or corrects a CA invoice's
+ * exchange rate, CAD per 1 USD, or clears it with `null` back to "rate pending". A USD invoice,
+ * or a rate outside 0.5–3.0, is a 400 whose `detail` says why; `ApiError` carries it. */
+export function patchInvoiceFx(id: string, fxCadPerUsd: number | null): Promise<InvoiceListItem> {
+  return request<InvoiceListItem>(`/invoices/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fxCadPerUsd }),
+  });
+}
+
 /** `GET /receipt-queue` — T-39's source for the sidebar's pending badge and
  * the top bar's standing "Receipts" count (both global, D17). */
 export function getReceiptQueue(): Promise<ReceiptQueueResult> {
@@ -179,8 +189,10 @@ export interface ListTransactionsParams {
   week?: string;
   /** One side of the week; the server serves both when omitted, so a screen reading one side says which. */
   currency?: "USD" | "CAD";
-  /** Converts quantities and per-unit prices (never money, D25); absent means as BVD printed them. */
+  /** Converts quantities and per-unit prices; absent means as BVD printed them. */
   units?: "imperial" | "metric";
+  /** Converts money and per-unit prices at the week's entered rate (T-66); absent means each row's own currency. */
+  convertTo?: "USD" | "CAD";
   page?: number;
   pageSize?: number;
   sortField?: TransactionSortField;

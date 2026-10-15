@@ -1293,6 +1293,12 @@ select.tx-filter-select {
 
 /* — Overview (T-41, A8.1) — */
 .overview-page { display: flex; flex-direction: column; gap: 16px; padding: 18px 22px; }
+/* T-66: the CA invoice's exchange rate, entered by the dispatcher. */
+.fx-rate { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; }
+.fx-rate-label { display: inline-flex; align-items: center; gap: 8px; font: 500 12px var(--font-body); }
+.fx-rate-input { width: 9ch; height: 26px; min-height: 0; padding: 0 6px; font: 400 12px var(--font-body); font-variant-numeric: tabular-nums; text-align: right; }
+.fx-rate-status { font: 400 12px var(--font-body); color: #a4abb9; }
+.fx-rate-error { flex-basis: 100%; color: var(--color-error); }
 
 .kpi-grid {
   display: grid;

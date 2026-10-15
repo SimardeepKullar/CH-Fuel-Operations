@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import type { InvoiceCurrency } from "../../db/types.js";
-import { datesDiffer } from "./invoices.js";
+import { datesDiffer, toInvoiceFx, type InvoiceFx } from "./invoices.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -18,6 +18,8 @@ export interface PeriodInvoice {
   actualStart: string | null;
   actualEnd: string | null;
   datesDiffer: boolean;
+  /** The CA invoice's entered exchange rate (D27, T-66); `null` until entered — and always on a USD invoice. */
+  fx: InvoiceFx | null;
 }
 
 export interface PeriodWeek {
@@ -36,6 +38,8 @@ interface PeriodRow {
   period_end: string;
   actual_start: string | null;
   actual_end: string | null;
+  fx_cad_per_usd: string | null;
+  fx_entered_at: Date | null;
 }
 
 /**
@@ -51,7 +55,8 @@ export async function handleListPeriods(pool: Pool): Promise<Response> {
             to_char(period_start, 'YYYY-MM-DD') AS period_start,
             to_char(period_end, 'YYYY-MM-DD') AS period_end,
             to_char(actual_start, 'YYYY-MM-DD') AS actual_start,
-            to_char(actual_end, 'YYYY-MM-DD') AS actual_end
+            to_char(actual_end, 'YYYY-MM-DD') AS actual_end,
+            fx_cad_per_usd, fx_entered_at
      FROM invoices
      WHERE status = 'imported'
      ORDER BY billing_week_end DESC, currency DESC`,
@@ -73,6 +78,7 @@ export async function handleListPeriods(pool: Pool): Promise<Response> {
       actualStart: row.actual_start,
       actualEnd: row.actual_end,
       datesDiffer: datesDiffer(row),
+      fx: toInvoiceFx(row),
     });
   }
   return jsonResponse({ weeks });

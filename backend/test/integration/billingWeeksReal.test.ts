@@ -123,6 +123,38 @@ describe.skipIf(!hasDatabase || !hasRealFixtures || !python)("billing weeks on t
     }
   });
 
+  it("convertTo=USD at an entered 1.3712 is each of 999217's 59 stops ÷ the rate, to the cent (T-66)", async () => {
+    const pending = await get<ListTransactionsResult>("/transactions?week=2026-09-09&currency=CAD&pageSize=200&convertTo=USD");
+    expect(pending.rows.filter((r) => r.ratePending === true && r.total === null)).toHaveLength(59);
+
+    const caId = (await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = '999217'")).rows[0]!.id;
+    const patched = await app.handle(
+      new Request(`http://localhost/api/v1/invoices/${caId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: 1.3712 }) }),
+    );
+    expect(patched.status).toBe(200);
+    try {
+      const usd = await get<ListTransactionsResult>("/transactions?week=2026-09-09&currency=CAD&pageSize=200&includeLines=true&convertTo=USD");
+      expect(usd.total).toBe(59);
+      const { rows: oracle } = await pool.query<{ id: string; total: string; lines: string }>(
+        `SELECT fs.id, round(fs.total / 1.3712, 2)::text AS total,
+                (SELECT count(*) FROM fuel_stop_lines WHERE fuel_stop_id = fs.id)::text AS lines
+         FROM fuel_stops fs WHERE fs.invoice_id = $1`,
+        [caId],
+      );
+      expect(oracle).toHaveLength(59);
+      for (const want of oracle) {
+        const row = usd.rows.find((r) => r.id === want.id)!;
+        expect(row).toMatchObject({ currency: "USD", invoiceCurrency: "CAD", fx: { rate: 1.3712 } });
+        expect(row.total).toBe(Number(want.total));
+        expect(row.lines).toHaveLength(Number(want.lines));
+      }
+      // The 999217 grand total is still stored as printed.
+      expect((await pool.query<{ g: string }>("SELECT grand_total::text AS g FROM invoices WHERE id = $1", [caId])).rows[0]!.g).toBe("46837.33");
+    } finally {
+      await pool.query("UPDATE invoices SET fx_cad_per_usd = NULL, fx_entered_at = NULL WHERE id = $1", [caId]);
+    }
+  });
+
   it("the US side of the same week is 999210's 66 stops in gallons, and the week holds both", async () => {
     const us = await get<ListTransactionsResult>("/transactions?week=2026-09-09&currency=USD&pageSize=200");
     expect(us.total).toBe(66);

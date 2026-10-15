@@ -10,8 +10,17 @@ import {
 } from "@tanstack/react-table";
 import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "@ch/core/db/types";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
-import { QTY_UNIT_NAMES, formatMoney, formatPricePerUnit, formatQty2dp, sumMoney } from "../lib/formatMoney";
-import { moneyConversionPending, type DisplayChoice } from "../lib/conversion";
+import Link from "next/link";
+import {
+  QTY_UNIT_NAMES,
+  formatMoney,
+  formatMoneyOrPending,
+  formatPriceOrPending,
+  formatPricePerUnit,
+  formatQty2dp,
+  sumMoney,
+} from "../lib/formatMoney";
+import { formatFxEnteredAt } from "../lib/conversion";
 import { SIDE_FLAGS, SIDE_LABELS } from "../lib/weeks";
 import {
   PRODUCT_OPTIONS,
@@ -57,8 +66,9 @@ function perUnitHeader(prefix: string, currency: InvoiceCurrency | null, unit: I
 }
 
 /** Under All invoices, the tag under a row's date naming the invoice it came
- * from and its country: `🇨🇦 999217`. A row carries its currency, and a week
- * holds one imported invoice per currency (D26), so the currency names it. */
+ * from and its country: `🇨🇦 999217`. A row carries the currency it was billed
+ * in (`invoiceCurrency`, which a conversion leaves alone — T-66), and a week
+ * holds one imported invoice per currency (D26), so that currency names it. */
 function InvoiceTag({ currency, invoiceNumber }: { currency: InvoiceCurrency; invoiceNumber: string | null }) {
   return (
     <span className="tx-invoice-tag" data-currency={currency} data-testid="tx-invoice-tag">
@@ -93,7 +103,10 @@ function buildColumns(
             <span className="tx-date">{date}</span>
             <span className="tx-time">{time}</span>
             {invoiceNumbers !== null && (
-              <InvoiceTag currency={row.original.currency} invoiceNumber={invoiceNumbers[row.original.currency] ?? null} />
+              <InvoiceTag
+                currency={row.original.invoiceCurrency}
+                invoiceNumber={invoiceNumbers[row.original.invoiceCurrency] ?? null}
+              />
             )}
           </span>
         );
@@ -153,6 +166,7 @@ function buildColumns(
           billedPerUnit={row.original.billedPerUnit}
           retailPerUnit={row.original.retailPerUnit}
           currency={row.original.currency}
+          ratePending={row.original.ratePending === true}
         />
       ),
     }),
@@ -161,13 +175,15 @@ function buildColumns(
       header: perUnitHeader("Retail", currency, unit),
       cell: ({ row }) => (
         <span className="muted">
-          {row.original.retailPerUnit === null ? "—" : formatPricePerUnit(row.original.retailPerUnit, row.original.currency)}
+          {row.original.retailPerUnit === null && row.original.ratePending !== true
+            ? "—"
+            : formatPriceOrPending(row.original.retailPerUnit, row.original.currency)}
         </span>
       ),
     }),
     columnHelper.accessor("total", {
       header: currency === null ? "Total" : `Total ${currency}`,
-      cell: ({ row }) => <span className="tx-total">{formatMoney(row.original.total, row.original.currency)}</span>,
+      cell: ({ row }) => <span className="tx-total">{formatMoneyOrPending(row.original.total, row.original.currency)}</span>,
     }),
     columnHelper.display({
       id: "receipt",
@@ -240,13 +256,13 @@ interface TransactionsTableProps {
   loading: boolean;
   error: Error | null;
   /** The week's invoice number per currency (one imported invoice per side, D26) — a row's
-   * own invoice for `StopExpansion`'s "Source" row. A row carries its currency, not its
-   * invoice id (A7); T-66's money conversion must keep the invoice's own currency on the row. */
+   * own invoice for `StopExpansion`'s "Source" row, keyed on the row's `invoiceCurrency`
+   * (what BVD billed), which a conversion leaves alone (T-66). */
   invoiceNumbers: Partial<Record<InvoiceCurrency, string>>;
   /** Tag each row with the invoice it came from (flag + number) — on under All invoices. */
   showInvoice?: boolean;
-  /** The conversion chosen on screen, `null` for as printed — for the "conversion pending" caption. */
-  conversion?: DisplayChoice | null;
+  /** The selected week — where "rate pending" links to enter the rate (the Overview, T-66). */
+  week?: string | null;
   /** What the page asked for — the headers' currency and unit when no row says. */
   currency: InvoiceCurrency;
   qtyUnit: InvoiceQtyUnit;
@@ -274,7 +290,7 @@ export default function TransactionsTable({
   error,
   invoiceNumbers,
   showInvoice = false,
-  conversion = null,
+  week = null,
   currency: requestedCurrency,
   qtyUnit: requestedUnit,
   filters,
@@ -342,7 +358,10 @@ export default function TransactionsTable({
   const units = new Set(rows.map((row) => row.qtyUnit));
   const currency = currencies.size > 1 ? null : (rows[0]?.currency ?? requestedCurrency);
   const unit = units.size > 1 ? null : (rows[0]?.qtyUnit ?? requestedUnit);
-  const pendingCurrencies = [...currencies].filter((c) => moneyConversionPending(conversion, c));
+  // T-66: a converted row carries the rate it was converted at; a row whose rate is not
+  // entered carries `ratePending` and no money — and then no total adds it in.
+  const ratePending = rows.some((row) => row.ratePending === true);
+  const fx = rows.find((row) => row.fx !== undefined)?.fx ?? null;
   const columns = useMemo(
     () => buildColumns(currency, unit, showInvoice ? invoiceNumbers : null),
     [currency, unit, showInvoice, invoiceNumbers],
@@ -357,21 +376,25 @@ export default function TransactionsTable({
     let weightedBilled = 0;
     let weightedRetail = 0;
     for (const row of rows) {
-      if (row.qty !== null && row.billedPerUnit !== null && row.retailPerUnit !== null) {
+      // A rate-pending row has no prices, but its quantity is not money and still adds up.
+      const priced = row.billedPerUnit !== null && row.retailPerUnit !== null;
+      if (row.qty !== null && (priced || row.ratePending === true)) {
         hasQty = true;
         qty += row.qty;
-        weightedBilled += row.qty * row.billedPerUnit;
-        weightedRetail += row.qty * row.retailPerUnit;
+        if (priced) {
+          weightedBilled += row.qty * row.billedPerUnit!;
+          weightedRetail += row.qty * row.retailPerUnit!;
+        }
       }
     }
-    const priced = currency !== null && unit !== null && hasQty && qty > 0;
+    const priced = currency !== null && unit !== null && hasQty && qty > 0 && !ratePending;
     return {
       qty: unit !== null && hasQty ? qty : null,
       avgBilled: priced ? weightedBilled / qty : null,
       avgRetail: priced ? weightedRetail / qty : null,
-      total: currency !== null ? sumMoney(rows.map((row) => row.total)) : null,
+      total: currency !== null && !ratePending ? sumMoney(rows.map((row) => row.total ?? 0)) : null,
     };
-  }, [rows, currency, unit]);
+  }, [rows, currency, unit, ratePending]);
 
   return (
     <>
@@ -567,7 +590,7 @@ export default function TransactionsTable({
                         ),
                       )}
                     </div>
-                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumbers[stop.currency] ?? null} />}
+                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumbers[stop.invoiceCurrency] ?? null} />}
                   </div>
                 );
               })}
@@ -601,12 +624,20 @@ export default function TransactionsTable({
           {currency === null
             ? "Amounts are in each invoice's own currency — no combined total."
             : `All amounts ${currency}.`}
-          {pendingCurrencies.length > 0 && (
+          {fx !== null && (
+            <span className="tx-fx-rate" data-testid="fx-rate-line">
+              {" "}
+              Converted at {fx.rate} CAD per USD, entered {formatFxEnteredAt(fx.enteredAt)}.
+            </span>
+          )}
+          {ratePending && (
             <span className="tx-conversion-pending" data-testid="conversion-pending">
               {" "}
-              Shown per {unit === "L" ? "litre" : "gallon"}; {pendingCurrencies.join(" and ")} amounts stay in{" "}
-              {pendingCurrencies.length > 1 ? "their own currency" : pendingCurrencies[0]} — converting them needs the
-              Bank of Canada rate (rate pending).
+              rate pending —{" "}
+              <Link href={week === null ? "/overview" : `/overview?week=${encodeURIComponent(week)}`} data-testid="enter-rate-link">
+                enter the exchange rate on the Overview
+              </Link>
+              .
             </span>
           )}
         </span>

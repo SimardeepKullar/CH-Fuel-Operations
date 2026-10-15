@@ -111,7 +111,18 @@ CREATE TABLE invoices (
   status          text NOT NULL
                     CHECK (status IN ('quarantined','imported')),
   file_sha256     char(64) NOT NULL UNIQUE,
-  imported_at     timestamptz NOT NULL DEFAULT now()
+  imported_at     timestamptz NOT NULL DEFAULT now(),
+  -- D27 (as amended): the exchange rate the dispatcher entered for a CA
+  -- invoice, CAD per 1 USD, and when it last changed. NULL until entered —
+  -- "rate pending", never an assumed 1.0. Correctable: nothing converted is
+  -- stored, so a corrected rate re-converts every figure on its next read.
+  -- A USD invoice has no rate to enter.
+  fx_cad_per_usd  numeric(10,6),
+  fx_entered_at   timestamptz,
+
+  CHECK (currency = 'CAD' OR (fx_cad_per_usd IS NULL AND fx_entered_at IS NULL)),
+  CHECK ((fx_cad_per_usd IS NULL) = (fx_entered_at IS NULL)),
+  CHECK (fx_cad_per_usd > 0)
 );
 
 -- Two imported invoices of one currency in one week is a 409, not a silent

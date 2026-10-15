@@ -1,5 +1,5 @@
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
-import { QTY_UNIT_NAMES, formatMoney, formatPricePerUnit, formatQty2dp, sumMoney } from "../lib/formatMoney";
+import { QTY_UNIT_NAMES, RATE_PENDING, formatMoneyOrPending, formatPriceOrPending, formatQty2dp, sumMoney } from "../lib/formatMoney";
 import { productLabel } from "../lib/transactionFilterConstants";
 import RawResolved from "./RawResolved";
 
@@ -53,15 +53,19 @@ interface StopExpansionProps {
  */
 export default function StopExpansion({ stop, stacked = false, invoiceNumber = null }: StopExpansionProps) {
   const lines = stop.lines ?? [];
+  // Money is in `currency` — the invoice's, or the one a conversion asked for (T-66).
+  // The tax columns follow what BVD billed: a CA stop shown in USD still has its HST.
   const { currency } = stop;
   const unit = lines[0]?.qtyUnit ?? stop.qtyUnit;
   const perUnit = unit === "L" ? "/L" : "/gal";
-  const showTax = currency === "CAD";
+  const showTax = stop.invoiceCurrency === "CAD";
   const rowClass = showTax ? " stop-expansion-line-row-tax" : "";
   // A line BVD printed no Pre Tax AMT for (Scale, Manual, Express) makes the
   // column's sum meaningless — "—", not a total that leaves that line out.
   const preTaxKnown = lines.length > 0 && lines.every((line) => line.preTaxAmount !== null);
-  const taxTotal = (pick: (line: (typeof lines)[number]) => number) => formatMoney(sumMoney(lines.map(pick)), currency);
+  const pending = stop.ratePending === true;
+  const taxTotal = (pick: (line: (typeof lines)[number]) => number | null) =>
+    pending ? RATE_PENDING : formatMoneyOrPending(sumMoney(lines.map((line) => pick(line) ?? 0)), currency);
 
   return (
     <div className={`stop-expansion${stacked ? " stop-expansion-stacked" : ""}`} data-testid="stop-expansion">
@@ -90,19 +94,21 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
             <span className="mono">{line.productCode}</span>
             <span className="stop-expansion-line-label">{productLabel(line.productCode)}</span>
             <span className="num">{formatQty2dp(line.qty)}</span>
-            <span className="num muted">{formatPricePerUnit(line.retailPerUnit, line.currency)}</span>
-            <span className="num stop-expansion-line-billed">{formatPricePerUnit(line.billedPerUnit, line.currency)}</span>
+            <span className="num muted">{formatPriceOrPending(line.retailPerUnit, line.currency)}</span>
+            <span className="num stop-expansion-line-billed">{formatPriceOrPending(line.billedPerUnit, line.currency)}</span>
             {showTax ? (
               <>
-                <span className="num">{line.preTaxAmount === null ? "—" : formatMoney(line.preTaxAmount, line.currency)}</span>
-                <span className="num">{formatMoney(line.hst, line.currency)}</span>
-                <span className="num">{formatMoney(line.gst, line.currency)}</span>
-                <span className="num">{formatMoney(line.pst, line.currency)}</span>
-                <span className="num">{formatMoney(line.qst, line.currency)}</span>
-                <span className="num">{formatMoney(line.amount, line.currency)}</span>
+                <span className="num">
+                  {line.preTaxAmount === null && !pending ? "—" : formatMoneyOrPending(line.preTaxAmount, line.currency)}
+                </span>
+                <span className="num">{formatMoneyOrPending(line.hst, line.currency)}</span>
+                <span className="num">{formatMoneyOrPending(line.gst, line.currency)}</span>
+                <span className="num">{formatMoneyOrPending(line.pst, line.currency)}</span>
+                <span className="num">{formatMoneyOrPending(line.qst, line.currency)}</span>
+                <span className="num">{formatMoneyOrPending(line.amount, line.currency)}</span>
               </>
             ) : (
-              <span className="num">{formatMoney(line.amount, line.currency)}</span>
+              <span className="num">{formatMoneyOrPending(line.amount, line.currency)}</span>
             )}
           </div>
         ))}
@@ -115,7 +121,7 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
           {showTax && (
             <>
               <span className="num muted" data-testid="stop-pretax">
-                {preTaxKnown ? formatMoney(sumMoney(lines.map((line) => line.preTaxAmount ?? 0)), currency) : "—"}
+                {pending ? RATE_PENDING : preTaxKnown ? formatMoneyOrPending(sumMoney(lines.map((line) => line.preTaxAmount ?? 0)), currency) : "—"}
               </span>
               <span className="num muted" data-testid="stop-hst">
                 {taxTotal((line) => line.hst)}
@@ -132,7 +138,7 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
             </>
           )}
           <span className="num stop-expansion-total-value" data-testid="stop-total">
-            {formatMoney(stop.total, currency)}
+            {formatMoneyOrPending(stop.total, currency)}
           </span>
         </div>
       </div>

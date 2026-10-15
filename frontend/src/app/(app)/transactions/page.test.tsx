@@ -55,6 +55,8 @@ function stop(overrides: Partial<TransactionListItem> = {}): TransactionListItem
     billedPerUnit: 5.499,
     total: 238.26,
     currency: "USD",
+    // What BVD billed; the same as `currency` unless a conversion says otherwise.
+    invoiceCurrency: overrides.invoiceCurrency ?? overrides.currency ?? "USD",
     receiptStatus: "confirmed",
     flags: [],
     lines: [],
@@ -142,8 +144,8 @@ describe("TransactionsPage (T-40)", () => {
 const PAIRED_WEEK: PeriodWeek = {
   weekEnd: "2026-09-09",
   invoices: [
-    { id: "inv-us", invoiceNumber: "999210", currency: "USD", printedStart: "2026-09-03", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-09", datesDiffer: false },
-    { id: "inv-ca", invoiceNumber: "999217", currency: "CAD", printedStart: "2026-08-01", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-10", datesDiffer: true },
+    { id: "inv-us", invoiceNumber: "999210", currency: "USD", printedStart: "2026-09-03", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-09", datesDiffer: false, fx: null },
+    { id: "inv-ca", invoiceNumber: "999217", currency: "CAD", printedStart: "2026-08-01", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-10", datesDiffer: true, fx: null },
   ],
 };
 const US_ONLY_WEEK: PeriodWeek = { weekEnd: "2026-09-02", invoices: [PAIRED_WEEK.invoices[0]!] };
@@ -163,21 +165,34 @@ function caRow(overrides: Partial<TransactionListItem> = {}): TransactionListIte
   });
 }
 
-function setupWeeks(weeks: PeriodWeek[], latest = weeks[0]!.weekEnd) {
+const FX = { rate: 1.3712, enteredAt: "2026-10-06T16:00:00.000Z" };
+
+function setupWeeks(weeks: PeriodWeek[], latest = weeks[0]!.weekEnd, rateEntered = true) {
   getHealth.mockResolvedValue({ latestInvoicePeriod: latest, openAnomalyCount: 0 });
   listPeriods.mockResolvedValue({ weeks });
   listDrivers.mockResolvedValue({ week: latest, invoiceId: "x", rows: [], unresolved: {}, fleet: {} });
   listTrucks.mockResolvedValue({ rows: [] });
-  // Serves what the request asks for: one side or both, as printed or in the requested unit.
-  listTransactions.mockImplementation(async (params: { currency?: string; units?: string }) => {
-    const us = params.units === "metric" ? stop({ qty: 151.42, qtyUnit: "L", billedPerUnit: 1.4527, retailPerUnit: 1.5319 }) : stop();
-    const ca = params.units === "imperial" ? caRow({ qty: 26.42, qtyUnit: "gal", billedPerUnit: 7.2093, retailPerUnit: 7.5708 }) : caRow();
+  // Serves what the request asks for: one side or both, as printed or in the requested unit and
+  // currency — converted at 1.3712 when `rateEntered`, otherwise rate pending (T-66).
+  listTransactions.mockImplementation(async (params: { currency?: string; units?: string; convertTo?: string }) => {
+    let us = params.units === "metric" ? stop({ qty: 151.42, qtyUnit: "L", billedPerUnit: 1.4527, retailPerUnit: 1.5319 }) : stop();
+    let ca = params.units === "imperial" ? caRow({ qty: 26.42, qtyUnit: "gal", billedPerUnit: 7.2093, retailPerUnit: 7.5708 }) : caRow();
+    if (params.convertTo === "USD") {
+      ca = rateEntered
+        ? { ...ca, currency: "USD", invoiceCurrency: "CAD", fx: FX, billedPerUnit: 5.2577, retailPerUnit: 5.5213, total: 156.96 }
+        : { ...ca, currency: "USD", invoiceCurrency: "CAD", ratePending: true, billedPerUnit: null, retailPerUnit: null, total: null };
+    }
+    if (params.convertTo === "CAD") {
+      us = rateEntered
+        ? { ...us, currency: "CAD", invoiceCurrency: "USD", fx: FX, billedPerUnit: 1.992, retailPerUnit: 2.1006, total: 326.7 }
+        : { ...us, currency: "CAD", invoiceCurrency: "USD", ratePending: true, billedPerUnit: null, retailPerUnit: null, total: null };
+    }
     const rows = params.currency === "USD" ? [us] : params.currency === "CAD" ? [ca] : [us, ca];
     return { rows, page: 1, pageSize: 200, total: rows.length };
   });
 }
 
-type TableRequest = { week?: string; currency?: string; units?: string };
+type TableRequest = { week?: string; currency?: string; units?: string; convertTo?: string };
 
 /** The last table-shaped request (`includeLines`) — what the page's figures came from. */
 function lastTableRequest(): TableRequest {
@@ -255,7 +270,7 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(screen.getAllByTestId("tx-invoice-tag").map((t) => t.textContent)).toEqual(["🇺🇸 999210", "🇨🇦 999217"]);
   });
 
-  it("USD/gal on the CA invoice asks for gallons and keeps the money in CAD, with the rate pending", async () => {
+  it("USD/gal on the CA invoice asks for gallons and USD, and shows USD money with the rate and when it was entered (T-66)", async () => {
     searchParams = new URLSearchParams({ invoice: "inv-ca" });
     setupWeeks([PAIRED_WEEK]);
     render(<TransactionsPage />);
@@ -263,12 +278,25 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
 
     fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
 
-    await waitFor(() => expect(lastTableRequest()).toMatchObject({ currency: "CAD", units: "imperial" }));
-    await waitFor(() => expect(document.querySelector(".tx-head-row")!.textContent).toContain("Gallons"));
-    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Billed CAD/gal");
-    expect(document.querySelector(".tx-total")!.textContent).toBe("CA$215.22");
-    expect(screen.getByTestId("conversion-pending").textContent).toContain("rate pending");
+    await waitFor(() => expect(lastTableRequest()).toMatchObject({ currency: "CAD", units: "imperial", convertTo: "USD" }));
+    await waitFor(() => expect(document.querySelector(".tx-total")!.textContent).toBe("US$156.96"));
+    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Billed USD/gal");
+    expect(screen.getByTestId("fx-rate-line").textContent).toContain("Converted at 1.3712 CAD per USD, entered Oct 6, 2026");
+    expect(screen.queryByTestId("conversion-pending")).toBeNull();
     expect(pressed()).toBe("USD/gal");
+  });
+
+  it("USD/gal on the CA invoice with no rate entered shows 'rate pending' and a link to that week's Overview", async () => {
+    searchParams = new URLSearchParams({ invoice: "inv-ca" });
+    setupWeeks([PAIRED_WEEK], "2026-09-09", false);
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
+
+    await waitFor(() => expect(document.querySelector(".tx-total")!.textContent).toBe("rate pending"));
+    expect(screen.getByTestId("conversion-pending").textContent).toContain("rate pending");
+    expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?week=2026-09-09");
   });
 
   it("CAD/L on the US invoice asks for litres; choosing the invoice's own format again sends nothing", async () => {
@@ -277,10 +305,11 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: "CAD/L" }));
-    await waitFor(() => expect(lastTableRequest()).toMatchObject({ currency: "USD", units: "metric" }));
+    await waitFor(() => expect(lastTableRequest()).toMatchObject({ currency: "USD", units: "metric", convertTo: "CAD" }));
 
     fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
     await waitFor(() => expect(lastTableRequest().units).toBeUndefined());
+    expect(lastTableRequest().convertTo).toBeUndefined();
   });
 
   it("the conversion applies to every row under All invoices", async () => {
@@ -290,7 +319,7 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
-    await waitFor(() => expect(lastTableRequest()).toMatchObject({ units: "imperial" }));
+    await waitFor(() => expect(lastTableRequest()).toMatchObject({ units: "imperial", convertTo: "USD" }));
     expect(lastTableRequest().currency).toBeUndefined();
     expect(pressed()).toBe("USD/gal");
   });

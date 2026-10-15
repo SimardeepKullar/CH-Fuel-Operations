@@ -126,6 +126,14 @@ describe.skipIf(!hasDatabase)("response keys across the period-scoped routes (in
     const trucks = (await get(`/trucks?week=${WEEK_END}`)) as TrucksResult;
     const txs = (await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true`)) as ListTransactionsResult;
 
+    // T-66: a conversion asked for before any rate is entered, then after one is —
+    // so /invoices and /periods below carry an entered fx too.
+    const pending = await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=USD`);
+    await pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'CAD'");
+    const toUsd = (await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=USD&units=imperial`)) as ListTransactionsResult;
+    const toCad = await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=CAD`);
+    expect(toUsd.rows.some((r) => r.fx !== undefined)).toBe(true);
+
     const responses: Record<string, unknown> = {
       "import report (US)": us.status === "imported" ? us.report : null,
       "import report (CA)": ca.status === "imported" ? ca.report : null,
@@ -135,6 +143,9 @@ describe.skipIf(!hasDatabase)("response keys across the period-scoped routes (in
       "/overview?units=metric": await get(`/overview?week=${WEEK_END}&units=metric`),
       "/transactions (both sides)": txs,
       "/transactions CAD": await get(`/transactions?week=${WEEK_END}&currency=CAD&pageSize=200&includeLines=true`),
+      "/transactions?convertTo=USD, rate pending": pending,
+      "/transactions?convertTo=USD&units=imperial": toUsd,
+      "/transactions?convertTo=CAD": toCad,
       "/transactions/{id}": await get(`/transactions/${txs.rows[0]!.id}`),
       "/drivers": drivers,
       "/drivers CAD": await get(`/drivers?week=${WEEK_END}&currency=CAD`),

@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import { isUuid } from "../../actuals/ids.js";
+import { fxRateProblem, type InvoiceFx } from "../../actuals/units.js";
 import type { InvoiceCurrency } from "../../db/types.js";
 import { detectInvoiceFormat } from "../../invoice/detectFormat.js";
 import { importInvoice, type ImportInvoiceMeta, type ImportInvoiceResult } from "../../invoice/importInvoice.js";
@@ -119,7 +120,12 @@ interface InvoiceListRow {
   grand_total: string;
   status: "imported" | "quarantined";
   imported_at: Date;
+  fx_cad_per_usd: string | null;
+  fx_entered_at: Date | null;
 }
+
+/** D27 (as amended): the exchange rate a dispatcher entered on a CA invoice. */
+export type { InvoiceFx };
 
 export interface InvoiceListItem {
   id: string;
@@ -139,6 +145,8 @@ export interface InvoiceListItem {
   grandTotal: number;
   status: "imported" | "quarantined";
   importedAt: string;
+  /** The entered rate; `null` until one is entered ("rate pending") and always on a USD invoice. */
+  fx: InvoiceFx | null;
 }
 
 export interface InvoiceListResult {
@@ -156,7 +164,7 @@ const INVOICE_COLUMNS = `id, invoice_number,
        to_char(billing_week_end, 'YYYY-MM-DD') AS billing_week_end,
        to_char(actual_start, 'YYYY-MM-DD') AS actual_start,
        to_char(actual_end, 'YYYY-MM-DD') AS actual_end,
-       currency, grand_total, status, imported_at`;
+       currency, grand_total, status, imported_at, fx_cad_per_usd, fx_entered_at`;
 
 /** `datesDiffer`: printed != actual. An invoice with no transactions has no
  * actual range to differ from. */
@@ -187,7 +195,14 @@ function toListItem(row: InvoiceListRow): InvoiceListItem {
     grandTotal: Number(row.grand_total),
     status: row.status,
     importedAt: row.imported_at.toISOString(),
+    fx: toInvoiceFx(row),
   };
+}
+
+export function toInvoiceFx(row: { fx_cad_per_usd: string | null; fx_entered_at: Date | null }): InvoiceFx | null {
+  return row.fx_cad_per_usd === null || row.fx_entered_at === null
+    ? null
+    : { rate: Number(row.fx_cad_per_usd), enteredAt: row.fx_entered_at.toISOString() };
 }
 
 /** `GET /invoices` — A8.2's history list: newest-first, paginated. Every
@@ -291,15 +306,33 @@ export async function handleGetInvoice(pool: Pool, id: string, url: URL): Promis
   });
 }
 
-const patchInvoiceSchema = z.object({ billingWeekEnd: isoDateSchema }).strict();
+const patchInvoiceSchema = z
+  .object({
+    billingWeekEnd: isoDateSchema.optional(),
+    // Validated below with its own reasons; `null` clears the rate.
+    fxCadPerUsd: z.unknown().optional(),
+  })
+  .strict()
+  .refine((body) => body.billingWeekEnd !== undefined || "fxCadPerUsd" in body, {
+    message: "expected billingWeekEnd, fxCadPerUsd, or both",
+  });
 
 /**
- * `PATCH /invoices/{id}` `{ billingWeekEnd }` (D26) — moves an invoice to
- * another billing week: the Import screen's override for a week BVD's printed
- * period end gets wrong. The printed and actual ranges are untouched. Moving
- * onto a week another *imported* invoice of the same currency already holds is
- * a 409, not a silent merge (the unique index decides, so two concurrent moves
- * cannot both win).
+ * `PATCH /invoices/{id}` `{ billingWeekEnd?, fxCadPerUsd? }`.
+ *
+ * `billingWeekEnd` (D26) moves an invoice to another billing week: the Import
+ * screen's override for a week BVD's printed period end gets wrong. The printed
+ * and actual ranges are untouched. Moving onto a week another *imported*
+ * invoice of the same currency already holds is a 409, not a silent merge (the
+ * unique index decides, so two concurrent moves cannot both win).
+ *
+ * `fxCadPerUsd` (D27, T-66) enters or corrects a CA invoice's exchange rate —
+ * CAD per 1 USD — or clears it with `null`, back to "rate pending".
+ * `fx_entered_at` moves only when the rate actually changes. A USD invoice has
+ * no rate (400), and a value outside 0.5–3.0 is a typo (400).
+ *
+ * Both fields go in one UPDATE, so a request carrying both applies both or
+ * neither.
  */
 export async function handlePatchInvoice(pool: Pool, id: string, request: Request, url: URL): Promise<Response> {
   if (!isUuid(id)) {
@@ -315,15 +348,44 @@ export async function handlePatchInvoice(pool: Pool, id: string, request: Reques
   if (!parsed.success) {
     return problemResponse({ title: "Bad Request", status: 400, detail: parsed.error.message, instance: url.pathname });
   }
+  const billingWeekEnd = parsed.data.billingWeekEnd ?? null;
+  const setsFx = "fxCadPerUsd" in parsed.data;
+  const fx = parsed.data.fxCadPerUsd ?? null;
+  if (setsFx && fx !== null) {
+    const problem = fxRateProblem(fx);
+    if (problem !== null) {
+      return problemResponse({ title: "Bad Request", status: 400, detail: problem, instance: url.pathname });
+    }
+  }
+
+  const { rows: found } = await pool.query<{ currency: InvoiceCurrency }>("SELECT currency FROM invoices WHERE id = $1", [id]);
+  const invoice = found[0];
+  if (!invoice) {
+    return problemResponse({ title: "Not Found", status: 404, detail: `No invoice with id ${id}`, instance: url.pathname });
+  }
+  if (setsFx && invoice.currency !== "CAD") {
+    return problemResponse({
+      title: "Bad Request",
+      status: 400,
+      detail: "a USD invoice has no exchange rate — the rate is entered on the CA invoice",
+      instance: url.pathname,
+    });
+  }
 
   try {
-    const result = await pool.query<{ id: string }>(
-      "UPDATE invoices SET billing_week_end = $2::date WHERE id = $1 RETURNING id",
-      [id, parsed.data.billingWeekEnd],
+    await pool.query(
+      `UPDATE invoices
+       SET billing_week_end = COALESCE($2::date, billing_week_end),
+           fx_entered_at = CASE
+             WHEN NOT $3::boolean THEN fx_entered_at
+             WHEN $4::numeric(10,6) IS NULL THEN NULL
+             WHEN fx_cad_per_usd IS DISTINCT FROM $4::numeric(10,6) THEN now()
+             ELSE fx_entered_at
+           END,
+           fx_cad_per_usd = CASE WHEN $3::boolean THEN $4::numeric(10,6) ELSE fx_cad_per_usd END
+       WHERE id = $1`,
+      [id, billingWeekEnd, setsFx, fx],
     );
-    if (result.rows.length === 0) {
-      return problemResponse({ title: "Not Found", status: 404, detail: `No invoice with id ${id}`, instance: url.pathname });
-    }
   } catch (err) {
     if ((err as { code?: string }).code !== "23505") {
       throw err;
@@ -333,7 +395,7 @@ export async function handlePatchInvoice(pool: Pool, id: string, request: Reques
        FROM invoices i
        JOIN invoices h ON h.billing_week_end = $2::date AND h.currency = i.currency AND h.status = 'imported'
        WHERE i.id = $1`,
-      [id, parsed.data.billingWeekEnd],
+      [id, billingWeekEnd],
     );
     const holder = rows[0];
     return problemResponse({
