@@ -12,6 +12,7 @@ import TopSpendByDriver from "../../../components/TopSpendByDriver";
 import AnomalyDigest from "../../../components/AnomalyDigest";
 import EmptyState from "../../../components/EmptyState";
 import Corners from "../../../components/Corners";
+import ExchangeRateField from "../../../components/ExchangeRateField";
 
 /**
  * A8.1 (T-41) — the whole landing screen behind one call, `GET
@@ -23,10 +24,17 @@ import Corners from "../../../components/Corners";
  *
  * `/overview` serves the US side alone until T-65 shapes the CA and combined
  * panels, so the screen tells the "Invoices in view" strip its figures are the US invoice's.
+ *
+ * The week's CA invoice, when it has one, gets its exchange-rate field here
+ * (T-66) — the one place the rate is entered, until T-65 moves it into the
+ * combined panel. It shows on a week with no US invoice too.
  */
 export default function OverviewPage() {
-  const { week: period, loading: periodLoading, weekEntry } = useWeek();
+  const { week: period, loading: periodLoading, weekEntry, reloadPeriods } = useWeek();
   const usInvoiceId = invoiceOnSide(weekEntry, "USD")?.id ?? null;
+  const caInvoice = invoiceOnSide(weekEntry, "CAD");
+  // Keyed on the invoice, so another week's CA invoice starts from its own rate.
+  const rateField = caInvoice === null ? null : <ExchangeRateField key={caInvoice.id} invoice={caInvoice} onSaved={reloadPeriods} />;
   usePublishInView(weekEntry === null ? null : usInvoiceId === null ? [] : [usInvoiceId]);
   const [result, setResult] = useState<OverviewResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,10 +84,18 @@ export default function OverviewPage() {
   if (result === null || result.kpis.invoiceId === null) {
     return (
       <div className="overview-page">
-        <EmptyState
-          title="No invoice imported yet"
-          detail="Import a BVD invoice to see spend, the billed-price trend and any anomalies for a period."
-        />
+        {rateField}
+        {caInvoice === null ? (
+          <EmptyState
+            title="No invoice imported yet"
+            detail="Import a BVD invoice to see spend, the billed-price trend and any anomalies for a period."
+          />
+        ) : (
+          <EmptyState
+            title="No US invoice in this week"
+            detail="The figures here are the US invoice's; this week has only the CA one."
+          />
+        )}
       </div>
     );
   }
@@ -90,6 +106,7 @@ export default function OverviewPage() {
 
   return (
     <div className="overview-page">
+      {rateField}
       <div className="kpi-grid">
         <KpiCard
           label="Average billed price"

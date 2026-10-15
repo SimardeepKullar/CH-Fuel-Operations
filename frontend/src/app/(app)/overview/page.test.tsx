@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OverviewResult } from "@ch/core/actuals/overview";
+import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
+import type { PeriodInvoice, PeriodWeek } from "@ch/core/api/routes/periods";
 
 const replace = vi.fn();
 const push = vi.fn();
@@ -15,12 +17,20 @@ vi.mock("next/navigation", () => ({
 const getHealth = vi.fn();
 const listPeriods = vi.fn();
 const getOverview = vi.fn();
+const patchInvoiceFx = vi.fn();
 
-vi.mock("../../../lib/api", () => ({
-  getHealth: (...args: unknown[]) => getHealth(...args),
-  listPeriods: (...args: unknown[]) => listPeriods(...args),
-  getOverview: (...args: unknown[]) => getOverview(...args),
-}));
+vi.mock("../../../lib/api", async () => {
+  const actual = await vi.importActual<typeof import("../../../lib/api")>("../../../lib/api");
+  return {
+    ApiError: actual.ApiError,
+    getHealth: (...args: unknown[]) => getHealth(...args),
+    listPeriods: (...args: unknown[]) => listPeriods(...args),
+    getOverview: (...args: unknown[]) => getOverview(...args),
+    patchInvoiceFx: (...args: unknown[]) => patchInvoiceFx(...args),
+  };
+});
+
+const { ApiError } = await import("../../../lib/api");
 
 const { default: OverviewPageInner } = await import("./page");
 const { WeekProvider } = await import("../../../hooks/useWeek");
@@ -65,6 +75,7 @@ afterEach(() => {
   getHealth.mockReset();
   listPeriods.mockReset();
   getOverview.mockReset();
+  patchInvoiceFx.mockReset();
   searchParams = new URLSearchParams();
 });
 
@@ -147,5 +158,176 @@ describe("OverviewPage (T-41)", () => {
     render(<OverviewPage />);
 
     await waitFor(() => expect(screen.getByText("network down")).toBeTruthy());
+  });
+});
+
+const US_INVOICE: PeriodInvoice = {
+  id: "inv-us",
+  invoiceNumber: "999210",
+  currency: "USD",
+  printedStart: "2026-09-03",
+  printedEnd: "2026-09-09",
+  actualStart: "2026-09-03",
+  actualEnd: "2026-09-09",
+  datesDiffer: false,
+  fx: null,
+};
+
+function caInvoice(fx: PeriodInvoice["fx"] = null): PeriodInvoice {
+  return {
+    id: "inv-ca",
+    invoiceNumber: "999217",
+    currency: "CAD",
+    printedStart: "2026-08-01",
+    printedEnd: "2026-09-09",
+    actualStart: "2026-09-03",
+    actualEnd: "2026-09-10",
+    datesDiffer: true,
+    fx,
+  };
+}
+
+const week = (invoices: PeriodInvoice[]): PeriodWeek => ({ weekEnd: "2026-09-09", invoices });
+
+/** What `PATCH /invoices/{id}` returns — only `fx` is read from it. */
+function patched(fx: InvoiceListItem["fx"]): InvoiceListItem {
+  return {
+    id: "inv-ca",
+    invoiceNumber: "999217",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-09-09",
+    billingWeekEnd: "2026-09-09",
+    actualStart: "2026-09-03",
+    actualEnd: "2026-09-10",
+    datesDiffer: true,
+    currency: "CAD",
+    grandTotal: 3839.54,
+    status: "imported",
+    importedAt: "2026-09-11T12:00:00.000Z",
+    fx,
+  };
+}
+
+const ENTERED = { rate: 1.3712, enteredAt: "2026-10-06T16:00:00.000Z" };
+
+function rateInput(): HTMLInputElement {
+  return screen.getByLabelText("Exchange rate (CAD per USD)") as HTMLInputElement;
+}
+
+function enter(value: string) {
+  fireEvent.change(rateInput(), { target: { value } });
+  fireEvent.keyDown(rateInput(), { key: "Enter" });
+}
+
+describe("OverviewPage — the CA invoice's exchange rate (T-66 step 66.2)", () => {
+  function renderWeek(invoices: PeriodInvoice[], after: PeriodInvoice[] = invoices) {
+    searchParams = new URLSearchParams({ week: "2026-09-09" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValueOnce({ weeks: [week(invoices)] }).mockResolvedValue({ weeks: [week(after)] });
+    getOverview.mockResolvedValue(overviewResult());
+    render(<OverviewPage />);
+  }
+
+  it("a week with a CA invoice and no rate shows the field and 'rate pending'", async () => {
+    renderWeek([US_INVOICE, caInvoice()]);
+
+    await waitFor(() => expect(screen.getByTestId("fx-rate")).toBeTruthy());
+    expect(screen.getByText("Exchange rate (CAD per USD)")).toBeTruthy();
+    expect(rateInput().value).toBe("");
+    expect(screen.getByTestId("fx-rate-status").textContent).toContain("rate pending");
+  });
+
+  it("entering 1.3712 PATCHes the CA invoice, then shows the rate and when it was entered without a reload", async () => {
+    renderWeek([US_INVOICE, caInvoice()], [US_INVOICE, caInvoice(ENTERED)]);
+    patchInvoiceFx.mockResolvedValue(patched(ENTERED));
+    await waitFor(() => expect(screen.getByTestId("fx-rate")).toBeTruthy());
+
+    enter("1.3712");
+
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-ca", 1.3712));
+    await waitFor(() => expect(screen.getByTestId("fx-rate-status").textContent).toContain("1.3712 CAD per USD"));
+    expect(screen.getByTestId("fx-rate-status").textContent).toContain("entered Oct 6, 2026");
+    expect(rateInput().value).toBe("1.3712");
+    // The shell re-read its weeks, so every screen sees the rate; the Overview's own figures were not refetched.
+    await waitFor(() => expect(listPeriods).toHaveBeenCalledTimes(2));
+    expect(getOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it("an entered rate shows on arrival, and editing it PATCHes again; leaving the box saves too", async () => {
+    renderWeek([US_INVOICE, caInvoice(ENTERED)]);
+    const corrected = { rate: 1.38, enteredAt: "2026-10-07T16:00:00.000Z" };
+    patchInvoiceFx.mockResolvedValue(patched(corrected));
+    await waitFor(() => expect(rateInput().value).toBe("1.3712"));
+    expect(screen.getByTestId("fx-rate-status").textContent).toContain("entered Oct 6, 2026");
+
+    fireEvent.change(rateInput(), { target: { value: "1.38" } });
+    fireEvent.blur(rateInput());
+
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-ca", 1.38));
+    await waitFor(() => expect(screen.getByTestId("fx-rate-status").textContent).toContain("entered Oct 7, 2026"));
+  });
+
+  it("leaving the box unchanged sends nothing", async () => {
+    renderWeek([US_INVOICE, caInvoice(ENTERED)]);
+    await waitFor(() => expect(rateInput().value).toBe("1.3712"));
+
+    fireEvent.blur(rateInput());
+    enter("1.3712");
+
+    expect(patchInvoiceFx).not.toHaveBeenCalled();
+  });
+
+  it("emptying the box clears the rate back to pending", async () => {
+    renderWeek([US_INVOICE, caInvoice(ENTERED)]);
+    patchInvoiceFx.mockResolvedValue(patched(null));
+    await waitFor(() => expect(rateInput().value).toBe("1.3712"));
+
+    enter("");
+
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-ca", null));
+    await waitFor(() => expect(screen.getByTestId("fx-rate-status").textContent).toContain("rate pending"));
+  });
+
+  it("a 400 shows its reason beside the field and keeps what was typed", async () => {
+    renderWeek([US_INVOICE, caInvoice()]);
+    const reason = "the exchange rate must be between 0.5 and 3.0 CAD per USD";
+    patchInvoiceFx.mockRejectedValue(new ApiError({ title: "Bad Request", status: 400, detail: reason }));
+    await waitFor(() => expect(screen.getByTestId("fx-rate")).toBeTruthy());
+
+    enter("13.712");
+
+    await waitFor(() => expect(screen.getByTestId("fx-rate-error").textContent).toBe(reason));
+    expect(rateInput().value).toBe("13.712");
+    expect(screen.getByTestId("fx-rate-status").textContent).toContain("rate pending");
+  });
+
+  it("text that is not a number is refused in place, with no PATCH", async () => {
+    renderWeek([US_INVOICE, caInvoice()]);
+    await waitFor(() => expect(screen.getByTestId("fx-rate")).toBeTruthy());
+
+    enter("1,37");
+
+    expect(screen.getByTestId("fx-rate-error").textContent).toContain("as a number");
+    expect(patchInvoiceFx).not.toHaveBeenCalled();
+  });
+
+  it("a US-only week shows no rate field", async () => {
+    renderWeek([US_INVOICE]);
+
+    await waitFor(() => expect(screen.getByTestId("kpi-avg-billed-value")).toBeTruthy());
+    expect(screen.queryByTestId("fx-rate")).toBeNull();
+    expect(screen.queryByText("Exchange rate (CAD per USD)")).toBeNull();
+  });
+
+  it("a CA-only week still offers the field, beside a note that the US figures are absent", async () => {
+    searchParams = new URLSearchParams({ week: "2026-09-09" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [week([caInvoice()])] });
+    getOverview.mockResolvedValue(overviewResult({ kpis: { ...overviewResult().kpis, invoiceId: null } }));
+
+    render(<OverviewPage />);
+
+    await waitFor(() => expect(screen.getByText("No US invoice in this week")).toBeTruthy());
+    expect(screen.getByTestId("fx-rate-status").textContent).toContain("rate pending");
   });
 });

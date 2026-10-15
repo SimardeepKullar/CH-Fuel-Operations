@@ -296,6 +296,15 @@ describe("ImportPage — billing weeks (T-64 step 64.4)", () => {
     expect(screen.queryByTestId("dates-differ-note-inv-us")).toBeNull();
   });
 
+  it("does not ask for the exchange rate — that is entered on the Overview (T-66)", async () => {
+    listInvoices.mockResolvedValue(historyResult([usInvoice, caInvoice()]));
+    render(<ImportPage />);
+
+    await waitFor(() => expect(screen.getByTestId("dates-differ-note-inv-ca")).toBeTruthy());
+    expect(screen.queryByTestId("fx-rate")).toBeNull();
+    expect(screen.queryByText(/exchange rate/i)).toBeNull();
+  });
+
   it("'Belongs to week ending' calls PATCH, and the top bar's selector shows the new week without a reload", async () => {
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
     // Before: 999217 sits in the week ending Sep 9 beside 999210. After: it has moved to the week ending Sep 16.
