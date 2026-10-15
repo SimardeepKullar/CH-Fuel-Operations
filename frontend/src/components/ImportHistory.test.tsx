@@ -20,6 +20,7 @@ function row(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem {
     datesDiffer: false,
     status: "imported",
     importedAt: "2026-09-01T12:00:00.000Z",
+    fx: null,
     ...overrides,
   };
 }

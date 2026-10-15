@@ -31,6 +31,36 @@ function printReport(report: ImportReport): void {
   }
 }
 
+const USAGE = "usage: import-invoice <file> [--fx-rate <CAD per 1 USD>]";
+
+/** `<file> [--fx-rate 1.3712]` (also `--fx-rate=1.3712`), or the usage error to print. */
+export function parseImportInvoiceArgs(argv: string[]): { filePath: string; fxCadPerUsd?: number } | { error: string } {
+  let filePath: string | undefined;
+  let fxRaw: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--fx-rate") {
+      fxRaw = argv[++i];
+      if (fxRaw === undefined) return { error: `--fx-rate needs a value
+${USAGE}` };
+    } else if (arg.startsWith("--fx-rate=")) {
+      fxRaw = arg.slice("--fx-rate=".length);
+    } else if (arg.startsWith("--") || filePath !== undefined) {
+      return { error: `unexpected argument "${arg}"
+${USAGE}` };
+    } else {
+      filePath = arg;
+    }
+  }
+  if (filePath === undefined) return { error: USAGE };
+  if (fxRaw === undefined) return { filePath };
+  // A plain decimal only: Number("") is 0 and Number("0x1") is 1.
+  if (!/^\d+(\.\d+)?$/.test(fxRaw)) {
+    return { error: `--fx-rate "${fxRaw}" is not a number (CAD per 1 USD, e.g. 1.3712)` };
+  }
+  return { filePath, fxCadPerUsd: Number(fxRaw) };
+}
+
 /**
  * argv and stdout, nothing else — same split as `cli/ingest.ts`. Every
  * decision (parse, group, reconcile, resolve, promote-or-quarantine, run
@@ -43,11 +73,12 @@ function printReport(report: ImportReport): void {
  * on express rows.
  */
 export async function runImportInvoiceCli(argv: string[], pool: Pool): Promise<number> {
-  const filePath = argv[0];
-  if (!filePath) {
-    console.error("usage: import-invoice <file>");
+  const args = parseImportInvoiceArgs(argv);
+  if ("error" in args) {
+    console.error(args.error);
     return 1;
   }
+  const { filePath, fxCadPerUsd } = args;
 
   try {
     const buffer = readFileSync(filePath);
@@ -58,19 +89,23 @@ export async function runImportInvoiceCli(argv: string[], pool: Pool): Promise<n
       return 1;
     }
 
-    const result = await importInvoice(
-      pool,
-      buffer,
-      { sourceFilename },
-      format === "pdf" ? { parse: parseInvoicePdf } : undefined,
-    );
+    const result = await importInvoice(pool, buffer, { sourceFilename }, {
+      ...(format === "pdf" ? { parse: parseInvoicePdf } : {}),
+      ...(fxCadPerUsd !== undefined ? { fxCadPerUsd } : {}),
+    });
 
     switch (result.status) {
       case "imported":
         printReport(result.report);
+        if (fxCadPerUsd !== undefined) {
+          console.log(`exchange rate:       ${fxCadPerUsd} CAD per USD`);
+        }
         return 0;
       case "duplicate":
         console.log(`already imported — invoice ${result.report.invoiceNumber} unchanged`);
+        if (fxCadPerUsd !== undefined) {
+          console.log("exchange rate not applied — correct it on the Overview (PATCH /invoices/{id})");
+        }
         printReport(result.report);
         return 0;
       case "quarantined":

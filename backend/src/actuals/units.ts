@@ -93,3 +93,32 @@ export async function loadWeekInvoice(pool: Pool, week: string, currency: Invoic
     ? { id: row.id, currency: row.currency, qtyUnit: row.qty_unit, grandTotal: row.grand_total, periodEnd: row.period_end }
     : null;
 }
+
+/**
+ * D27 (as amended): the exchange rate a dispatcher enters on a CA invoice, CAD
+ * per 1 USD, stored as `numeric(10,6)`. The band is a typo guard — 13.712 or
+ * 0.13712 for 1.3712 — not a market check.
+ */
+export const FX_RATE_MIN = 0.5;
+export const FX_RATE_MAX = 3.0;
+export const FX_RATE_PLACES = 6;
+
+/** Why `rate` cannot be stored as an entered rate, or `null` when it can. */
+export function fxRateProblem(rate: unknown): string | null {
+  if (typeof rate !== "number" || !Number.isFinite(rate)) {
+    return "the exchange rate must be a number (CAD per 1 USD)";
+  }
+  if (rate <= 0) {
+    return "the exchange rate must be greater than 0";
+  }
+  if (rate < FX_RATE_MIN || rate > FX_RATE_MAX) {
+    return `the exchange rate must be between ${FX_RATE_MIN.toFixed(1)} and ${FX_RATE_MAX.toFixed(1)} CAD per USD`;
+  }
+  // Inside the band a number never prints in exponent form, so its decimal
+  // places are what follows the point.
+  const places = String(rate).split(".")[1]?.length ?? 0;
+  if (places > FX_RATE_PLACES) {
+    return `the exchange rate has at most ${FX_RATE_PLACES} decimal places`;
+  }
+  return null;
+}

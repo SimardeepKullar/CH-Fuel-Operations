@@ -97,6 +97,7 @@ function historyRow(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem {
     datesDiffer: false,
     status: "quarantined",
     importedAt: "2026-01-08T00:00:00.000Z",
+    fx: null,
     ...overrides,
   };
 }
@@ -282,8 +283,8 @@ function periodWeek(weekEnd: string, invoices: PeriodWeek["invoices"]): PeriodWe
   return { weekEnd, invoices };
 }
 
-const US_PERIOD = { id: "inv-us", invoiceNumber: "999210", currency: "USD" as const, printedStart: "2026-09-03", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-09", datesDiffer: false };
-const CA_PERIOD = { id: "inv-ca", invoiceNumber: "999217", currency: "CAD" as const, printedStart: "2026-08-01", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-10", datesDiffer: true };
+const US_PERIOD = { id: "inv-us", invoiceNumber: "999210", currency: "USD" as const, printedStart: "2026-09-03", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-09", datesDiffer: false, fx: null };
+const CA_PERIOD = { id: "inv-ca", invoiceNumber: "999217", currency: "CAD" as const, printedStart: "2026-08-01", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-10", datesDiffer: true, fx: null };
 
 describe("ImportPage — billing weeks (T-64 step 64.4)", () => {
   it("an invoice whose printed range is not the range it ran shows the amber note, in the ticket's words", async () => {

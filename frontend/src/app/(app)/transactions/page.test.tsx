@@ -142,8 +142,8 @@ describe("TransactionsPage (T-40)", () => {
 const PAIRED_WEEK: PeriodWeek = {
   weekEnd: "2026-09-09",
   invoices: [
-    { id: "inv-us", invoiceNumber: "999210", currency: "USD", printedStart: "2026-09-03", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-09", datesDiffer: false },
-    { id: "inv-ca", invoiceNumber: "999217", currency: "CAD", printedStart: "2026-08-01", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-10", datesDiffer: true },
+    { id: "inv-us", invoiceNumber: "999210", currency: "USD", printedStart: "2026-09-03", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-09", datesDiffer: false, fx: null },
+    { id: "inv-ca", invoiceNumber: "999217", currency: "CAD", printedStart: "2026-08-01", printedEnd: "2026-09-09", actualStart: "2026-09-03", actualEnd: "2026-09-10", datesDiffer: true, fx: null },
   ],
 };
 const US_ONLY_WEEK: PeriodWeek = { weekEnd: "2026-09-02", invoices: [PAIRED_WEEK.invoices[0]!] };

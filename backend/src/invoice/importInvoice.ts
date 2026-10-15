@@ -4,7 +4,7 @@ import type { InvoiceCurrency } from "../db/types.js";
 import { runAnomalies } from "../anomaly/runAnomalies.js";
 import { getCardByNumber } from "../catalog/cards.js";
 import { getTruckByUnitNumber } from "../catalog/trucks.js";
-import { qtyUnitFor } from "../actuals/units.js";
+import { fxRateProblem, qtyUnitFor } from "../actuals/units.js";
 import { resolveExpressDriver, type ExpressDriverResolution } from "../resolve/resolveDriver.js";
 import { resolveStation } from "../resolve/resolveStation.js";
 import { resolveTruckForStop } from "../resolve/resolveTruck.js";
@@ -41,6 +41,15 @@ export interface ImportInvoiceOptions {
     productCodes: ReadonlyMap<string, InvoiceProductType>,
     sourceFilename: string,
   ) => ParsedInvoice | Promise<ParsedInvoice>;
+  /**
+   * D27 (T-66): the exchange rate the dispatcher entered for a CA invoice, CAD
+   * per 1 USD — the import CLI's `--fx-rate`. Checked as soon as the file is
+   * parsed, before anything is written: on a USD invoice, or outside the typo
+   * band, `importInvoice` throws and the database is untouched. A duplicate
+   * file is a no-op and leaves an already-imported invoice's rate alone —
+   * correcting it is `PATCH /invoices/{id}`'s job.
+   */
+  fxCadPerUsd?: number;
 }
 
 export type ImportInvoiceResult =
@@ -248,13 +257,15 @@ async function insertInvoiceRow(
   fileSha256: string,
   status: "imported" | "quarantined",
   actual: ActualRange,
+  fxCadPerUsd: number | null,
 ): Promise<string> {
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO invoices
        (invoice_number, period_start, period_end, invoice_date, due_date,
         currency, qty_unit, grand_total, status, file_sha256,
-        billing_week_end, actual_start, actual_end)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        billing_week_end, actual_start, actual_end, fx_cad_per_usd, fx_entered_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+             $14::numeric(10,6), CASE WHEN $14::numeric IS NULL THEN NULL ELSE now() END)
      RETURNING id`,
     [
       parsed.header.invoiceNumber,
@@ -270,6 +281,7 @@ async function insertInvoiceRow(
       parsed.header.periodEnd,
       actual.start,
       actual.end,
+      fxCadPerUsd,
     ],
   );
   const id = rows[0]?.id;
@@ -438,6 +450,20 @@ export async function importInvoice(
 
   const parsed = await parseFn(buffer, productCodes, meta.sourceFilename);
 
+  const fxCadPerUsd = options?.fxCadPerUsd ?? null;
+  if (fxCadPerUsd !== null) {
+    if (parsed.header.currency !== "CAD") {
+      throw new Error(
+        `invoice ${parsed.header.invoiceNumber} is a ${parsed.header.currency} invoice — ` +
+          "an exchange rate is entered on a CA invoice only; nothing was imported",
+      );
+    }
+    const problem = fxRateProblem(fxCadPerUsd);
+    if (problem !== null) {
+      throw new Error(`${problem}; nothing was imported`);
+    }
+  }
+
   const existingByNumber = await findExistingByInvoiceNumber(pool, parsed.header.invoiceNumber);
   if (existingByNumber && existingByNumber.file_sha256 !== fileSha256) {
     return {
@@ -514,6 +540,7 @@ export async function importInvoice(
       fileSha256,
       promote ? "imported" : "quarantined",
       actual,
+      fxCadPerUsd,
     );
 
     if (promote) {

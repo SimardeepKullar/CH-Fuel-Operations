@@ -66,6 +66,7 @@ describe.skipIf(!hasDatabase)("GET /periods and PATCH /invoices/{id} (integratio
         actualStart: "2026-09-07",
         actualEnd: WEEK_END,
         datesDiffer: false,
+        fx: null,
       },
       {
         id: await idOf("700001"),
@@ -76,6 +77,7 @@ describe.skipIf(!hasDatabase)("GET /periods and PATCH /invoices/{id} (integratio
         actualStart: "2026-09-03",
         actualEnd: "2026-09-10",
         datesDiffer: true,
+        fx: null,
       },
     ]);
     expect(weeks[1]!.invoices).toHaveLength(1);

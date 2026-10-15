@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convertNullable, qtyConverter, qtyUnitFor } from "./units.js";
+import { convertNullable, fxRateProblem, qtyConverter, qtyUnitFor } from "./units.js";
 
 const LITRES_PER_GALLON = 3.785411784;
 
@@ -43,5 +43,25 @@ describe("qtyConverter (D25: the API converts, storage never does)", () => {
     expect(qtyConverter("L", "imperial").qty(0)).toBe(0);
     expect(convertNullable(qtyConverter("L", "imperial").perUnit, null)).toBeNull();
     expect(convertNullable(qtyConverter("L", "imperial").perUnit, 0)).toBe(0);
+  });
+});
+
+describe("fxRateProblem (T-66)", () => {
+  it("accepts a rate inside 0.5–3.0 with up to six decimal places, the band's edges included", () => {
+    for (const rate of [1.3712, 0.5, 3, 1.371234, 2]) {
+      expect(fxRateProblem(rate), String(rate)).toBeNull();
+    }
+  });
+
+  it("names why a rate is refused: not a number, not positive, outside the band, too precise", () => {
+    expect(fxRateProblem("1.3712")).toContain("must be a number");
+    expect(fxRateProblem(Number.NaN)).toContain("must be a number");
+    expect(fxRateProblem(null)).toContain("must be a number");
+    expect(fxRateProblem(0)).toContain("greater than 0");
+    expect(fxRateProblem(-1)).toContain("greater than 0");
+    expect(fxRateProblem(0.4)).toContain("between 0.5 and 3.0");
+    expect(fxRateProblem(3.1)).toContain("between 0.5 and 3.0");
+    expect(fxRateProblem(13.712)).toContain("between 0.5 and 3.0");
+    expect(fxRateProblem(1.3712345)).toContain("at most 6 decimal places");
   });
 });
