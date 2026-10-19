@@ -43,7 +43,7 @@ function OverviewPage() {
   );
 }
 
-function overviewResult(overrides: Partial<OverviewResult> = {}): OverviewResult {
+function usSide(): NonNullable<OverviewResult["us"]> {
   return {
     currency: "USD",
     qtyUnit: "gal",
@@ -51,9 +51,11 @@ function overviewResult(overrides: Partial<OverviewResult> = {}): OverviewResult
       week: "2026-09-03",
       invoiceId: "inv-1",
       total: { amount: 50929.71, currency: "USD" },
-      diesel: { qty: 9000, amount: 47000, currency: "USD" },
-      def: { qty: 120, amount: 500, currency: "USD" },
+      tax: { beforeTax: 50929.71, tax: 0, withTax: 50929.71, hst: 0, gst: 0, pst: 0, qst: 0, currency: "USD" },
+      diesel: { qty: 9000, amount: 47000, preTax: 47000, tax: 0, currency: "USD" },
+      def: { qty: 120, amount: 500, preTax: 500, tax: 0, currency: "USD" },
       avgBilledPerUnit: 5.2395,
+      avgBilledPreTaxPerUnit: 5.2395,
       discount: { total: 1200.5, avgPerUnit: 0.1334, currency: "USD" },
       otherCharges: { total: 1543.13, scale: 1000, express: 500, expressFee: 43.13, currency: "USD" },
       receiptCompliance: { confirmed: 55, total: 60 },
@@ -64,6 +66,58 @@ function overviewResult(overrides: Partial<OverviewResult> = {}): OverviewResult
     anomalyDigest: [
       { id: "anom-1", fuelStopId: "stop-1", rule: "sub_gallon", severity: "red", detail: {}, detectedAt: "2026-09-05T14:30:00.000Z" },
     ],
+  };
+}
+
+function caSide(overrides: Partial<NonNullable<OverviewResult["ca"]>["kpis"]["tax"]> = {}): NonNullable<OverviewResult["ca"]> {
+  const tax = { beforeTax: 41460.89, tax: 5376.44, withTax: 46837.33, hst: 5376.44, gst: 0, pst: 0, qst: 0, currency: "CAD" as const, ...overrides };
+  return {
+    currency: "CAD",
+    qtyUnit: "L",
+    kpis: {
+      week: "2026-09-09",
+      invoiceId: "inv-ca",
+      total: { amount: tax.withTax, currency: "CAD" },
+      tax,
+      diesel: { qty: 21318.77, amount: 46559.28, preTax: 41202.86, tax: 5356.42, currency: "CAD" },
+      def: { qty: 113.09, amount: 174.05, preTax: 154.03, tax: 20.02, currency: "CAD" },
+      avgBilledPerUnit: 2.1522,
+      avgBilledPreTaxPerUnit: 1.9046,
+      discount: { total: 6759.96, avgPerUnit: 0.3171, currency: "CAD" },
+      otherCharges: { total: 104, scale: 104, express: 0, expressFee: 0, currency: "CAD" },
+      receiptCompliance: { confirmed: 0, total: 59 },
+      anomaliesFlagged: 1,
+    },
+    trend: [],
+    topSpendByDriver: [],
+    anomalyDigest: [],
+  };
+}
+
+function combinedPanel(overrides: Partial<NonNullable<OverviewResult["combined"]>> = {}): NonNullable<OverviewResult["combined"]> {
+  return {
+    currency: "USD",
+    qtyUnit: "gal",
+    partial: false,
+    missingSide: null,
+    ratePending: false,
+    spend: { beforeTax: 84000.12, tax: 3920.97, withTax: 87000.5 },
+    diesel: { qty: 14631.2, beforeTax: 70000.1, tax: 3906.12, withTax: 73906.22 },
+    def: { qty: 150, beforeTax: 600.5, tax: 14.6, withTax: 615.1 },
+    discount: 6130.78,
+    avgBilledPreTaxPerUnit: 4.7843,
+    avgBilledPerUnit: 5.0511,
+    ...overrides,
+  };
+}
+
+/** A US-only week unless overridden: the shape the first tests were written against. */
+function overviewResult(overrides: Partial<OverviewResult> = {}): OverviewResult {
+  return {
+    us: usSide(),
+    ca: null,
+    combined: combinedPanel({ partial: true, missingSide: "CAD", spend: { beforeTax: 50929.71, tax: 0, withTax: 50929.71 } }),
+    fx: null,
     ...overrides,
   };
 }
@@ -90,7 +144,7 @@ describe("OverviewPage (T-41)", () => {
 
     await waitFor(() => expect(screen.getByTestId("kpi-avg-billed-value")).toBeTruthy());
     expect(getOverview).toHaveBeenCalledTimes(1);
-    expect(getOverview).toHaveBeenCalledWith("2026-09-03");
+    expect(getOverview).toHaveBeenCalledWith("2026-09-03", {});
   });
 
   it("average billed price is the headline figure and discount rides as its subline (A9.1)", async () => {
@@ -102,8 +156,8 @@ describe("OverviewPage (T-41)", () => {
     render(<OverviewPage />);
 
     await waitFor(() => expect(screen.getByTestId("kpi-avg-billed-value")).toBeTruthy());
-    expect(screen.getByTestId("kpi-avg-billed-value").textContent).toBe("$5.2395");
-    expect(screen.getByTestId("kpi-avg-billed-sub").textContent).toBe("discount captured $1200.50");
+    expect(screen.getByTestId("kpi-avg-billed-value").textContent).toBe("US$5.2395");
+    expect(screen.getByTestId("kpi-avg-billed-sub").textContent).toBe("discount captured US$1200.50");
     const dominantSize = parseFloat(getComputedStyle(screen.getByTestId("kpi-avg-billed-value")).fontSize);
     const totalSize = parseFloat(getComputedStyle(screen.getByTestId("kpi-total-value")).fontSize);
     expect(dominantSize).toBeGreaterThan(totalSize);
@@ -113,25 +167,7 @@ describe("OverviewPage (T-41)", () => {
     searchParams = new URLSearchParams({ week: "2026-09-10" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listPeriods.mockResolvedValue({ weeks: [] });
-    getOverview.mockResolvedValue(
-      overviewResult({
-        kpis: {
-          week: "2026-09-10",
-          invoiceId: null,
-          total: { amount: 0, currency: "USD" },
-          diesel: { qty: 0, amount: 0, currency: "USD" },
-          def: { qty: 0, amount: 0, currency: "USD" },
-          avgBilledPerUnit: null,
-          discount: { total: 0, avgPerUnit: null, currency: "USD" },
-          otherCharges: { total: 0, scale: 0, express: 0, expressFee: 0, currency: "USD" },
-          receiptCompliance: { confirmed: 0, total: 0 },
-          anomaliesFlagged: 0,
-        },
-        trend: [],
-        topSpendByDriver: [],
-        anomalyDigest: [],
-      }),
-    );
+    getOverview.mockResolvedValue({ us: null, ca: null, combined: null, fx: null });
 
     render(<OverviewPage />);
 
@@ -248,9 +284,9 @@ describe("OverviewPage — the CA invoice's exchange rate (T-66 step 66.2)", () 
     await waitFor(() => expect(screen.getByTestId("fx-rate-status").textContent).toContain("1.3712 CAD per USD"));
     expect(screen.getByTestId("fx-rate-status").textContent).toContain("entered Oct 6, 2026");
     expect(rateInput().value).toBe("1.3712");
-    // The shell re-read its weeks, so every screen sees the rate; the Overview's own figures were not refetched.
+    // The shell re-read its weeks, so every screen sees the rate; the Overview re-read too, since the combined figures depend on it.
     await waitFor(() => expect(listPeriods).toHaveBeenCalledTimes(2));
-    expect(getOverview).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(getOverview).toHaveBeenCalledTimes(2));
   });
 
   it("an entered rate shows on arrival, and editing it PATCHes again; leaving the box saves too", async () => {
@@ -319,15 +355,202 @@ describe("OverviewPage — the CA invoice's exchange rate (T-66 step 66.2)", () 
     expect(screen.queryByText("Exchange rate (CAD per USD)")).toBeNull();
   });
 
-  it("a CA-only week still offers the field, beside a note that the US figures are absent", async () => {
+  it("a CA-only week still offers the field, beside the US panel's 'Not imported'", async () => {
     searchParams = new URLSearchParams({ week: "2026-09-09" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
     listPeriods.mockResolvedValue({ weeks: [week([caInvoice()])] });
-    getOverview.mockResolvedValue(overviewResult({ kpis: { ...overviewResult().kpis, invoiceId: null } }));
+    getOverview.mockResolvedValue(
+      overviewResult({ us: null, ca: caSide(), combined: combinedPanel({ partial: true, missingSide: "USD", ratePending: true }) }),
+    );
 
     render(<OverviewPage />);
 
-    await waitFor(() => expect(screen.getByText("No US invoice in this week")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("US — Not imported")).toBeTruthy());
     expect(screen.getByTestId("fx-rate-status").textContent).toContain("rate pending");
+  });
+});
+
+describe("OverviewPage — US, CA and combined panels (T-65 step 65.2)", () => {
+  function renderBoth(result: OverviewResult, invoices: PeriodInvoice[] = [US_INVOICE, caInvoice(ENTERED)]) {
+    searchParams = new URLSearchParams({ week: "2026-09-09" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [week(invoices)] });
+    getOverview.mockResolvedValue(result);
+    render(<OverviewPage />);
+  }
+  const both = (combined: Partial<NonNullable<OverviewResult["combined"]>> = {}, ca = caSide()): OverviewResult => ({
+    us: usSide(),
+    ca,
+    combined: combinedPanel(combined),
+    fx: ENTERED,
+  });
+  const text = (id: string) => screen.getByTestId(id).textContent;
+
+  it("US on the left, CA on the right, combined below", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
+
+    const us = screen.getByTestId("us-panel");
+    const ca = screen.getByTestId("ca-panel");
+    const combined = screen.getByTestId("combined-panel");
+    expect(us.compareDocumentPosition(ca) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ca.compareDocumentPosition(combined) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(us.parentElement).toBe(ca.parentElement);
+    expect(combined.parentElement).not.toBe(us.parentElement);
+  });
+
+  it("the CA panel shows before tax, tax and with tax, and both per-litre rates", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("ca-panel")).toBeTruthy());
+
+    expect(text("ca-spend-before")).toBe("CA$41460.89");
+    expect(text("ca-spend-tax")).toBe("CA$5376.44");
+    expect(text("ca-spend-with")).toBe("CA$46837.33");
+    expect(text("ca-diesel-before")).toBe("CA$41202.86");
+    expect(text("ca-diesel-with")).toBe("CA$46559.28");
+    expect(text("ca-def-tax")).toBe("CA$20.02");
+    expect(text("ca-discount")).toBe("CA$6759.96");
+    expect(text("ca-rate-before")).toBe("CA$1.9046");
+    expect(text("ca-rate-with")).toBe("CA$2.1522");
+    expect(screen.getByTestId("ca-panel").textContent).toContain("CAD/L");
+  });
+
+  it("labels the CA tax column HST when HST is the only tax, Sales tax otherwise", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("ca-tax-label")).toBeTruthy());
+    expect(text("ca-tax-label")).toBe("HST");
+    cleanup();
+
+    renderBoth(both({}, caSide({ hst: 0, gst: 2688.22, qst: 2688.22 })));
+    await waitFor(() => expect(screen.getByTestId("ca-tax-label")).toBeTruthy());
+    expect(text("ca-tax-label")).toBe("Sales tax");
+  });
+
+  it("the US panel shows one value per figure — no tax split", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("us-panel")).toBeTruthy());
+    expect(text("kpi-total-value")).toBe("US$50929.71");
+    expect(screen.getByTestId("us-panel").textContent).not.toMatch(/before tax|with tax/i);
+  });
+
+  it("the combined panel says 'before HST', never 'pre-tax', with the rate and its date beside the figures", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
+
+    const panel = screen.getByTestId("combined-panel");
+    expect(panel.textContent).toContain("Before HST");
+    expect(panel.textContent?.toLowerCase()).not.toContain("pre-tax");
+    expect(text("combined-spend-before")).toBe("US$84000.12");
+    expect(text("combined-spend-tax")).toBe("US$3920.97");
+    expect(text("combined-spend-with")).toBe("US$87000.50");
+    expect(text("combined-rate-with")).toBe("US$5.0511");
+    expect(text("combined-currency")).toBe("USD · per gal");
+    expect(panel.contains(screen.getByTestId("fx-rate"))).toBe(true);
+    expect(text("fx-rate-status")).toContain("1.3712 CAD per USD");
+    expect(text("fx-rate-status")).toContain("entered Oct 6, 2026");
+    expect(screen.queryByTestId("combined-partial")).toBeNull();
+    expect(screen.queryByTestId("combined-pending")).toBeNull();
+  });
+
+  it("a US-only week: the CA panel is 'Not imported' and the combined panel is 'Partial — CA invoice not imported'", async () => {
+    renderBoth(overviewResult(), [US_INVOICE]);
+    await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
+
+    expect(screen.getByTestId("ca-not-imported").textContent).toContain("CA — Not imported");
+    expect(text("combined-partial")).toBe("Partial — CA invoice not imported");
+    expect(screen.queryByTestId("fx-rate")).toBeNull();
+    expect(text("combined-spend-with")).toBe("US$50929.71");
+  });
+
+  it("a CA-only week says 'Partial — US invoice not imported'", async () => {
+    renderBoth({ us: null, ca: caSide(), combined: combinedPanel({ partial: true, missingSide: "USD" }), fx: ENTERED }, [
+      caInvoice(ENTERED),
+    ]);
+    await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
+    expect(text("combined-partial")).toBe("Partial — US invoice not imported");
+    expect(screen.getByTestId("us-not-imported")).toBeTruthy();
+  });
+
+  it("with no rate every converted figure reads 'rate pending' — never a number — and the rate field is right there", async () => {
+    const pending = {
+      ratePending: true,
+      spend: { beforeTax: null, tax: null, withTax: null },
+      diesel: { qty: 14631.2, beforeTax: null, tax: null, withTax: null },
+      def: { qty: 150, beforeTax: null, tax: null, withTax: null },
+      discount: null,
+      avgBilledPreTaxPerUnit: null,
+      avgBilledPerUnit: null,
+    };
+    renderBoth({ ...both(pending), fx: null }, [US_INVOICE, caInvoice()]);
+    await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
+
+    for (const id of [
+      "combined-spend-before",
+      "combined-spend-tax",
+      "combined-spend-with",
+      "combined-diesel-before",
+      "combined-diesel-with",
+      "combined-def-tax",
+      "combined-discount",
+      "combined-rate-before",
+      "combined-rate-with",
+    ]) {
+      expect(text(id), id).toBe("rate pending");
+    }
+    expect(text("combined-pending")).toContain("rate pending");
+    expect(screen.getByTestId("combined-panel").contains(screen.getByTestId("fx-rate"))).toBe(true);
+    // The sides themselves are unaffected.
+    expect(text("ca-spend-with")).toBe("CA$46837.33");
+    expect(text("kpi-total-value")).toBe("US$50929.71");
+  });
+
+  it("a footnote gives each datesDiffer invoice's actual range", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("combined-footnote")).toBeTruthy());
+    expect(screen.getAllByTestId("combined-footnote")).toHaveLength(1);
+    expect(text("combined-footnote")).toBe("999217: Printed Aug 1 – Sep 9; transactions Sep 3 – Sep 10");
+  });
+
+  it("both invoices are in view: the ids published to the strip are both", async () => {
+    searchParams = new URLSearchParams({ week: "2026-09-09" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [week([US_INVOICE, caInvoice(ENTERED)])] });
+    getOverview.mockResolvedValue(both());
+    const { useWeek } = await import("../../../hooks/useWeek");
+    function Probe() {
+      return <span data-testid="in-view-ids">{JSON.stringify(useWeek().inViewIds)}</span>;
+    }
+    render(
+      <WeekProvider>
+        <OverviewPageInner />
+        <Probe />
+      </WeekProvider>,
+    );
+    await waitFor(() => expect(text("in-view-ids")).toBe('["inv-us","inv-ca"]'));
+  });
+
+  it("the toggle asks the API for that unit and currency, and never converts a side's money", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
+    expect(getOverview).toHaveBeenLastCalledWith("2026-09-09", {});
+
+    getOverview.mockResolvedValue(both({ currency: "CAD", qtyUnit: "L" }));
+    fireEvent.click(screen.getByRole("button", { name: "CAD/L" }));
+    await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith("2026-09-09", { units: "metric", convertTo: "CAD" }));
+    await waitFor(() => expect(text("combined-currency")).toBe("CAD · per L"));
+
+    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
+    await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith("2026-09-09", { units: "imperial", convertTo: "USD" }));
+  });
+
+  it("a CA side read per gallon is labelled CAD/gal, with the same money", async () => {
+    const litres = caSide();
+    renderBoth(
+      both({}, { ...litres, qtyUnit: "gal", kpis: { ...litres.kpis, avgBilledPerUnit: 8.147, avgBilledPreTaxPerUnit: 7.2097 } }),
+    );
+    await waitFor(() => expect(screen.getByTestId("ca-panel")).toBeTruthy());
+    expect(screen.getByTestId("ca-panel").textContent).toContain("CAD/gal");
+    expect(text("ca-rate-with")).toBe("CA$8.1470");
+    expect(text("ca-spend-with")).toBe("CA$46837.33");
   });
 });

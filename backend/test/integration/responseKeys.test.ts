@@ -13,7 +13,7 @@ const hasDatabase = Boolean(process.env.DATABASE_URL);
  * must sit beside it (T-63: "every money field has a `currency` beside it"). */
 const MONEY_KEYS = new Set([
   "amount", "total", "fee", "discount", "scale", "express", "expressFee",
-  "preTaxAmount", "hst", "gst", "pst", "qst", "grandTotal",
+  "preTaxAmount", "hst", "gst", "pst", "qst", "grandTotal", "beforeTax", "withTax", "tax",
 ]);
 
 /** Subtrees whose `total`/`grandTotal` are counts or cents, not money. */
@@ -129,6 +129,7 @@ describe.skipIf(!hasDatabase)("response keys across the period-scoped routes (in
     // T-66: a conversion asked for before any rate is entered, then after one is —
     // so /invoices and /periods below carry an entered fx too.
     const pending = await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=USD`);
+    const overviewPending = await get(`/overview?week=${WEEK_END}`);
     await pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'CAD'");
     const toUsd = (await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=USD&units=imperial`)) as ListTransactionsResult;
     const toCad = await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=CAD`);
@@ -140,7 +141,10 @@ describe.skipIf(!hasDatabase)("response keys across the period-scoped routes (in
       "/invoices": await get("/invoices"),
       "/periods": await get("/periods"),
       "/overview (US digest carries the legacy finding)": await get(`/overview?week=${WEEK_END}`),
+      "/overview, rate pending (combined money is null)": overviewPending,
+      "/overview, rate entered": await get(`/overview?week=${WEEK_END}`),
       "/overview?units=metric": await get(`/overview?week=${WEEK_END}&units=metric`),
+      "/overview?convertTo=CAD&units=metric": await get(`/overview?week=${WEEK_END}&convertTo=CAD&units=metric`),
       "/transactions (both sides)": txs,
       "/transactions CAD": await get(`/transactions?week=${WEEK_END}&currency=CAD&pageSize=200&includeLines=true`),
       "/transactions?convertTo=USD, rate pending": pending,
@@ -159,8 +163,14 @@ describe.skipIf(!hasDatabase)("response keys across the period-scoped routes (in
     };
 
     // The legacy finding really is in the response, so the walk is not vacuous.
-    const digest = (responses["/overview (US digest carries the legacy finding)"] as { anomalyDigest: Array<{ detail: unknown }> }).anomalyDigest;
+    const digest = (responses["/overview (US digest carries the legacy finding)"] as { us: { anomalyDigest: Array<{ detail: unknown }> } }).us.anomalyDigest;
     expect(digest.map((d) => d.detail)).toContainEqual({ productCode: "TA", qty: "0.50", amount: "2.61", minGallons: "1.00", currency: "USD", qtyUnit: "gal" });
+
+    // The pending response really is pending, so that walk is not vacuous either.
+    expect((overviewPending as { combined: { ratePending: boolean; spend: { withTax: number | null } } }).combined).toMatchObject({
+      ratePending: true,
+      spend: { withTax: null },
+    });
 
     for (const [name, body] of Object.entries(responses)) {
       const walked = walk(JSON.parse(JSON.stringify(body)));

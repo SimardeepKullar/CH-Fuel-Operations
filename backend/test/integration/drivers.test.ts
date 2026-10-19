@@ -217,7 +217,7 @@ describe.skipIf(!hasDatabase)("GET /drivers, /drivers/{id} (integration)", () =>
       const overview = await get<OverviewResult>("/overview?week=2026-03-07");
 
       expect(list.fleet.avgBilledPerUnit).toBeCloseTo(3100 / 550, 10);
-      expect(list.fleet.avgBilledPerUnit).toBeCloseTo(overview.kpis.avgBilledPerUnit!, 10);
+      expect(list.fleet.avgBilledPerUnit).toBeCloseTo(overview.us!.kpis.avgBilledPerUnit!, 10);
     });
 
     it("a period with no invoice is empty with zero totals, not an error", async () => {
@@ -497,7 +497,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("driver and truck rollups on 99
   it("the biggest spender is the same driver, at the same dollars, as the Overview's top-spend list", async () => {
     const list = await get<DriversResult>(`/drivers?week=${week}`);
     const overview = await get<OverviewResult>(`/overview?week=${week}`);
-    const top = overview.topSpendByDriver.find((d) => d.driverId !== null)!;
+    const top = overview.us!.topSpendByDriver.find((d) => d.driverId !== null)!;
     const row = list.rows.find((r) => r.driver.id === top.driverId)!;
 
     expect(row.total).toBe(top.total);

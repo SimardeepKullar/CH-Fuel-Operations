@@ -491,9 +491,9 @@ the Import screen never asks for it.
 | Param | Rule |
 |---|---|
 | `week` | `YYYY-MM-DD`, a real date. **Required** on `/overview`, `/drivers`, `/drivers/{id}`, `/trucks/{id}`, `/express-charges`, `/plan-actual`; a missing or malformed one is a 400 problem+json. **Optional** where the screen has no week of its own — `/trucks` (omitted: the plain roster, D23), `/transactions` (a driver's or truck's history spans weeks), `/receipt-queue` (a standing worklist) — but a malformed one is still a 400. |
-| `currency` | `USD` or `CAD`; anything else is a 400. On the one-sided screens (`/drivers`, `/trucks`, `/express-charges` and their details) an omitted `currency` is `USD` and the response says so: gallons and litres cannot be summed. On `/transactions` and `/receipt-queue` an omitted `currency` is *both* sides, each row carrying its own. `/overview` takes the week alone and serves the US side (T-65 shapes the rest); `/stations/{id}/billed-prices` defaults to the station's own country. |
+| `currency` | `USD` or `CAD`; anything else is a 400. On the one-sided screens (`/drivers`, `/trucks`, `/express-charges` and their details) an omitted `currency` is `USD` and the response says so: gallons and litres cannot be summed. On `/transactions` and `/receipt-queue` an omitted `currency` is *both* sides, each row carrying its own. `/overview` takes no `currency` — it serves both sides at once, as `{ us, ca, combined, fx }` (T-65, below); `/stations/{id}/billed-prices` defaults to the station's own country. |
 | `units` | `imperial` or `metric`; anything else is a 400. Absent means as BVD printed it — gallons on a US invoice, litres on a CA one. Converts **quantity and per-unit prices only**, at the API (D25): CAD/L × 3.785411784 is CAD/gal. Money is never converted by `units`, and nothing converted is stored. |
-| `convertTo` | `/transactions` only (T-66). `USD` or `CAD`; anything else is a 400. Absent means each row in the currency its invoice was billed in. Converts **money and per-unit prices** at the rate entered on the row's billing week's CA invoice: CAD → USD divides by it, USD → CAD multiplies. Each stored figure is converted on its own, exactly, and rounded once half away from zero — money to the cent, prices to 4 dp (a price whose unit also changes takes the unit factor inside that one rounding) — so a converted stop total need not equal the sum of its converted lines to the cent. A converted row's `currency` is the target; every row carries `invoiceCurrency` (what BVD billed — what names its invoice); a converted row carries `fx: { rate, enteredAt }`. **No entered rate → every money figure and price on the row and its lines is `null` and the row has `ratePending: true`; never a 1.0 rate.** A row already in the target currency is unchanged. Nothing converted is stored, so a corrected rate re-converts on the next read. |
+| `convertTo` | `/transactions` (T-66) and, for its `combined` body only, `/overview` (T-65). `USD` or `CAD`; anything else is a 400. Absent means each row in the currency its invoice was billed in. Converts **money and per-unit prices** at the rate entered on the row's billing week's CA invoice: CAD → USD divides by it, USD → CAD multiplies. Each stored figure is converted on its own, exactly, and rounded once half away from zero — money to the cent, prices to 4 dp (a price whose unit also changes takes the unit factor inside that one rounding) — so a converted stop total need not equal the sum of its converted lines to the cent. A converted row's `currency` is the target; every row carries `invoiceCurrency` (what BVD billed — what names its invoice); a converted row carries `fx: { rate, enteredAt }`. **No entered rate → every money figure and price on the row and its lines is `null` and the row has `ratePending: true`; never a 1.0 rate.** A row already in the target currency is unchanged. Nothing converted is stored, so a corrected rate re-converts on the next read. |
 
 **Field names carry no currency or unit.** `…Usd` is gone from every Actuals
 response (the Plan screens' `unitPriceUsd`-style fields are USD by construction
@@ -505,6 +505,37 @@ and keep theirs): `totalUsd` → `total`, `amountUsd` → `amount`, `feeUsd` →
 week's end) wherever a result echoes it. The import report's `grandTotalUsd`
 and `productTotals[].gallons/amountUsd/discountUsd` are `grandTotal` and
 `qty/amount/discount`. The transactions sort value `total_usd` is `total`.
+
+**`GET /overview?week=` is `{ us, ca, combined, fx }` (T-65).** Takes `week`, and
+optionally `units` and `convertTo`.
+
+- `us` / `ca`: the per-invoice body (`currency`, `qtyUnit`, `kpis`, `trend`,
+  `topSpendByDriver`, `anomalyDigest`) in that invoice's own currency and — unless
+  `units` — its own unit; `null` when the week has no imported invoice on that
+  side (not an error). `units` converts a side's quantities and per-unit rates and
+  never its money. `kpis.tax` is `{ beforeTax, tax, withTax, hst, gst, pst, qst,
+  currency }` with `beforeTax + tax = withTax` exactly and `withTax` the invoice's
+  grand total; `tax` is the sum of the grand-total rows' four tax columns, so a
+  line that prints a final amount alone (Scale, Express) is before tax. Each of
+  `kpis.diesel` / `kpis.def` also carries `preTax` and `tax`, and
+  `avgBilledPreTaxPerUnit` sits beside `avgBilledPerUnit` (which, as billed,
+  includes tax). A US side has `tax: 0` everywhere — US fuel tax is inside the
+  pump price, so the US panel shows one value per figure.
+- `combined`: the two sides added in `currency` (`USD`, or `CAD` with
+  `convertTo=CAD`) and `qtyUnit` (`gal`, or `L` with `units=metric`). Shape:
+  `partial` / `missingSide` (one side absent: the present side's figures alone),
+  `ratePending`, `spend`, `diesel`, `def` (each `{ beforeTax, tax, withTax }`, with
+  `qty` on the products), `discount`, and the two billed-per-unit rates. The CA
+  side is converted at the entered rate, then added **in integer cents with one
+  rounding point**: each converted CA (or US, for `CAD`) figure is the exact
+  quotient rounded once, half away from zero, to the cent. Only `withTax` and
+  `tax` are converted; `beforeTax` is their difference, so the split adds up after
+  conversion and `withTax` is the US cents plus the one rounded CA figure. Rates
+  are spend over quantity. **`ratePending`: no entered rate where one is needed →
+  every money figure and rate is `null`, nothing is computed, never a 1.0 rate.**
+  A US-only week in USD needs no rate. `null` as a whole only when neither side is
+  imported.
+- `fx`: `{ rate, enteredAt }` — the CA invoice's entered rate — or `null`.
 
 **A currency beside every money field.** Each response carries `currency` (and
 `qtyUnit`, `"gal"` or `"L"`, for the quantities) either on the object that holds

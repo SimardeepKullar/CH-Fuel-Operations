@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { getOverview } from "../../actuals/overview.js";
-import { parseWeekQuery } from "../query.js";
+import { badRequest, currencySchema, parseWeekQuery } from "../query.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -9,14 +9,20 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-/** `GET /overview?week=` — A8.1's whole landing screen in one call. Takes the
- * week alone (T-65 shapes the CA and combined panels); `currency`, if sent, is
+/** `GET /overview?week=` — A8.1's whole landing screen in one call, as `{ us,
+ * ca, combined, fx }` (T-65). `units` sets the unit of every per-unit rate and
+ * quantity; `convertTo=USD|CAD` the combined panel's currency (USD when
+ * absent). Neither converts a side's own figures. `currency`, if sent, is
  * validated like every period-scoped route and otherwise ignored. */
 export async function handleGetOverview(pool: Pool, url: URL): Promise<Response> {
   const query = parseWeekQuery(url);
   if (query instanceof Response) {
     return query;
   }
+  const convertTo = currencySchema.optional().safeParse(url.searchParams.get("convertTo") ?? undefined);
+  if (!convertTo.success) {
+    return badRequest(url, convertTo.error.message);
+  }
 
-  return jsonResponse(await getOverview(pool, query.week, { units: query.units }));
+  return jsonResponse(await getOverview(pool, query.week, { units: query.units, convertTo: convertTo.data ?? null }));
 }

@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp, type App } from "../../src/api/app.js";
 import type { PeriodWeek } from "../../src/api/routes/periods.js";
+import type { OverviewResult } from "../../src/actuals/overview.js";
 import type { ListTransactionsResult } from "../../src/actuals/transactions.js";
 import { runMigrations } from "../../src/db/migrate.js";
 import { importInvoice } from "../../src/invoice/importInvoice.js";
@@ -160,5 +161,34 @@ describe.skipIf(!hasDatabase || !hasRealFixtures || !python)("billing weeks on t
     expect(us.total).toBe(66);
     expect(us.rows.every((r) => r.currency === "USD" && r.qtyUnit === "gal")).toBe(true);
     expect((await get<ListTransactionsResult>("/transactions?week=2026-09-09&pageSize=1")).total).toBe(125);
+  });
+
+  it("/overview for the week: CA with tax is 999217's grand total 46,837.33; combined at 1.3712 is 50,929.71 + 46,837.33 ÷ 1.3712 (T-65)", async () => {
+    const pending = await get<OverviewResult>("/overview?week=2026-09-09");
+    expect(pending.us!.kpis.total.amount).toBe(50929.71);
+    expect(pending.ca!.kpis.tax).toMatchObject({ withTax: 46837.33, tax: 5376.44, beforeTax: 41460.89, hst: 5376.44, currency: "CAD" });
+    expect(pending.fx).toBeNull();
+    expect(pending.combined).toMatchObject({ ratePending: true, partial: false });
+    expect(pending.combined!.spend).toEqual({ beforeTax: null, tax: null, withTax: null });
+
+    const caId = (await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = '999217'")).rows[0]!.id;
+    const patched = await app.handle(
+      new Request(`http://localhost/api/v1/invoices/${caId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: 1.3712 }) }),
+    );
+    expect(patched.status).toBe(200);
+    try {
+      const { rows } = await pool.query<{ with_tax: string; tax: string }>(
+        "SELECT round(46837.33 / 1.3712, 2)::text AS with_tax, round(5376.44 / 1.3712, 2)::text AS tax",
+      );
+      const rated = await get<OverviewResult>("/overview?week=2026-09-09");
+      const withTax = Math.round(5092971 + Number(rows[0]!.with_tax) * 100) / 100;
+      const tax = Number(rows[0]!.tax);
+      expect(rated.combined).toMatchObject({ currency: "USD", ratePending: false });
+      expect(rated.combined!.spend.withTax).toBe(withTax);
+      expect(rated.combined!.spend.tax).toBe(tax);
+      expect(Math.round(rated.combined!.spend.beforeTax! * 100) + Math.round(tax * 100)).toBe(Math.round(withTax * 100));
+    } finally {
+      await pool.query("UPDATE invoices SET fx_cad_per_usd = NULL, fx_entered_at = NULL WHERE id = $1", [caId]);
+    }
   });
 });

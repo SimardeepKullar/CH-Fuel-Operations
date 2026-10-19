@@ -188,13 +188,13 @@ describe.skipIf(!hasDatabase)("period-scoped routes over a US + CA week (integra
   describe("GET /overview and GET /receipt-queue", () => {
     it("/overview takes the week alone and serves the US side", async () => {
       const overview = await get<OverviewResult>(`/overview?${w}`);
-      expect(overview).toMatchObject({ currency: "USD", qtyUnit: "gal" });
-      expect(overview.kpis.week).toBe(WEEK_END);
-      expect(overview.trend.map((p) => p.week)).toEqual([WEEK_END]);
+      expect(overview.us).toMatchObject({ currency: "USD", qtyUnit: "gal" });
+      expect(overview.us!.kpis.week).toBe(WEEK_END);
+      expect(overview.us!.trend.map((p) => p.week)).toEqual([WEEK_END]);
       const litres = await get<OverviewResult>(`/overview?${w}&units=metric`);
-      expect(litres.qtyUnit).toBe("L");
-      expect(litres.kpis.total).toEqual(overview.kpis.total);
-      expect(litres.kpis.diesel.qty).toBeCloseTo(overview.kpis.diesel.qty * LITRES_PER_GALLON, 2);
+      expect(litres.us!.qtyUnit).toBe("L");
+      expect(litres.us!.kpis.total).toEqual(overview.us!.kpis.total);
+      expect(litres.us!.kpis.diesel.qty).toBeCloseTo(overview.us!.kpis.diesel.qty * LITRES_PER_GALLON, 2);
     });
 
     it("/receipt-queue is both sides until narrowed by currency or week", async () => {
