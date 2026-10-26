@@ -1320,6 +1320,63 @@ select.tx-filter-select {
 .tax-pending { margin: 0; font: 400 12px var(--font-body); color: #a4abb9; }
 .tax-footnote { margin: 0; font: 400 11px var(--font-body); color: var(--color-muted); }
 
+/* US and CA: one card each — badge, title, subtitle, then a grid of flat tiles. */
+.side-panel { background: var(--color-surface); border: 1px solid var(--color-border); border-top: 3px solid var(--color-accent-800); min-width: 0; }
+.side-panel[data-accent="ca"] { border-top-color: var(--color-accent); }
+.side-panel-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.side-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; padding: 0 8px; background: var(--color-accent-800); color: #fff; font: 700 15px var(--font-heading); letter-spacing: 0.06em; }
+.side-panel[data-accent="ca"] .side-badge { background: var(--color-accent); }
+.side-badge-light { background: #fff; color: var(--color-accent-800); height: 34px; font-size: 14px; }
+.side-panel-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.side-panel-title { margin: 0; font: 600 19px/1 var(--font-heading); letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-accent-800); }
+.side-panel-sub { font: 400 11px var(--font-body); color: var(--color-muted); }
+.side-panel-note { margin-left: auto; align-self: center; padding: 4px 9px; font: 500 10.5px/1.3 var(--font-body); white-space: nowrap; color: #8a5a00; background: #fff7e6; border: 1px solid var(--color-amber); }
+.side-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.kpi-tile { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; border-top: 1px solid var(--color-divider); min-width: 0; }
+.kpi-tile-dominant { padding: 14px 16px; }
+.side-grid > .kpi-tile:nth-child(even) { border-left: 1px solid var(--color-divider); }
+.kpi-tile-dominant .kpi-card-value-row { gap: 8px; }
+.kpi-tile-dominant .kpi-card-corner { top: 14px; }
+.kpi-tile-dominant .kpi-card-unit { font-size: 13px; }
+a.kpi-tile-link { color: inherit; text-decoration: none; cursor: pointer; }
+a.kpi-tile-link:hover { background: var(--color-accent-100); }
+a.kpi-tile-link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.kpi-card-head { display: flex; align-items: flex-start; min-height: 12px; justify-content: space-between; gap: 10px; }
+/* Out of flow, so a stacked reading never makes its tile taller than the same tile on the other side. */
+.kpi-card-corner { position: absolute; top: 12px; right: 16px; text-align: right; white-space: pre-line; line-height: 1.35; font: 600 11.5px/1.35 var(--font-body); color: var(--color-control-fg); font-variant-numeric: tabular-nums; }
+.kpi-card-corner-bottom { position: absolute; bottom: 12px; right: 16px; font: 400 10.5px var(--font-body); color: var(--color-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kpi-card-link-hint { font-weight: 600; color: var(--color-control-fg); }
+a.kpi-tile-link:hover .kpi-card-link-hint { text-decoration: underline; }
+.kpi-card-prefix { margin-right: 2px; font-size: 0.55em; font-weight: 600; letter-spacing: 0.02em; opacity: 0.75; }
+@media (max-width: 700px) {
+  .side-grid { grid-template-columns: 1fr; }
+  .side-grid > .kpi-tile:nth-child(even) { border-left: 0; }
+  .side-panel-head { flex-wrap: wrap; }
+  .side-panel-note { margin-left: 0; max-width: none; }
+}
+
+/* Combined: a navy band carrying the exchange rate, a row of tiles, the breakdown table. */
+.combined-panel { background: var(--color-surface); border: 1px solid var(--color-border); display: flex; flex-direction: column; }
+.combined-head { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--color-accent-800); }
+.combined-head .side-panel-title { color: #fff; }
+.combined-head .side-panel-sub { color: rgba(255, 255, 255, 0.7); }
+.combined-rate { margin-left: auto; }
+.combined-rate .fx-rate { padding: 0; background: transparent; border: 0; gap: 4px 12px; justify-content: flex-end; }
+.combined-rate .fx-rate-label { color: #7fd2f2; font: 600 10px var(--font-heading); letter-spacing: 0.1em; text-transform: uppercase; }
+.combined-rate .fx-rate-input { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.25); }
+.combined-rate .fx-rate-status { max-width: 360px; text-align: right; font-size: 11px; color: rgba(255, 255, 255, 0.6); }
+.combined-rate .fx-rate-error { color: #ffb4ab; }
+.combined-panel > .tax-partial, .combined-panel > .tax-pending { padding: 10px 16px 0; }
+.combined-tiles { display: grid; grid-template-columns: repeat(5, 1fr); }
+.combined-tiles > .kpi-tile + .kpi-tile { border-left: 1px solid var(--color-divider); }
+.combined-foot { display: flex; flex-direction: column; gap: 2px; padding: 8px 16px 12px; }
+@media (max-width: 1100px) {
+  .combined-tiles { grid-template-columns: repeat(2, 1fr); }
+  .combined-tiles > .kpi-tile { border-left: 0 !important; }
+  .combined-head { flex-wrap: wrap; }
+  .combined-rate { margin-left: 0; }
+}
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1344,7 +1401,12 @@ select.tx-filter-select {
 @media (max-width: 1100px) {
   .overview-panels { grid-template-columns: 1fr; }
 }
-.overview-trend-panel, .overview-topspend-panel, .overview-anomaly-panel { padding: 14px 16px; }
+/* The trend and top-spend panels wear the same frame as the US/CA cards: a 4px navy rule, a titled header, a divider. */
+.chart-panel { background: var(--color-surface); border: 1px solid var(--color-border); border-top: 3px solid var(--color-accent-800); min-width: 0; }
+.chart-panel-head { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border-bottom: 1px solid var(--color-divider); }
+.chart-panel-title { margin: 0; font: 600 16px/1 var(--font-heading); letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-accent-800); }
+.chart-panel-sub { font: 400 11px var(--font-body); color: var(--color-muted); }
+.chart-panel-body { padding: 14px 16px; }
 
 /* Recharts tooltip — plain HTML per the chart's own `content` render prop. */
 .chart-tooltip {

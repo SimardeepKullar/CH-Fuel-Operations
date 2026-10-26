@@ -506,7 +506,7 @@ week's end) wherever a result echoes it. The import report's `grandTotalUsd`
 and `productTotals[].gallons/amountUsd/discountUsd` are `grandTotal` and
 `qty/amount/discount`. The transactions sort value `total_usd` is `total`.
 
-**`GET /overview?week=` is `{ us, ca, combined, fx }` (T-65).** Takes `week`, and
+**`GET /overview?week=` is `{ us, usConverted, ca, combined, fx }` (T-65).** Takes `week`, and
 optionally `units` and `convertTo`.
 
 - `us` / `ca`: the per-invoice body (`currency`, `qtyUnit`, `kpis`, `trend`,
@@ -521,8 +521,16 @@ optionally `units` and `convertTo`.
   `avgBilledPreTaxPerUnit` sits beside `avgBilledPerUnit` (which, as billed,
   includes tax). A US side has `tax: 0` everywhere — US fuel tax is inside the
   pump price, so the US panel shows one value per figure.
+- `usConverted`: the US side's tile figures in **CAD and litres** (`total`, `dieselAmount`,
+  `defAmount`, `discount`, `otherCharges`, `avgBilledPerUnit`, `discountPerUnit`, and the
+  quantities `dieselQty` / `defQty`), each converted once from its stored figure at the CA
+  invoice's entered rate — the Overview prints them top right of each US tile. `null` exactly
+  when `us` is. No entered rate: `ratePending: true` and every money figure and price is
+  `null`; the litre quantities still carry. Independent of `units` and `convertTo`.
 - `combined`: the two sides added in `currency` (`USD`, or `CAD` with
-  `convertTo=CAD`) and `qtyUnit` (`gal`, or `L` with `units=metric`). Shape:
+  `convertTo=CAD`) and `qtyUnit` — `units` when given, otherwise the currency's own
+  unit (`gal` in USD, `L` in CAD). The Overview screen asks `convertTo=CAD`: the
+  sides as printed, the combined panel in CAD/L. Shape:
   `partial` / `missingSide` (one side absent: the present side's figures alone),
   `ratePending`, `spend`, `diesel`, `def` (each `{ beforeTax, tax, withTax }`, with
   `qty` on the products), `discount`, and the two billed-per-unit rates. The CA

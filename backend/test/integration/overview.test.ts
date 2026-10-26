@@ -126,7 +126,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
 
     expect(response.status).toBe(200);
     const body = (await response.json()) as { us: unknown; ca: unknown; combined: unknown; fx: unknown };
-    expect(body).toEqual({ us: null, ca: null, combined: null, fx: null });
+    expect(body).toEqual({ us: null, usConverted: null, ca: null, combined: null, fx: null });
   });
 
   it("GET /overview over HTTP serves the whole screen in one call", async () => {

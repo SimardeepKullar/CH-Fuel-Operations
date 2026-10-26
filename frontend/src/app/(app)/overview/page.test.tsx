@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { OverviewResult } from "@ch/core/actuals/overview";
+import type { OverviewConverted, OverviewResult } from "@ch/core/actuals/overview";
 import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
 import type { PeriodInvoice, PeriodWeek } from "@ch/core/api/routes/periods";
 
@@ -69,6 +69,25 @@ function usSide(): NonNullable<OverviewResult["us"]> {
   };
 }
 
+/** The US side in CAD/L at a rate of 1.3712 — display figures only; the arithmetic is the backend's. */
+function usConverted(overrides: Partial<OverviewConverted> = {}): OverviewConverted {
+  return {
+    currency: "CAD",
+    qtyUnit: "L",
+    ratePending: false,
+    avgBilledPerUnit: 1.8979,
+    discountPerUnit: 0.2111,
+    total: 69834.81,
+    dieselQty: 33051.74,
+    dieselAmount: 64440.62,
+    defQty: 660.15,
+    defAmount: 1159.23,
+    discount: 6977.74,
+    otherCharges: 2237.69,
+    ...overrides,
+  };
+}
+
 function caSide(overrides: Partial<NonNullable<OverviewResult["ca"]>["kpis"]["tax"]> = {}): NonNullable<OverviewResult["ca"]> {
   const tax = { beforeTax: 41460.89, tax: 5376.44, withTax: 46837.33, hst: 5376.44, gst: 0, pst: 0, qst: 0, currency: "CAD" as const, ...overrides };
   return {
@@ -96,8 +115,8 @@ function caSide(overrides: Partial<NonNullable<OverviewResult["ca"]>["kpis"]["ta
 
 function combinedPanel(overrides: Partial<NonNullable<OverviewResult["combined"]>> = {}): NonNullable<OverviewResult["combined"]> {
   return {
-    currency: "USD",
-    qtyUnit: "gal",
+    currency: "CAD",
+    qtyUnit: "L",
     partial: false,
     missingSide: null,
     ratePending: false,
@@ -115,6 +134,7 @@ function combinedPanel(overrides: Partial<NonNullable<OverviewResult["combined"]
 function overviewResult(overrides: Partial<OverviewResult> = {}): OverviewResult {
   return {
     us: usSide(),
+    usConverted: usConverted(),
     ca: null,
     combined: combinedPanel({ partial: true, missingSide: "CAD", spend: { beforeTax: 50929.71, tax: 0, withTax: 50929.71 } }),
     fx: null,
@@ -144,7 +164,7 @@ describe("OverviewPage (T-41)", () => {
 
     await waitFor(() => expect(screen.getByTestId("kpi-avg-billed-value")).toBeTruthy());
     expect(getOverview).toHaveBeenCalledTimes(1);
-    expect(getOverview).toHaveBeenCalledWith("2026-09-03", {});
+    expect(getOverview).toHaveBeenCalledWith("2026-09-03", { convertTo: "CAD" });
   });
 
   it("average billed price is the headline figure and discount rides as its subline (A9.1)", async () => {
@@ -157,17 +177,18 @@ describe("OverviewPage (T-41)", () => {
 
     await waitFor(() => expect(screen.getByTestId("kpi-avg-billed-value")).toBeTruthy());
     expect(screen.getByTestId("kpi-avg-billed-value").textContent).toBe("US$5.2395");
-    expect(screen.getByTestId("kpi-avg-billed-sub").textContent).toBe("discount captured US$1200.50");
+    expect(screen.getByTestId("kpi-avg-billed-sub").textContent).toBe("US$0.1334 / gal discount");
     const dominantSize = parseFloat(getComputedStyle(screen.getByTestId("kpi-avg-billed-value")).fontSize);
-    const totalSize = parseFloat(getComputedStyle(screen.getByTestId("kpi-total-value")).fontSize);
-    expect(dominantSize).toBeGreaterThan(totalSize);
+    const dieselSize = parseFloat(getComputedStyle(screen.getByTestId("kpi-diesel-value")).fontSize);
+    expect(dominantSize).toBeGreaterThan(dieselSize);
+    expect(parseFloat(getComputedStyle(screen.getByTestId("kpi-total-value")).fontSize)).toBe(dominantSize);
   });
 
   it("shows the designed empty state for a period with no invoice, not an indefinite spinner", async () => {
     searchParams = new URLSearchParams({ week: "2026-09-10" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
     listPeriods.mockResolvedValue({ weeks: [] });
-    getOverview.mockResolvedValue({ us: null, ca: null, combined: null, fx: null });
+    getOverview.mockResolvedValue({ us: null, usConverted: null, ca: null, combined: null, fx: null });
 
     render(<OverviewPage />);
 
@@ -380,6 +401,7 @@ describe("OverviewPage — US, CA and combined panels (T-65 step 65.2)", () => {
   }
   const both = (combined: Partial<NonNullable<OverviewResult["combined"]>> = {}, ca = caSide()): OverviewResult => ({
     us: usSide(),
+    usConverted: usConverted(),
     ca,
     combined: combinedPanel(combined),
     fx: ENTERED,
@@ -399,37 +421,61 @@ describe("OverviewPage — US, CA and combined panels (T-65 step 65.2)", () => {
     expect(combined.parentElement).not.toBe(us.parentElement);
   });
 
-  it("the CA panel shows before tax, tax and with tax, and both per-litre rates", async () => {
+  it("the CA panel shows each figure with tax, its before-tax + tax split beneath, and both per-litre rates, all in CAD", async () => {
     renderBoth(both());
     await waitFor(() => expect(screen.getByTestId("ca-panel")).toBeTruthy());
 
-    expect(text("ca-spend-before")).toBe("CA$41460.89");
-    expect(text("ca-spend-tax")).toBe("CA$5376.44");
-    expect(text("ca-spend-with")).toBe("CA$46837.33");
-    expect(text("ca-diesel-before")).toBe("CA$41202.86");
-    expect(text("ca-diesel-with")).toBe("CA$46559.28");
-    expect(text("ca-def-tax")).toBe("CA$20.02");
-    expect(text("ca-discount")).toBe("CA$6759.96");
-    expect(text("ca-rate-before")).toBe("CA$1.9046");
-    expect(text("ca-rate-with")).toBe("CA$2.1522");
-    expect(screen.getByTestId("ca-panel").textContent).toContain("CAD/L");
+    expect(text("ca-avg-billed-value")).toBe("CA$2.1522");
+    expect(text("ca-avg-billed-sub")).toBe("CA$1.9046 / L before HST");
+    expect(text("ca-total-value")).toBe("CA$46,837.33");
+    expect(text("ca-total-sub")).toBe("Diesel + DEF + other charges");
+    expect(text("ca-total-corner-bottom")).toBe("5,376.44 HST");
+    expect(text("ca-diesel-value")).toBe("CA$46,559.28");
+    expect(text("ca-diesel-sub")).toBe("21,318.77 L");
+    expect(text("ca-diesel-corner-bottom")).toBe("5,356.42 HST");
+    expect(text("ca-other-value")).toBe("CA$104.00");
+    expect(text("ca-def-sub")).toBe("113.09 L");
+    expect(text("ca-def-corner-bottom")).toBe("20.02 HST");
+    expect(text("ca-discount-value")).toBe("CA$6,759.96");
+    expect(text("ca-discount-sub")).toBe("Before tax");
+    expect(screen.getByTestId("ca-panel").textContent).toContain("Invoice 999217 · Sep 3–10 · CAD, incl. HST");
+    expect(screen.getByTestId("ca-panel").textContent).not.toContain("US$");
   });
 
-  it("labels the CA tax column HST when HST is the only tax, Sales tax otherwise", async () => {
+  it("the CA panel shows its own receipt compliance and anomaly count, coloured", async () => {
     renderBoth(both());
-    await waitFor(() => expect(screen.getByTestId("ca-tax-label")).toBeTruthy());
-    expect(text("ca-tax-label")).toBe("HST");
+    await waitFor(() => expect(screen.getByTestId("ca-panel")).toBeTruthy());
+
+    expect(text("ca-receipts-value")).toBe("0%");
+    expect(text("ca-receipts-sub")).toBe("0 of 59 confirmed");
+    expect(screen.getByTestId("ca-receipts-value").style.color).toBe("var(--color-error)");
+    expect(text("ca-anomalies-value")).toBe("1");
+    expect(screen.getByTestId("ca-anomalies-value").style.color).not.toBe("");
+  });
+
+  it("an invoice whose printed range differs puts the amber 'check period' callout in the CA header", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("ca-panel-note")).toBeTruthy());
+    expect(text("ca-panel-note")).toBe("Printed Aug 1 – Sep 9 · check period");
+    expect(screen.queryByTestId("us-panel-note")).toBeNull();
+  });
+
+  it("labels the CA tax HST when HST is the only tax, Sales tax otherwise", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("ca-panel")).toBeTruthy());
+    expect(text("ca-avg-billed-sub")).toContain("before HST");
     cleanup();
 
     renderBoth(both({}, caSide({ hst: 0, gst: 2688.22, qst: 2688.22 })));
-    await waitFor(() => expect(screen.getByTestId("ca-tax-label")).toBeTruthy());
-    expect(text("ca-tax-label")).toBe("Sales tax");
+    await waitFor(() => expect(screen.getByTestId("ca-panel")).toBeTruthy());
+    expect(text("ca-avg-billed-sub")).toContain("before Sales tax");
+    expect(text("ca-total-corner-bottom")).toContain("Sales tax");
   });
 
   it("the US panel shows one value per figure — no tax split", async () => {
     renderBoth(both());
     await waitFor(() => expect(screen.getByTestId("us-panel")).toBeTruthy());
-    expect(text("kpi-total-value")).toBe("US$50929.71");
+    expect(text("kpi-total-value")).toBe("US$50,929.71");
     expect(screen.getByTestId("us-panel").textContent).not.toMatch(/before tax|with tax/i);
   });
 
@@ -438,18 +484,84 @@ describe("OverviewPage — US, CA and combined panels (T-65 step 65.2)", () => {
     await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
 
     const panel = screen.getByTestId("combined-panel");
-    expect(panel.textContent).toContain("Before HST");
     expect(panel.textContent?.toLowerCase()).not.toContain("pre-tax");
-    expect(text("combined-spend-before")).toBe("US$84000.12");
-    expect(text("combined-spend-tax")).toBe("US$3920.97");
-    expect(text("combined-spend-with")).toBe("US$87000.50");
-    expect(text("combined-rate-with")).toBe("US$5.0511");
-    expect(text("combined-currency")).toBe("USD · per gal");
+    // Five tiles, each figure with HST and its HST amount bottom right; no breakdown table repeating them.
+    expect(text("combined-total-value")).toBe("CA$87,000.50");
+    expect(text("combined-total-sub")).toBe("Diesel + DEF + other charges");
+    expect(text("combined-total-corner-bottom")).toBe("3,920.97 HST");
+    expect(text("combined-diesel-value")).toBe("CA$73,906.22");
+    expect(text("combined-diesel-sub")).toBe("14,631.20 L");
+    expect(text("combined-diesel-corner-bottom")).toBe("3,906.12 HST");
+    expect(text("combined-def-value")).toBe("CA$615.10");
+    expect(text("combined-def-corner-bottom")).toBe("14.60 HST");
+    expect(text("combined-disc-value")).toBe("CA$6,130.78");
+    expect(text("combined-billed-value")).toBe("CA$5.0511");
+    expect(text("combined-billed-sub")).toBe("CA$4.7843 / L before HST");
+    expect(panel.querySelector("table")).toBeNull();
+    expect(panel.textContent).toContain("Both invoices, US converted to CAD · litres");
     expect(panel.contains(screen.getByTestId("fx-rate"))).toBe(true);
     expect(text("fx-rate-status")).toContain("1.3712 CAD per USD");
     expect(text("fx-rate-status")).toContain("entered Oct 6, 2026");
     expect(screen.queryByTestId("combined-partial")).toBeNull();
     expect(screen.queryByTestId("combined-pending")).toBeNull();
+  });
+
+  it("each US tile carries its CAD/L reading top right; the counts carry none", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("us-panel")).toBeTruthy());
+
+    expect(text("kpi-avg-billed-corner")).toBe("CA$1.8979 / L");
+    expect(text("kpi-total-corner")).toBe("CA$69,834.81");
+    expect(text("kpi-diesel-corner")).toBe("CA$64,440.62\n33,051.74 L");
+    expect(text("kpi-def-corner")).toBe("CA$1,159.23\n660.15 L");
+    expect(text("kpi-diesel-value")).toBe("US$47,000.00");
+    expect(text("kpi-diesel-sub")).toBe("9,000.00 gal");
+    expect(text("kpi-discount-corner")).toBe("CA$6,977.74");
+    expect(text("kpi-other-corner")).toBe("CA$2,237.69");
+    expect(screen.queryByTestId("kpi-receipts-corner")).toBeNull();
+    expect(screen.queryByTestId("kpi-anomalies-corner")).toBeNull();
+    // The US figures themselves are untouched.
+    expect(text("kpi-total-value")).toBe("US$50,929.71");
+  });
+
+  it("with no rate the US corners read 'rate pending' — never a number — but litres still show", async () => {
+    const pending = usConverted({
+      ratePending: true,
+      avgBilledPerUnit: null,
+      discountPerUnit: null,
+      total: null,
+      dieselAmount: null,
+      defAmount: null,
+      discount: null,
+      otherCharges: null,
+    });
+    renderBoth({ ...both(), usConverted: pending, fx: null }, [US_INVOICE, caInvoice()]);
+    await waitFor(() => expect(screen.getByTestId("us-panel")).toBeTruthy());
+
+    for (const id of ["kpi-total-corner", "kpi-discount-corner", "kpi-other-corner"]) {
+      expect(text(id), id).toBe("rate pending");
+    }
+    expect(text("kpi-avg-billed-corner")).toBe("rate pending");
+    // A product keeps its litres, which need no rate, beside the pending cost.
+    expect(text("kpi-diesel-corner")).toBe("rate pending\n33,051.74 L");
+    expect(text("kpi-def-corner")).toBe("rate pending\n660.15 L");
+  });
+
+  it("the Anomalies flagged tiles replace the digest: each opens Transactions on its own invoice's flagged stops", async () => {
+    renderBoth(both());
+    await waitFor(() => expect(screen.getByTestId("kpi-anomalies-link")).toBeTruthy());
+
+    expect(screen.queryByText("View flagged in Transactions →")).toBeNull();
+    expect(screen.getByTestId("kpi-anomalies-link").getAttribute("href")).toBe("/transactions?anomalyOnly=true&week=2026-09-09&invoice=inv-1");
+    expect(screen.getByTestId("ca-anomalies-link").getAttribute("href")).toBe("/transactions?anomalyOnly=true&week=2026-09-09&invoice=inv-ca");
+
+    fireEvent.click(screen.getByTestId("ca-anomalies-link"));
+    expect(push).toHaveBeenCalledWith("/transactions?anomalyOnly=true&week=2026-09-09&invoice=inv-ca");
+    // A link says so, bottom right.
+    expect(text("kpi-anomalies-corner-bottom")).toBe("View →");
+    expect(text("ca-anomalies-corner-bottom")).toBe("View →");
+    // Only the anomaly tiles are links.
+    expect(screen.queryByTestId("kpi-total-link")).toBeNull();
   });
 
   it("a US-only week: the CA panel is 'Not imported' and the combined panel is 'Partial — CA invoice not imported'", async () => {
@@ -459,11 +571,11 @@ describe("OverviewPage — US, CA and combined panels (T-65 step 65.2)", () => {
     expect(screen.getByTestId("ca-not-imported").textContent).toContain("CA — Not imported");
     expect(text("combined-partial")).toBe("Partial — CA invoice not imported");
     expect(screen.queryByTestId("fx-rate")).toBeNull();
-    expect(text("combined-spend-with")).toBe("US$50929.71");
+    expect(text("combined-total-value")).toBe("CA$50,929.71");
   });
 
   it("a CA-only week says 'Partial — US invoice not imported'", async () => {
-    renderBoth({ us: null, ca: caSide(), combined: combinedPanel({ partial: true, missingSide: "USD" }), fx: ENTERED }, [
+    renderBoth({ us: null, usConverted: null, ca: caSide(), combined: combinedPanel({ partial: true, missingSide: "USD" }), fx: ENTERED }, [
       caInvoice(ENTERED),
     ]);
     await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
@@ -484,24 +596,17 @@ describe("OverviewPage — US, CA and combined panels (T-65 step 65.2)", () => {
     renderBoth({ ...both(pending), fx: null }, [US_INVOICE, caInvoice()]);
     await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
 
-    for (const id of [
-      "combined-spend-before",
-      "combined-spend-tax",
-      "combined-spend-with",
-      "combined-diesel-before",
-      "combined-diesel-with",
-      "combined-def-tax",
-      "combined-discount",
-      "combined-rate-before",
-      "combined-rate-with",
-    ]) {
+    for (const id of ["combined-total-value", "combined-diesel-value", "combined-def-value", "combined-disc-value", "combined-billed-value"]) {
       expect(text(id), id).toBe("rate pending");
     }
+    // No HST amount is invented while the rate is pending.
+    expect(screen.queryByTestId("combined-total-corner-bottom")).toBeNull();
+    expect(screen.queryByTestId("combined-diesel-corner-bottom")).toBeNull();
     expect(text("combined-pending")).toContain("rate pending");
     expect(screen.getByTestId("combined-panel").contains(screen.getByTestId("fx-rate"))).toBe(true);
     // The sides themselves are unaffected.
-    expect(text("ca-spend-with")).toBe("CA$46837.33");
-    expect(text("kpi-total-value")).toBe("US$50929.71");
+    expect(text("ca-total-value")).toBe("CA$46,837.33");
+    expect(text("kpi-total-value")).toBe("US$50,929.71");
   });
 
   it("a footnote gives each datesDiffer invoice's actual range", async () => {
@@ -529,28 +634,17 @@ describe("OverviewPage — US, CA and combined panels (T-65 step 65.2)", () => {
     await waitFor(() => expect(text("in-view-ids")).toBe('["inv-us","inv-ca"]'));
   });
 
-  it("the toggle asks the API for that unit and currency, and never converts a side's money", async () => {
+  it("has no unit control: the sides read as printed, the combined panel in CAD/L", async () => {
     renderBoth(both());
     await waitFor(() => expect(screen.getByTestId("combined-panel")).toBeTruthy());
-    expect(getOverview).toHaveBeenLastCalledWith("2026-09-09", {});
 
-    getOverview.mockResolvedValue(both({ currency: "CAD", qtyUnit: "L" }));
-    fireEvent.click(screen.getByRole("button", { name: "CAD/L" }));
-    await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith("2026-09-09", { units: "metric", convertTo: "CAD" }));
-    await waitFor(() => expect(text("combined-currency")).toBe("CAD · per L"));
-
-    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
-    await waitFor(() => expect(getOverview).toHaveBeenLastCalledWith("2026-09-09", { units: "imperial", convertTo: "USD" }));
-  });
-
-  it("a CA side read per gallon is labelled CAD/gal, with the same money", async () => {
-    const litres = caSide();
-    renderBoth(
-      both({}, { ...litres, qtyUnit: "gal", kpis: { ...litres.kpis, avgBilledPerUnit: 8.147, avgBilledPreTaxPerUnit: 7.2097 } }),
-    );
-    await waitFor(() => expect(screen.getByTestId("ca-panel")).toBeTruthy());
-    expect(screen.getByTestId("ca-panel").textContent).toContain("CAD/gal");
-    expect(text("ca-rate-with")).toBe("CA$8.1470");
-    expect(text("ca-spend-with")).toBe("CA$46837.33");
+    expect(getOverview).toHaveBeenLastCalledWith("2026-09-09", { convertTo: "CAD" });
+    expect(screen.queryByRole("button", { name: "USD/gal" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "CAD/L" })).toBeNull();
+    expect(text("kpi-avg-billed-value")).toBe("US$5.2395");
+    expect(screen.getByTestId("kpi-avg-billed-value").parentElement!.textContent).toContain("/ gal");
+    expect(text("ca-avg-billed-sub")).toBe("CA$1.9046 / L before HST");
+    expect(text("combined-billed-value")).toBe("CA$5.0511");
+    expect(text("combined-diesel-sub")).toBe("14,631.20 L");
   });
 });

@@ -3,6 +3,7 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { OverviewTopSpendDriver } from "@ch/core/actuals/overview";
 import { formatGallons2dp, formatMoneyUsd, formatPricePerGal } from "../lib/formatMoney";
+import { AXIS_LABEL, AXIS_TICK } from "./chartText";
 import EmptyState from "./EmptyState";
 
 interface TopSpendByDriverProps {
@@ -63,7 +64,7 @@ export default function TopSpendByDriver({ drivers }: TopSpendByDriverProps) {
         <CartesianGrid stroke="var(--color-divider)" horizontal={false} />
         <XAxis
           type="number"
-          tick={{ fill: "var(--color-muted)", fontSize: 11 }}
+          tick={AXIS_TICK}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v: number) => `$${v.toFixed(0)}`}
@@ -71,7 +72,7 @@ export default function TopSpendByDriver({ drivers }: TopSpendByDriverProps) {
         <YAxis
           type="category"
           dataKey="label"
-          tick={{ fill: "var(--color-text)", fontSize: 11.5 }}
+          tick={AXIS_LABEL}
           axisLine={false}
           tickLine={false}
           width={110}

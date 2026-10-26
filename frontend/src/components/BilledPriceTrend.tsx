@@ -3,6 +3,7 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { OverviewTrendPoint } from "@ch/core/actuals/overview";
 import { formatPricePerGal } from "../lib/formatMoney";
+import { AXIS_TICK } from "./chartText";
 import EmptyState from "./EmptyState";
 
 interface BilledPriceTrendProps {
@@ -64,12 +65,12 @@ export default function BilledPriceTrend({ points }: BilledPriceTrendProps) {
         <CartesianGrid stroke="var(--color-divider)" vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fill: "var(--color-muted)", fontSize: 11 }}
+          tick={AXIS_TICK}
           axisLine={{ stroke: "var(--color-divider)" }}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: "var(--color-muted)", fontSize: 11 }}
+          tick={AXIS_TICK}
           axisLine={false}
           tickLine={false}
           width={52}

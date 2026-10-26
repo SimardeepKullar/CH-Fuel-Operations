@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { OverviewAnomalyDigestItem } from "@ch/core/actuals/overview";
 import AnomalyFlag from "./AnomalyFlag";
 import EmptyState from "./EmptyState";
+import { INVOICE_PARAM } from "../lib/weeks";
 
 interface AnomalyDigestProps {
   items: OverviewAnomalyDigestItem[];
@@ -16,9 +17,11 @@ interface AnomalyDigestProps {
 
 /** A8.1's deep link into Transactions, `anomalyOnly` pre-applied — the exact
  * query param `useTransactionFilters` reads (T-41 DoD). */
-export function anomalyDigestHref(week: string | null): string {
+export function anomalyDigestHref(week: string | null, invoiceId: string | null = null): string {
   const params = new URLSearchParams({ anomalyOnly: "true" });
   if (week !== null) params.set("week", week);
+  // One invoice, not the whole week: the Overview's anomaly tiles are per side.
+  if (invoiceId !== null) params.set(INVOICE_PARAM, invoiceId);
   return `/transactions?${params.toString()}`;
 }
 

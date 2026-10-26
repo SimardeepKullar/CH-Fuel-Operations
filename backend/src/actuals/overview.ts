@@ -160,9 +160,33 @@ export interface OverviewCombined {
   avgBilledPerUnit: number | null;
 }
 
+/**
+ * The US side's tile figures in CAD and litres, for the corner of each US tile
+ * (T-65): the dispatcher reads the whole week in CAD/L without a unit control.
+ * Money and per-unit prices are converted at the CA invoice's entered rate and
+ * are `null` while `ratePending` (D27); quantities need no rate.
+ */
+export interface OverviewConverted {
+  currency: "CAD";
+  qtyUnit: "L";
+  /** No entered rate, so every money figure and price below is `null`. */
+  ratePending: boolean;
+  avgBilledPerUnit: number | null;
+  discountPerUnit: number | null;
+  total: number | null;
+  dieselQty: number;
+  dieselAmount: number | null;
+  defQty: number;
+  defAmount: number | null;
+  discount: number | null;
+  otherCharges: number | null;
+}
+
 export interface OverviewResult {
   /** `null` when the week has no imported US invoice. */
   us: OverviewSide | null;
+  /** The US side in CAD/L; `null` exactly when `us` is. */
+  usConverted: OverviewConverted | null;
   /** `null` when the week has no imported CA invoice. */
   ca: OverviewSide | null;
   /** `null` only when neither side is imported. */
@@ -172,7 +196,8 @@ export interface OverviewResult {
 }
 
 export interface OverviewOptions {
-  /** `?units=` — absent means each side as BVD printed it (the combined panel: gallons). */
+  /** `?units=` — absent means each side as BVD printed it, and the combined panel in its
+   * currency's own unit: gallons in USD, litres in CAD. */
   units?: RequestedUnits;
   /** `?convertTo=` — the combined panel's currency; absent means USD. */
   convertTo?: InvoiceCurrency | null;
@@ -602,6 +627,29 @@ function combine(
   };
 }
 
+/** The US side's tile figures in CAD/L, each converted from its stored figure and rounded once. */
+function convertUs(us: OverviewSide, fx: StoredFx | null): OverviewConverted {
+  const money = moneyConverter(us.currency, "CAD", fx, us.qtyUnit, "metric");
+  const qty = qtyConverter(us.qtyUnit, "metric");
+  const amount = (n: number) => money.money(n.toFixed(2));
+  const price = (n: number | null) => (n === null ? null : money.perUnit(n.toFixed(6)));
+  const { kpis } = us;
+  return {
+    currency: "CAD",
+    qtyUnit: "L",
+    ratePending: money.ratePending,
+    avgBilledPerUnit: price(kpis.avgBilledPerUnit),
+    discountPerUnit: price(kpis.discount.avgPerUnit),
+    total: amount(kpis.total.amount),
+    dieselQty: qty.qty(kpis.diesel.qty),
+    dieselAmount: amount(kpis.diesel.amount),
+    defQty: qty.qty(kpis.def.qty),
+    defAmount: amount(kpis.def.amount),
+    discount: amount(kpis.discount.total),
+    otherCharges: amount(kpis.otherCharges.total),
+  };
+}
+
 /**
  * `GET /overview?week=` (A8.1, A13, T-65). `week` is a billing week's end (D26).
  * Returns `{ us, ca, combined, fx }`: each side is the per-invoice body in its
@@ -615,11 +663,13 @@ export async function getOverview(pool: Pool, week: string, options: OverviewOpt
 
   const present = [us, ca].filter((side): side is OverviewSide => side !== null);
   const missingSide: InvoiceCurrency | null = present.length === 2 ? null : us === null ? "USD" : "CAD";
-  const combined =
-    present.length === 0 ? null : combine(present, options.convertTo ?? "USD", storedFx, options.units ?? null, missingSide);
+  const target = options.convertTo ?? "USD";
+  const combinedUnits = options.units ?? (target === "CAD" ? "metric" : "imperial");
+  const combined = present.length === 0 ? null : combine(present, target, storedFx, combinedUnits, missingSide);
 
   return {
     us,
+    usConverted: us ? convertUs(us, storedFx) : null,
     ca,
     combined,
     fx: storedFx ? { rate: Number(storedFx.rate), enteredAt: storedFx.enteredAt.toISOString() } : null,

@@ -81,6 +81,39 @@ export function formatPriceOrPending(price: number | null, currency: InvoiceCurr
   return price === null ? RATE_PENDING : formatPricePerUnit(price, currency);
 }
 
+/*
+ * Overview display (T-65): the same figures with thousands separators, as the
+ * panels print them. Kept apart from the helpers above so the Transactions
+ * screen's ungrouped cells are untouched.
+ */
+const GROUPED_2DP = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const GROUPED_4DP = new Intl.NumberFormat("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+
+/** `46837.33, "CAD"` -> `"CA$46,837.33"`. */
+export function formatMoneyGrouped(amount: number, currency: InvoiceCurrency): string {
+  return `${amount < 0 ? "-" : ""}${CURRENCY_PREFIX[currency]}${GROUPED_2DP.format(Math.abs(amount))}`;
+}
+
+/** `5.5479, "USD"` -> `"US$5.5479"` — 4dp. */
+export function formatPriceGrouped(price: number, currency: InvoiceCurrency): string {
+  return `${price < 0 ? "-" : ""}${CURRENCY_PREFIX[currency]}${GROUPED_4DP.format(Math.abs(price))}`;
+}
+
+/** `21318.77` -> `"21,318.77"`. */
+export function formatQtyGrouped(qty: number): string {
+  return GROUPED_2DP.format(qty);
+}
+
+/** `formatMoneyGrouped`, or "rate pending" for a pending conversion's `null`. */
+export function formatMoneyGroupedOrPending(amount: number | null, currency: InvoiceCurrency): string {
+  return amount === null ? RATE_PENDING : formatMoneyGrouped(amount, currency);
+}
+
+/** `formatPriceGrouped`, or "rate pending". */
+export function formatPriceGroupedOrPending(price: number | null, currency: InvoiceCurrency): string {
+  return price === null ? RATE_PENDING : formatPriceGrouped(price, currency);
+}
+
 /** Sums money in integer cents, so a column of 2dp amounts does not drift by a float's error. */
 export function sumMoney(amounts: readonly number[]): number {
   return amounts.reduce((cents, amount) => cents + Math.round(amount * 100), 0) / 100;

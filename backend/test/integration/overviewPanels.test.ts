@@ -95,6 +95,25 @@ describe.skipIf(!hasDatabase)("GET /overview: us, ca, combined, fx (integration,
     expect(combined!.diesel.qty).toBeCloseTo(us!.kpis.diesel.qty + ca!.kpis.diesel.qty / 3.785411784, 3);
   });
 
+  it("usConverted is the US side in CAD/L: each figure converted once at the entered rate, litres without one", async () => {
+    await bothSides();
+    const pending = await get("");
+    expect(pending.usConverted).toMatchObject({ currency: "CAD", qtyUnit: "L", ratePending: true, total: null, avgBilledPerUnit: null });
+    // Litres need no rate.
+    expect(pending.usConverted!.dieselQty).toBeCloseTo(pending.us!.kpis.diesel.qty * 3.785411784, 2);
+
+    await enterRate();
+    const { us, usConverted } = await get("");
+    expect(usConverted).toMatchObject({ currency: "CAD", qtyUnit: "L", ratePending: false });
+    expect(cents(usConverted!.total!)).toBe(Math.round((cents(us!.kpis.total.amount) * 13712) / 10000));
+    expect(cents(usConverted!.discount!)).toBe(Math.round((cents(us!.kpis.discount.total) * 13712) / 10000));
+    // A per-gallon USD price is a per-litre CAD one: × rate ÷ litres per gallon.
+    expect(usConverted!.avgBilledPerUnit!).toBeCloseTo((us!.kpis.avgBilledPerUnit! * RATE) / 3.785411784, 3);
+    // The US side itself is untouched, and it is not a function of ?convertTo.
+    expect(us!.currency).toBe("USD");
+    expect((await get("&convertTo=CAD")).usConverted).toEqual(usConverted);
+  });
+
   it("?convertTo=CAD converts the US side up instead: CA total + round(US total × rate)", async () => {
     await bothSides();
     await enterRate();
@@ -103,6 +122,11 @@ describe.skipIf(!hasDatabase)("GET /overview: us, ca, combined, fx (integration,
     const expectedWith = cents(ca!.kpis.total.amount) + Math.round((cents(us!.kpis.total.amount) * 13712) / 10000);
     expect(combined!.currency).toBe("CAD");
     expect(cents(combined!.spend.withTax!)).toBe(expectedWith);
+    // In CAD the combined panel reads in litres, as the CA invoice prints; each side keeps its own unit.
+    expect(combined!.qtyUnit).toBe("L");
+    expect(us!.qtyUnit).toBe("gal");
+    expect(ca!.qtyUnit).toBe("L");
+    expect(combined!.diesel.qty).toBeCloseTo(ca!.kpis.diesel.qty + us!.kpis.diesel.qty * 3.785411784, 2);
     expect(cents(combined!.spend.beforeTax!) + cents(combined!.spend.tax!)).toBe(cents(combined!.spend.withTax!));
   });
 
@@ -152,7 +176,7 @@ describe.skipIf(!hasDatabase)("GET /overview: us, ca, combined, fx (integration,
   });
 
   it("a week with neither invoice is a well-formed empty payload", async () => {
-    expect(await get("")).toEqual({ us: null, ca: null, combined: null, fx: null });
+    expect(await get("")).toEqual({ us: null, usConverted: null, ca: null, combined: null, fx: null });
   });
 
   it("?units changes per-unit rates and quantities and never money", async () => {

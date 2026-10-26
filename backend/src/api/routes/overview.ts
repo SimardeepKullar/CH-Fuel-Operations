@@ -12,7 +12,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 /** `GET /overview?week=` — A8.1's whole landing screen in one call, as `{ us,
  * ca, combined, fx }` (T-65). `units` sets the unit of every per-unit rate and
  * quantity; `convertTo=USD|CAD` the combined panel's currency (USD when
- * absent). Neither converts a side's own figures. `currency`, if sent, is
+ * absent). Without `units` the combined panel reads in its currency's own unit
+ * (gallons in USD, litres in CAD). Neither converts a side's own figures. `currency`, if sent, is
  * validated like every period-scoped route and otherwise ignored. */
 export async function handleGetOverview(pool: Pool, url: URL): Promise<Response> {
   const query = parseWeekQuery(url);

@@ -32,6 +32,10 @@ describe("anomalyDigestHref", () => {
     expect(anomalyDigestHref("2026-09-03")).toBe("/transactions?anomalyOnly=true&week=2026-09-03");
   });
 
+  it("carries one invoice when asked, so a side's tile opens only its own flagged stops", () => {
+    expect(anomalyDigestHref("2026-09-09", "inv-ca")).toBe("/transactions?anomalyOnly=true&week=2026-09-09&invoice=inv-ca");
+  });
+
   it("omits week when it isn't known yet, rather than writing 'null'", () => {
     expect(anomalyDigestHref(null)).toBe("/transactions?anomalyOnly=true");
   });
