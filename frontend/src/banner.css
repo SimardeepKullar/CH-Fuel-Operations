@@ -1,0 +1,103 @@
+/* ===========================================================================
+   PAGE BANNER, SEGMENTED CONTROL AND SUB-STRIP (T-75) — the blocky header
+   every screen uses. Literal colours from the design hand-off.
+   =========================================================================== */
+
+.pb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  padding: 14px 24px;
+  background: #fff;
+  border-top: 2px solid #00a6e2;
+  border-bottom: 1px solid #dfe4ee;
+}
+.pb-title { margin: 0; font: 700 24px/1 var(--font-heading); letter-spacing: 0.04em; text-transform: uppercase; color: #16205c; }
+.pb-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.pb-readout { font: 600 14px var(--font-body); color: #16205c; }
+.pb-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; font: 500 12px var(--font-body); color: #7b869e; }
+.pb-meta a, .ov a.ov-link { font-weight: 600; color: #0b4f9e; text-decoration: underline; }
+.pb-meta a:hover, .ov a.ov-link:hover { color: #00a6e2; }
+
+.seg { display: flex; border: 1px solid #cdd6e5; }
+.seg-btn {
+  padding: 8px 14px;
+  border: none;
+  border-right: 1px solid #cdd6e5;
+  background: #fff;
+  color: #16205c;
+  font: 600 11px var(--font-heading);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.seg-btn:last-child { border-right: none; }
+.seg-btn[aria-pressed="true"] { background: #16205c; color: #fff; }
+.seg-compact .seg-btn { padding: 7px 12px; font-size: 10.5px; }
+
+.pb-select {
+  width: auto;
+  min-height: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #16205c;
+  background: #fff;
+  font: 600 12.5px var(--font-body);
+  color: #16205c;
+}
+.pb-to { font: 500 12px var(--font-body); color: #7b869e; }
+.pb-range { display: flex; align-items: center; gap: 6px; }
+
+.ss {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #dfe4ee;
+}
+.ss-label { font: 600 10px var(--font-heading); letter-spacing: 0.14em; text-transform: uppercase; color: #7b869e; }
+.ss-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid #16205c;
+  font: 600 12.5px var(--font-body);
+  color: #16205c;
+}
+.ss-chip-absent { border: 1px dashed #b6bfcf; color: #7b869e; }
+.ss-chip-dim { font-weight: 400; color: #7b869e; }
+.ss-badge { padding: 1px 5px; font: 700 10px var(--font-heading); letter-spacing: 0.08em; color: #fff; }
+.ss-badge-us { background: #16205c; }
+.ss-badge-ca { background: #00a6e2; }
+.ss-badge-absent { background: #b6bfcf; }
+.ss-badge-small { padding: 1px 4px; font-size: 9.5px; }
+.ss-ghost {
+  padding: 5px 9px;
+  border: 1px solid #cdd6e5;
+  background: #fff;
+  font: 600 11px var(--font-heading);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0b4f9e;
+  cursor: pointer;
+}
+.ss-ghost:hover { border-color: #00a6e2; }
+.ss-list { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px solid #eef1f6; }
+.ss-list .ss-chip { gap: 6px; padding: 3px 8px; border: 1px solid #dfe4ee; font: 500 11.5px var(--font-body); }
+
+/* Phone shell: the sidebar becomes a scrolling strip above the page, so a 390px
+   screen is all content (the design's phone state, 1i). */
+@media (max-width: 640px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { position: static; height: auto; }
+  .sidebar-brand { padding: 10px 16px; }
+  .sidebar-scroll { display: flex; overflow-x: auto; padding: 0; }
+  .sidebar-group { display: flex; margin: 0; }
+  .sidebar-group-label { display: none; }
+  .sidebar-item { white-space: nowrap; }
+}

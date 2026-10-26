@@ -21,6 +21,7 @@ import type { ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { DriversResult } from "@ch/core/actuals/drivers";
 import type { ListTransactionsResult, TransactionSortField } from "@ch/core/actuals/transactions";
 import type { OverviewResult } from "@ch/core/actuals/overview";
+import type { OverviewWeeksResult } from "@ch/core/actuals/overviewWeeks";
 import type { ConversionParams } from "./conversion";
 
 const BASE_URL = "/api/v1";
@@ -230,6 +231,11 @@ export function listTransactions(params: ListTransactionsParams = {}): Promise<L
  * rather than a second one. */
 export function listDrivers(week: string, currency: "USD" | "CAD"): Promise<DriversResult> {
   return request<DriversResult>(`/drivers?week=${encodeURIComponent(week)}&currency=${currency}`);
+}
+
+/** `GET /overview/weeks` (T-70): every imported billing week's figures, ascending, for the Overview to aggregate. */
+export function getOverviewWeeks(): Promise<OverviewWeeksResult> {
+  return request<OverviewWeeksResult>("/overview/weeks");
 }
 
 /** `GET /overview?week=` — A8.1's whole landing screen in one call: `{ us, ca,

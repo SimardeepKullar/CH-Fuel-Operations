@@ -5,6 +5,7 @@ import { loadSide, loadStoredFx, type OverviewSide } from "./overview.js";
  * single-week views are all aggregated from. Each side is as BVD printed it — US in USD and
  * gallons, CA in CAD with HST and litres — and absent when the week has no imported invoice. */
 export interface OverviewWeekUs {
+  /** The printed invoice number. */
   invoice: string;
   gal: number;
   diesel: number;
@@ -74,10 +75,10 @@ interface WeekRow {
 /** Large enough to list every driver; the per-invoice route caps at ten. */
 const ALL_DRIVERS = 100_000;
 
-function usWeek(side: OverviewSide): OverviewWeekUs {
+function usWeek(side: OverviewSide, invoice: string): OverviewWeekUs {
   const { kpis } = side;
   return {
-    invoice: kpis.invoiceId,
+    invoice,
     gal: kpis.diesel.qty,
     diesel: kpis.diesel.amount,
     def: kpis.def.amount,
@@ -91,10 +92,10 @@ function usWeek(side: OverviewSide): OverviewWeekUs {
   };
 }
 
-function caWeek(side: OverviewSide): OverviewWeekCa {
+function caWeek(side: OverviewSide, invoice: string): OverviewWeekCa {
   const { kpis } = side;
   return {
-    invoice: kpis.invoiceId,
+    invoice,
     litres: kpis.diesel.qty,
     dieselWithTax: kpis.diesel.amount,
     dieselPreTax: kpis.diesel.preTax,
@@ -153,6 +154,11 @@ export async function getOverviewWeeks(pool: Pool): Promise<OverviewWeeksResult>
      ORDER BY billing_week_end`,
   );
 
+  const numbers = await pool.query<{ id: string; invoice_number: string }>(
+    "SELECT id, invoice_number FROM invoices WHERE status = 'imported'",
+  );
+  const numberOf = new Map(numbers.rows.map((r) => [r.id, r.invoice_number]));
+
   const options = { trendPeriods: 0, anomalyDigestLimit: 0, topDriverLimit: ALL_DRIVERS };
   const weeks = await Promise.all(
     rows.map(async (r): Promise<OverviewWeek> => {
@@ -163,8 +169,8 @@ export async function getOverviewWeeks(pool: Pool): Promise<OverviewWeeksResult>
         start: r.start,
         end: r.end,
         fx: fx === null ? null : Number(fx.rate),
-        us: us === null ? null : usWeek(us),
-        ca: ca === null ? null : caWeek(ca),
+        us: us === null ? null : usWeek(us, numberOf.get(us.kpis.invoiceId) ?? us.kpis.invoiceId),
+        ca: ca === null ? null : caWeek(ca, numberOf.get(ca.kpis.invoiceId) ?? ca.kpis.invoiceId),
         drivers: mergeDrivers(us, ca),
       };
     }),

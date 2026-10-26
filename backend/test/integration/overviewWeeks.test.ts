@@ -49,7 +49,7 @@ describe.skipIf(!hasDatabase)("GET /overview/weeks (integration, T-70)", () => {
     expect(week.fx).toBe(1.3712);
     expect(week.start <= week.end).toBe(true);
     expect(week.us).toMatchObject({
-      invoice: us!.kpis.invoiceId,
+      invoice: expect.stringMatching(/^\d+$/),
       gal: us!.kpis.diesel.qty,
       diesel: us!.kpis.diesel.amount,
       def: us!.kpis.def.amount,
@@ -61,7 +61,7 @@ describe.skipIf(!hasDatabase)("GET /overview/weeks (integration, T-70)", () => {
       anomalies: us!.kpis.anomaliesFlagged,
     });
     expect(week.ca).toMatchObject({
-      invoice: ca!.kpis.invoiceId,
+      invoice: expect.stringMatching(/^\d+$/),
       litres: ca!.kpis.diesel.qty,
       dieselWithTax: ca!.kpis.diesel.amount,
       dieselPreTax: ca!.kpis.diesel.preTax,

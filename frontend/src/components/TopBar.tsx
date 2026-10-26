@@ -56,8 +56,12 @@ interface TopBarProps {
   flags: number | null;
 }
 
+/** Screens that render their own `PageBanner` (T-75); the shell draws no header over them. */
+const OWN_BANNER = new Set(["/overview"]);
+
 export default function TopBar({ receipts, flags }: TopBarProps) {
   const pathname = usePathname();
+  if (OWN_BANNER.has(pathname)) return null;
   const copy = SCREEN_COPY[pathname] ?? DEFAULT_COPY;
   const showWeek = !PLAN_ROUTES.has(pathname);
   const showStandingCounts = STANDING_COUNTS_ROUTES.has(pathname);

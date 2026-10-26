@@ -7,6 +7,8 @@ import { WeekProvider } from "../../hooks/useWeek";
 import { useStandingCounts } from "../../hooks/useStandingCounts";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "../../App.css";
+import "../../banner.css";
+import "../../overview.css";
 
 /**
  * T-39: the shell every Phase 9 screen mounts into (D15, A7). Fetches the
