@@ -43,8 +43,10 @@ function drivers(share: number, usPrice: number, caPrice: number, withUs: boolea
     driverName: `Driver ${k + 1}`,
     usd: withUs ? usd * share : 0,
     usGal: withUs ? (usd * share) / usPrice : 0,
+    usDiesel: withUs ? usd * share : 0,
     cad: withCa ? cad * share : 0,
     caLitres: withCa ? (cad * share) / caPrice : 0,
+    caDiesel: withCa ? cad * share : 0,
   }));
   for (let k = 0; k < OTHER_DRIVER_COUNT; k++) {
     const usd = (OTHER_DRIVERS_USD / OTHER_DRIVER_COUNT) * share;
@@ -54,8 +56,10 @@ function drivers(share: number, usPrice: number, caPrice: number, withUs: boolea
       driverName: `Driver ${TOP_DRIVERS.length + k + 1}`,
       usd: withUs ? usd : 0,
       usGal: withUs ? usd / usPrice : 0,
+      usDiesel: withUs ? usd : 0,
       cad: withCa ? cad : 0,
       caLitres: withCa ? cad / caPrice : 0,
+      caDiesel: withCa ? cad : 0,
     });
   }
   return rows;

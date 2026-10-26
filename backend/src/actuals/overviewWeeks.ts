@@ -40,8 +40,11 @@ export interface OverviewWeekDriver {
   driverName: string | null;
   usd: number;
   usGal: number;
+  /** Diesel dollars behind `usGal`, so an average billed price is exact rather than spend over diesel gallons. */
+  usDiesel: number;
   cad: number;
   caLitres: number;
+  caDiesel: number;
 }
 
 export interface OverviewWeek {
@@ -113,7 +116,7 @@ function mergeDrivers(us: OverviewSide | null, ca: OverviewSide | null): Overvie
     const key = id ?? "";
     let existing = byDriver.get(key);
     if (existing === undefined) {
-      existing = { driverId: id, driverName: name, usd: 0, usGal: 0, cad: 0, caLitres: 0 };
+      existing = { driverId: id, driverName: name, usd: 0, usGal: 0, usDiesel: 0, cad: 0, caLitres: 0, caDiesel: 0 };
       byDriver.set(key, existing);
     }
     return existing;
@@ -122,11 +125,13 @@ function mergeDrivers(us: OverviewSide | null, ca: OverviewSide | null): Overvie
     const r = row(d.driverId, d.driverName);
     r.usd += d.total;
     r.usGal += d.qty;
+    r.usDiesel += (d.avgBilledPerUnit ?? 0) * d.qty;
   }
   for (const d of ca?.topSpendByDriver ?? []) {
     const r = row(d.driverId, d.driverName);
     r.cad += d.total;
     r.caLitres += d.qty;
+    r.caDiesel += (d.avgBilledPerUnit ?? 0) * d.qty;
   }
   return [...byDriver.values()];
 }
