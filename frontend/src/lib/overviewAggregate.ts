@@ -12,63 +12,23 @@
  * - The rate shown is the mean of the covered weeks' rates, for display only.
  */
 
+import type {
+  OverviewWeek,
+  OverviewWeekCa,
+  OverviewWeekDriver,
+  OverviewWeekUs,
+} from "@ch/core/actuals/overviewWeeks";
+
 export const LITRES_PER_GALLON = 3.78541;
 
 /** One US invoice's figures, in USD and gallons. */
-export interface UsWeekFigures {
-  invoice: string;
-  gal: number;
-  diesel: number;
-  def: number;
-  defGal: number;
-  other: number;
-  disc: number;
-  stops: number;
-  receiptsExpected: number;
-  receiptsConfirmed: number;
-  anomalies: number;
-}
-
+export type UsWeekFigures = OverviewWeekUs;
 /** One CA invoice's figures, in CAD and litres. `*WithTax` is the printed Final AMT. */
-export interface CaWeekFigures {
-  invoice: string;
-  litres: number;
-  dieselWithTax: number;
-  dieselPreTax: number;
-  def: number;
-  defWithTax: number;
-  defPreTax: number;
-  defLitres: number;
-  disc: number;
-  stops: number;
-  receiptsExpected: number;
-  receiptsConfirmed: number;
-  anomalies: number;
-}
-
+export type CaWeekFigures = OverviewWeekCa;
 /** One driver's spend in one week, on either or both sides. */
-export interface DriverWeekSpend {
-  driverId: string | null;
-  driverName: string | null;
-  usd: number;
-  usGal: number;
-  cad: number;
-  caLitres: number;
-}
-
-/** Everything the Overview needs of one billing week. */
-export interface WeekFigures {
-  /** The billing week end, `YYYY-MM-DD` — the key. */
-  weekEnd: string;
-  /** The first and last transaction's date. */
-  start: string;
-  end: string;
-  /** CAD per 1 USD for this week, or `null` until entered. */
-  fx: number | null;
-  us: UsWeekFigures | null;
-  ca: CaWeekFigures | null;
-  drivers: DriverWeekSpend[];
-}
+export type DriverWeekSpend = OverviewWeekDriver;
+/** Everything the Overview needs of one billing week — `GET /overview/weeks`'s entry. */
+export type WeekFigures = OverviewWeek;
 
 const sum = <T>(items: readonly T[], pick: (item: T) => number): number => items.reduce((total, item) => total + pick(item), 0);
 
@@ -124,7 +84,6 @@ export interface CaAggregate {
   litres: number;
   dieselWithTax: number;
   dieselPreTax: number;
-  def: number;
   defWithTax: number;
   defPreTax: number;
   defLitres: number;
@@ -243,8 +202,7 @@ function aggregateCa(weeks: readonly WeekFigures[]): CaAggregate | null {
     litres,
     dieselWithTax,
     dieselPreTax,
-    def: ca((c) => c.def),
-    defWithTax,
+      defWithTax,
     defPreTax,
     defLitres: ca((c) => c.defLitres),
     disc,

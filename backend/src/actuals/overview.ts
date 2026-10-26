@@ -511,7 +511,7 @@ async function loadAnomalyDigest(pool: Pool, invoiceId: string, limit: number): 
   }));
 }
 
-async function loadSide(
+export async function loadSide(
   pool: Pool,
   week: string,
   currency: InvoiceCurrency,
@@ -536,7 +536,7 @@ interface FxRow {
   fx_entered_at: Date | null;
 }
 
-async function loadStoredFx(pool: Pool, invoiceId: string): Promise<StoredFx | null> {
+export async function loadStoredFx(pool: Pool, invoiceId: string): Promise<StoredFx | null> {
   const { rows } = await pool.query<FxRow>("SELECT fx_cad_per_usd, fx_entered_at FROM invoices WHERE id = $1", [invoiceId]);
   const row = rows[0];
   return row?.fx_cad_per_usd && row.fx_entered_at ? { rate: row.fx_cad_per_usd, enteredAt: row.fx_entered_at } : null;

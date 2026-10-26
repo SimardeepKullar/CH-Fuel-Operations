@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { getOverview } from "../../actuals/overview.js";
+import { getOverviewWeeks } from "../../actuals/overviewWeeks.js";
 import { badRequest, currencySchema, parseWeekQuery } from "../query.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -26,4 +27,9 @@ export async function handleGetOverview(pool: Pool, url: URL): Promise<Response>
   }
 
   return jsonResponse(await getOverview(pool, query.week, { units: query.units, convertTo: convertTo.data ?? null }));
+}
+
+/** `GET /overview/weeks` — every imported billing week's figures, ascending (T-70). */
+export async function handleGetOverviewWeeks(pool: Pool): Promise<Response> {
+  return jsonResponse(await getOverviewWeeks(pool));
 }
