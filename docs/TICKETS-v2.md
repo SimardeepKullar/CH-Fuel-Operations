@@ -111,6 +111,8 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **done — merged (`cfff981`, PR #18)** |
 | **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
 | **T-66** | **Exchange rate on the CA invoice, entered by the dispatcher** | T-61, T-64 | **11** | **done — merged (`13475b8`, PR #20)** |
+| **T-67** | **Prompt for the exchange rate when a US invoice is imported** | T-42, T-68 | **11** | **new** · waits on T-68 |
+| **T-68** | **Move the exchange rate from the CA invoice to the US invoice** | T-66 | **11** | **decided 2026-10-26 — not started** |
 
 **Phase 11 (Canada invoices)** lands before T-49: T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place, which D21 allows only until the first deploy. Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. Decisions D24–D30 (PROJECT-SCOPE-v2 §A15) govern all seven.
 
@@ -1413,12 +1415,13 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 **Design.**
 - `GET /overview?week=` returns `{ us, ca, combined, fx }`; `us`/`ca` are the existing per-invoice overview body (or `null` when that side is not imported), in the invoice's currency and native units.
-- **CA panel:** spend, diesel, DEF, discount and rates shown **before tax, tax, and with tax** — billed per litre both before and with tax (1.9046 / 2.1522 CAD/L on a 999217 line). Tax = HST + GST + PST + QST, labelled "HST" when only HST is non-zero, "Sales tax" otherwise.
-- **US panel:** unchanged figures; one value each (US tax is inside the pump price).
-- **Combined panel:** USD by default, CAD on request, converted at the CA invoice's entered rate (T-66), with the rate and when it was entered shown — and T-66's exchange-rate field moves here, beside the figures it converts. Spend before HST = US + CA before tax; with HST = US + CA with tax; HST separately. Rates in one unit (the toggle's; USD/gal by default).
+- **CA panel:** in CAD/L as printed. Spend, diesel and DEF shown with tax, with the before-tax + tax split beneath; billed per litre with tax as the headline and before tax under it (2.1522 / 1.9046 CAD/L on a 999217 line); its own receipt compliance and anomaly count. Tax = HST + GST + PST + QST, labelled "HST" when only HST is non-zero, "Sales tax" otherwise.
+- **US panel:** in USD/gal as printed; one value each (US tax is inside the pump price).
+- **Combined panel:** in **CAD/L** — the US side converted at the CA invoice's entered rate (T-66), with the rate and when it was entered shown — and T-66's exchange-rate field moves here, beside the figures it converts. Spend before HST = US + CA before tax; with HST = US + CA with tax; HST separately. Rates per litre. Shown as five tiles (total spend, diesel, DEF, discount, billed price), each figure with HST and its HST amount bottom right; there is no separate breakdown table (it repeated the tiles).
 - **States:** one side missing → combined shows the present side's totals labelled **"Partial — CA invoice not imported"** (or US); rate unavailable → "rate pending" in place of every converted figure, never a 1.0 conversion, with the rate field right there to enter it; `datesDiffer` → a footnote with each invoice's actual range.
 - The "Invoices in view" strip shows both chips highlighted.
-- *(As built.)* The Overview had no units control, so it takes Transactions' `USD/gal | CAD/L` toggle (`ConversionToggle`, `conversionParams`): `units` sets every rate's and quantity's unit, `convertTo` the combined panel's currency. With none chosen each side shows as printed and the combined panel is USD/gal. `/overview` gains `convertTo` for that. CA `withTax` is `invoices.grand_total`, `tax` the sum of the grand-total rows' four tax columns, `beforeTax` the difference (Scale and Express print a final amount alone, so they fall before tax). Combined converts only `withTax` and `tax` and derives `beforeTax`, so the split adds up after conversion. Saving the rate re-reads the overview. The trend, top-spend and anomaly panels stay US-scoped.
+- **US tiles show their CAD/L reading top right** (`usConverted`), so no unit control is needed; "rate pending" until the rate is entered.
+- *(As built.)* The Overview has **no units control** (decided 2026-10-26: dropped for now). It asks `/overview?convertTo=CAD`: each side as printed, the combined panel in CAD and — with no `units` — in its currency's own unit, litres. `/overview` gains `convertTo` for that, and still honours an explicit `units` for every rate and quantity. CA `withTax` is `invoices.grand_total`, `tax` the sum of the grand-total rows' four tax columns, `beforeTax` the difference (Scale and Express print a final amount alone, so they fall before tax). Combined converts only `withTax` and `tax` and derives `beforeTax`, so the split adds up after conversion. Saving the rate re-reads the overview. The trend, top-spend and anomaly panels stay US-scoped.
 
 **Files.** Modified: `backend/src/actuals/overview.ts`, `backend/src/api/routes/overview.ts`, the Overview page and KPI components (T-41), `docs/UI-DATA-CONTRACT.md`.
 
@@ -1426,10 +1429,10 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 **Definition of done.**
 - [ ] For the week ending 2026-09-09 the CA panel's with-tax spend equals 999217's grand total, and before-tax + tax = with-tax exactly.
-- [ ] Combined USD spend = US total + CA total ÷ stored rate, computed in integer cents with one documented rounding point.
+- [ ] Combined CAD spend = CA total + US total × stored rate (and in USD, US total + CA total ÷ rate), computed in integer cents with one documented rounding point.
 - [ ] A week with only a US invoice shows the CA panel as "Not imported" and the combined panel as "Partial".
 - [ ] A CA invoice with no rate shows "rate pending" on every converted figure, and none of them is computed.
-- [ ] The units toggle changes CA's per-litre rates to per-gallon and the combined rates accordingly; money is unchanged.
+- [ ] With no unit control, US reads USD/gal, CA reads CAD/L and the combined panel CAD/L; `?units=` on the API still changes rates and quantities and never money.
 
 ---
 
@@ -1444,7 +1447,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Design.**
 - **One rate per CA invoice**, quoted as **CAD per 1 USD** (e.g. `1.3712`), up to 6 dp. CAD → USD divides by it; USD → CAD multiplies. `invoices` gains `fx_cad_per_usd numeric(10,6)` and `fx_entered_at timestamptz`, both nullable and both null on a USD invoice (a CHECK keeps them null there).
 - **Entering it.**
-  - **Overview** (the only screen that enters it, for now): for the selected week's CA invoice, the Overview shows "Exchange rate (CAD per USD)" — the entered rate and when it was entered, or "rate pending" — with a field to enter or correct it. A week with no CA invoice shows no field. The Import screen does not ask for it. T-65 moves the field into the combined panel, beside the figures it converts.
+  - **Overview** (the only screen that enters it, for now): for the selected week's CA invoice, the Overview shows "Exchange rate (CAD per USD)" — the entered rate and when it was entered, or "rate pending" — with a field to enter or correct it. A week with no CA invoice shows no field. The Import screen does not ask for it. T-65 moves the field into the combined panel, beside the figures it converts. *(Superseded by T-68: the rate moves to the US invoice, and the Overview field follows it. T-67 adds a prompt on the Import screen when a US invoice imports.)*
   - **API:** `PATCH /invoices/{id}` accepts `{ fxCadPerUsd }` (a number, or `null` to clear it) alone or beside `billingWeekEnd`. On a USD invoice it is a 400; a value ≤ 0 or outside a sanity band of 0.5–3.0 is a 400 (a typo guard, not a market check). The response is the updated invoice, which carries `fx: { rate, enteredAt }` (`null` until entered) — `fxCadPerUsd` is the request key only, since no response key may contain `Usd` (T-63's key walk covers `/invoices` and `/periods`). `GET /periods` carries the same `fx` on each invoice, so the Overview reads the week's rate without a second call.
   - **CLI:** `npm run import-invoice -- <file> --fx-rate 1.3712` sets it at import; the flag on a USD invoice is an error before anything is written.
 - **Correctable, not frozen.** A rate can be changed later — a mistyped rate must be fixable — and `fx_entered_at` records when it last changed. Nothing converted is ever stored, so a corrected rate re-converts every figure the next time it is read; there is no stale converted copy to repair.
@@ -1463,3 +1466,66 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 - [x] `GET /transactions?convertTo=USD` on 999217's week returns each CAD money field ÷ the entered rate, rounded once to the cent, with `fx` and `invoiceCurrency` on the row; with no rate, money is `null` and `ratePending: true`; a USD row is unchanged; correcting the rate changes the next read and nothing stored.
 - [x] On Transactions, `USD/gal` on the CA invoice shows USD money and the rate line; with no rate, "rate pending" and a link to enter it.
 - [x] The full suite runs with no network.
+
+---
+
+## T-67 · Prompt for the exchange rate when a US invoice is imported
+
+**Priority 67. D27. Amends T-66's "the Import screen does not ask for it" (dispatcher's request, 2026-10-26). Waits on T-68, which moves the rate onto the US invoice.**
+
+**Goal.** When the dispatcher uploads a US invoice on the Import screen, they are asked for that invoice's exchange rate straight away, instead of having to find the field on the Overview later.
+
+**Why.** The rate converts the US figures to CAD and litres (T-68). Without a prompt, a freshly imported US invoice sits at "rate pending" until someone remembers to open the Overview, and every CAD reading of it — the US tiles' corners, the combined panel, converted Transactions rows — reads "rate pending" until then. The person importing the invoice is the one who knows the rate it settled at, at the moment they import it.
+
+**Design.**
+- **When.** After a US invoice (`currency = 'USD'`) imports successfully (`status = 'imported'`) on the Import screen. A CA invoice (it never carries a rate), a quarantined file, and a rejected file show no prompt.
+- **What.** "Exchange rate (CAD per USD) for 🇺🇸 999210", reusing T-66's `ExchangeRateField` (same validation: a plain decimal; the API's 0.5–3.0 band and its 400 reason shown beside the field). Saving goes through the existing `PATCH /invoices/{id}` `{ fxCadPerUsd }` — no new endpoint.
+- **Optional, not blocking.** The import has already committed when the prompt appears; the rate is not required to finish. "Enter later" dismisses the prompt and leaves the invoice at "rate pending", entered or corrected on the Overview as today.
+- **Already has a rate.** An invoice that already carries a rate (e.g. imported with the CLI's `--fx-rate`) shows the prompt pre-filled with it and when it was entered, so it can be confirmed or corrected.
+- **After saving.** The shell's weeks re-read (as the Overview does after a save), so the new rate shows everywhere without a reload. The prompt then shows the saved rate and its time, and links to that week's Overview.
+- **Import history.** A US invoice still at "rate pending" is marked as such in the import history, with the same prompt reachable from its row.
+
+**Files.** Modified: `frontend/src/app/(app)/import/page.tsx` (the prompt after a US import), `frontend/src/components/ImportHistory.tsx` (the "rate pending" mark and the row's prompt), `frontend/src/components/ExchangeRateField.tsx` (if a heading or "Enter later" needs a prop), their tests. No backend change beyond T-68: confirm the upload response carries the invoice's `currency` and `fx`; if not, add them to it.
+
+**Dependencies.** T-42, T-68.
+
+**Definition of done.**
+- [ ] Importing a US invoice on the Import screen shows the exchange-rate prompt for that invoice; importing a CA invoice, or a file that quarantines or is rejected, does not.
+- [ ] Entering 1.3712 in the prompt PATCHes that invoice; the prompt then shows the rate and when it was entered, and the Overview for that week shows the same rate without a reload.
+- [ ] "Enter later" leaves the invoice at "rate pending" with nothing PATCHed; the Overview's field still enters it.
+- [ ] A US invoice imported with a rate already set shows the prompt pre-filled with it.
+- [ ] A 400 (outside 0.5–3.0) shows its reason beside the field and keeps what was typed.
+- [ ] The import history marks a US invoice with no rate as "rate pending" and offers the prompt from its row.
+
+---
+
+## T-68 · Move the exchange rate from the CA invoice to the US invoice
+
+**Priority 68. D27 (amended). Decided 2026-10-26 by the dispatcher; not started.** On build, record it as a D-number in PROJECT-SCOPE-v2 §A15 and amend D27 and T-66.
+
+**Decision.** The CA invoice stays in CAD and litres, as BVD printed it; the **US** invoice is the one that gets converted — to CAD and litres — so the exchange rate **comes with the US file** and is stored **on the US invoice**. One US invoice per billing week (D26) makes it a rate per week, so no per-day rate is needed (the "per day" option is dropped). The rate is **CAD per 1 USD**, as in T-66.
+
+**Why the change.** T-66 put the rate on the CA invoice because it converted CAD → USD. The screens now read the whole week in CAD/L (T-65): the US side is the one converted, so the rate belongs to it. It also fixes two gaps: a week with a US invoice and no CA one can now be given a rate (it had nowhere to live), and a CA-only week needs none, since nothing in it is converted.
+
+**Design.**
+- **Schema.** `invoices.fx_cad_per_usd` / `fx_entered_at` stay, but the CHECK flips: only a **USD** invoice may carry them; both are null on a CAD invoice. Edited in place in `0003_actuals_schema.sql`, `synthetic` and `real` (D21 — pre-deploy). Any rate already entered on a CA invoice is dropped by the reset and re-entered on the US invoice.
+- **Lookup.** The week's rate is its **US invoice's**: `loadStoredFx` reads the US invoice of the billing week, for both directions. A CA-only week has no rate, so converting it to USD (`/transactions?convertTo=USD`) is "rate pending" with nothing to enter it on — an accepted edge, since nothing on screen asks for it.
+- **API.** `PATCH /invoices/{id}` `{ fxCadPerUsd }` is a 400 on a **CAD** invoice and accepted on a USD one (the band, the 6 dp, and "`null` clears it" are unchanged). `GET /periods` carries `fx` on the US invoice, so a week's rate is read without a second call. `import-invoice --fx-rate` is an error on a CA invoice and sets the rate on a US one.
+- **Overview.** `usConverted` and the combined panel read the US invoice's rate. A week with no US invoice shows no rate field and no "rate pending" (there is nothing to convert). The rate field sits where it converts: the combined header, as now, but keyed on the US invoice.
+- **Combined panel.** In CAD/L, the US side converted at the rate, plus the CA side as printed. A **CA-only** week is the CA invoice alone and needs no rate; a **US-only** week is the US invoice converted at its own rate.
+- **Transactions.** `?convertTo=CAD` on a USD row multiplies by the rate on that row's own invoice; `?convertTo=USD` on a CAD row divides by the week's US invoice rate.
+- **Frontend.** `ExchangeRateField` takes the US invoice; the "rate pending" line says "enter the rate for 🇺🇸 999210". T-67's prompt follows the US upload.
+
+**Files.** `migrations/{synthetic,real}/0003_actuals_schema.sql`; `backend/src/actuals/{overview,transactions,units}.ts` (`loadStoredFx`, `combine`, `convertUs`); `backend/src/api/routes/{invoices,periods}.ts`; `backend/src/invoice/importInvoice.ts` and the import CLI (`--fx-rate`); `frontend/src/components/ExchangeRateField.tsx`; the Overview page; `docs/UI-DATA-CONTRACT.md`; `PROJECT-SCOPE-v2.md` D27; `TICKETS-v2.md` T-66 and T-67.
+
+**Dependencies.** T-66. T-65 builds on the rate's current home and must be re-pointed by this ticket (or this ticket folds into T-65 if it lands before merge). T-67 waits on this.
+
+**Definition of done.**
+- [ ] `PATCH /invoices/{id}` `{ fxCadPerUsd: 1.3712 }` on a **US** invoice stores it with `fx_entered_at`; a second `PATCH` corrects it; `null` clears it; on a **CA** invoice, ≤ 0, or outside 0.5–3.0 it is a 400 and nothing changes. The migration's CHECK refuses a rate on a CAD invoice.
+- [ ] `--fx-rate` sets the rate on a US invoice at import; on a CA invoice it fails before any write.
+- [ ] The Overview shows the week's rate (or "rate pending") from the US invoice and enters and corrects it there; a week with no US invoice shows no field.
+- [ ] A **US-only** week converts: `usConverted` and the combined panel carry CAD/L figures once the rate is entered, and read "rate pending" until then. A **CA-only** week's combined panel equals the CA invoice and needs no rate.
+- [ ] Combined CAD spend = CA total + round(US total × rate), in integer cents, one rounding point (as T-65).
+- [ ] `GET /transactions?convertTo=CAD` on a USD row multiplies by its invoice's rate; `convertTo=USD` on a CAD row divides by the week's US rate; with no rate, money is `null` and `ratePending: true`.
+- [ ] No figure is converted at another week's rate — a test enters two different rates on two weeks' US invoices.
+- [ ] Nothing converted is stored; correcting the rate re-converts on the next read. The full suite runs with no network.
