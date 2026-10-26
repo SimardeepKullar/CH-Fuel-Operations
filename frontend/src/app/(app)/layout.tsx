@@ -5,6 +5,7 @@ import Sidebar from "../../components/Sidebar";
 import TopBar from "../../components/TopBar";
 import { WeekProvider } from "../../hooks/useWeek";
 import { useStandingCounts } from "../../hooks/useStandingCounts";
+import { StandingCountsProvider } from "../../hooks/standingCountsContext";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "../../App.css";
 import "../../banner.css";
@@ -22,13 +23,15 @@ export default function AppShellLayout({ children }: { children: ReactNode }) {
 
   return (
     <WeekProvider>
-      <div className="app-shell">
-        <Sidebar pendingReceipts={pendingReceipts} />
-        <div className="app-shell-main">
-          <TopBar receipts={receipts} flags={flags} />
-          <main className="app-shell-content">{children}</main>
+      <StandingCountsProvider value={{ receipts, flags }}>
+        <div className="app-shell">
+          <Sidebar pendingReceipts={pendingReceipts} />
+          <div className="app-shell-main">
+            <TopBar />
+            <main className="app-shell-content">{children}</main>
+          </div>
         </div>
-      </div>
+      </StandingCountsProvider>
     </WeekProvider>
   );
 }

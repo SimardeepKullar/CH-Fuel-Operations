@@ -10,6 +10,8 @@ interface RecentTabProps {
   /** The plan currently open on the Plan tab, if any — highlights its row. */
   currentPlanId: string | null;
   onOpenPlan: (planId: string) => void;
+  /** Draft = not yet sent to the driver, Sent = sent; applied to the page loaded. Default: every plan. */
+  filter?: "all" | "draft" | "sent";
 }
 
 const PAGE_SIZE = 25;
@@ -24,12 +26,12 @@ function shortDate(iso: string): string {
 }
 
 /** `GET /plans` list projection (T-18 step 18.3, UI contract §4) — real data, paginated. */
-export default function RecentTab({ currentPlanId, onOpenPlan }: RecentTabProps) {
+export default function RecentTab({ currentPlanId, onOpenPlan, filter = "all" }: RecentTabProps) {
   const [page, setPage] = useState(1);
   const fetcher = useCallback(() => listPlans({ page, pageSize: PAGE_SIZE }), [page]);
   const { data, loading, error } = useApiResource(fetcher);
 
-  const plans = data?.plans ?? [];
+  const plans = (data?.plans ?? []).filter((t) => filter === "all" || (filter === "sent") === t.sentToDriver);
   const total = data?.total ?? 0;
   const hasNextPage = page * PAGE_SIZE < total;
 

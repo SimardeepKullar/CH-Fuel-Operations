@@ -366,3 +366,25 @@ describe("ImportPage — billing weeks (T-64 step 64.4)", () => {
     expect(button.disabled).toBe(false);
   });
 });
+
+describe("ImportPage — the page banner (T-75)", () => {
+  it("shows the last import in the banner and counts the quarantined invoices in the strip", async () => {
+    listInvoices.mockResolvedValue(
+      historyResult([
+        historyRow({ id: "a", status: "imported", importedAt: "2026-09-10T15:00:00.000Z" }),
+        historyRow({ id: "b", status: "quarantined", importedAt: "2026-01-08T00:00:00.000Z" }),
+      ]),
+    );
+    render(<ImportPage />);
+    await waitFor(() => expect(screen.getByTestId("last-import").textContent).toBe("Last import · Sep 10, 2026"));
+    expect(screen.getByRole("heading", { name: "Import" })).toBeTruthy();
+    expect(screen.getByTestId("quarantine-strip").textContent).toContain("1 quarantined");
+  });
+
+  it("says nothing is quarantined, and has no last-import line, with an empty history", async () => {
+    listInvoices.mockResolvedValue(historyResult());
+    render(<ImportPage />);
+    await waitFor(() => expect(screen.getByTestId("quarantine-strip").textContent).toContain("Nothing quarantined"));
+    expect(screen.queryByTestId("last-import")).toBeNull();
+  });
+});

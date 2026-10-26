@@ -332,7 +332,7 @@ describe("TransactionsTable", () => {
     const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
     expect(cells).toEqual(["66.42", "—", "—", "—"]);
     expect(screen.getByTestId("conversion-pending").textContent).toContain("rate pending — enter the exchange rate on the Overview");
-    expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?week=2026-09-09");
+    expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?scope=week&w=2026-09-09");
     expect(screen.queryByTestId("fx-rate-line")).toBeNull();
 
     fireEvent.click(document.querySelectorAll(".tx-row")[1]!);
