@@ -506,6 +506,22 @@ week's end) wherever a result echoes it. The import report's `grandTotalUsd`
 and `productTotals[].gallons/amountUsd/discountUsd` are `grandTotal` and
 `qty/amount/discount`. The transactions sort value `total_usd` is `total`.
 
+**`GET /overview/weeks` is `{ weeks: OverviewWeek[] }` (T-70).** No parameters. One entry per imported
+billing week, ascending by `weekEnd`: `{ weekEnd, start, end, fx, us, ca, drivers }`. `start` and `end` are the
+first and last transaction date across the week's invoices (the printed range for an invoice with none). `fx` is
+CAD per 1 USD, read from the week's CA invoice until T-68, or `null`. `us` and `ca` are each `null` for a week
+with no imported invoice on that side, otherwise the side as BVD printed it: US in USD and gallons
+(`gal`, `diesel`, `def`, `defGal`, `other`, `disc`), CA in CAD with HST and litres (`litres`, `dieselWithTax`,
+`dieselPreTax`, `defWithTax`, `defPreTax`, `defLitres`, `disc`), each with the printed `invoice` number, `stops`,
+`receiptsExpected`, `receiptsConfirmed` and `anomalies`. `drivers` is one row per driver across both sides:
+`{ driverId, driverName, usd, usGal, usDiesel, cad, caLitres, caDiesel }`, zero where they bought none. The
+server sums nothing across weeks: the client aggregates over the scope (prices Σ$/Σqty, never a mean; a week
+with no rate is left out of every converted figure, never converted at 1.0). No key contains `Usd`.
+
+**`GET /transactions` also takes `weekFrom` and `weekTo` (T-74)** — inclusive billing week ends, each
+`YYYY-MM-DD`, either alone open-ended. They are a 400 with `week`, and when `weekFrom` is after `weekTo`.
+With none of `week`, `weekFrom`, `weekTo`, the response covers every imported week.
+
 **`GET /overview?week=` is `{ us, usConverted, ca, combined, fx }` (T-65).** Takes `week`, and
 optionally `units` and `convertTo`.
 
