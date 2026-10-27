@@ -84,7 +84,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-40G** | **Colour-code product badges; drop the redundant Scale flag** | T-40B, T-40C | **9** | **done — merged (`c93176e`, PR #6)** |
 | **T-40H** | **Drop the Scale flag everywhere, not just alongside a Scale badge** | T-40G | **9** | **done — merged (`5635e0d`, PR #8)** |
 | **T-40I** | **"Flagged only" no longer matches a charges_no_fuel-only stop** | T-40H | **9** | **done — merged (`987cc02`, PR #10)** |
-| **T-40J** | **Sort Transactions by date — newest or oldest first** | T-32, T-40, T-64 | **9** | **new** |
+| **T-40J** | **Sort Transactions by date — newest or oldest first** | T-32, T-40, T-64 | **9** | **built — PR #23, awaiting merge** |
 | **T-41** | **Overview screen** | T-33, T-39 | **9** | **done — merged (`1b36ae7`, PR #12)** |
 | **T-42** | **Import screens, including quarantine** | T-34, T-39 | **9** | **done — merged (`3ce1791`, PR #13)** |
 | **T-43** | **Receipt Queue screen — desktop and phone** | T-35, T-39 | **9** | **new** |
@@ -696,19 +696,26 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 - The page sends `sortField: "occurred_at"` and `sortDirection` on the table's request; the order comes from the server, not a client-side re-sort, so it stays index-backed (T-32's DoD) and holds under every filter and under All invoices (T-64), where both invoices' rows interleave by time.
 - The direction round-trips through the URL like every other filter (T-40 DoD: a filtered view is linkable) — `sort=asc` when oldest first, absent for the default — and **Clear** resets it with the filters.
 - The free-text search (client-side) and the row keyboard navigation (↑/↓/Enter) keep working on the sorted rows; the active row resets to the first.
+- Newest first is the API's default, so only oldest first sends `sortField`/`sortDirection`; the default request carries no sort param.
 
-**Files.** Modified: `frontend/src/components/TransactionsTable.tsx` (header button), `frontend/src/app/(app)/transactions/page.tsx` (sends the sort), `frontend/src/hooks/useTransactionFilters.ts` (the `sort` URL key), `frontend/src/App.css` (+ tests). No backend change.
+**Added during review (2026-10-27).**
+- **Active-row tint removed.** The `.active` row kept its hover colour after the mouse left, so a row stayed blue; hover and `:focus-visible` already highlight, so the standing tint went. The active row still carries `tabIndex` and the `active` class.
+- **Invoice tag outside a single week.** Under All invoices the row tag (flag + invoice number) showed only for a single week; in a range or All time rows from both invoices mix and carried no tag. It now shows whenever the side is All invoices.
+- **`invoiceNumber` on the row.** To name the invoice in a range, `GET /transactions` rows (list and detail) carry `invoiceNumber` — one `i.invoice_number` column on the existing join, no new query. The table's tag and `StopExpansion`'s "Source" row read it from the row, so the page no longer builds a per-currency number map from the selected week (which was empty outside a week).
+
+**Files.** Modified: `frontend/src/components/TransactionsTable.tsx` (header button, row tag), `frontend/src/app/(app)/transactions/page.tsx` (sends the sort, tags by side), `frontend/src/hooks/useTransactionFilters.ts` (the `sort` URL key), `frontend/src/App.css` (+ tests). Backend, one column: `backend/src/actuals/transactions.ts` (`invoiceNumber`), asserted in `backend/test/integration/transactionsConvert.test.ts`.
 
 **Not in scope.** Sorting by total, or by any other column — the API offers `total`, but nobody has asked for it; adding it later is the same header pattern on the Total column. The filter-option seed fetch (`useTransactionFilterOptions`) is unsorted on purpose and stays so.
 
 **Dependencies.** T-32, T-40, T-64.
 
 **Definition of done.**
-- [ ] The table opens newest first with no sort param in the URL or the request (the API's default).
-- [ ] Clicking "Date · time" requests `sortField=occurred_at&sortDirection=asc`, writes `sort=asc` to the URL, and shows `↑` with `aria-sort="ascending"`; clicking again returns to newest first and removes `sort` from the URL — asserted against the request made.
-- [ ] A URL with `sort=asc` opens oldest first; **Clear** returns to newest first.
-- [ ] Under All invoices the request carries the sort and no `currency`, so both invoices' rows interleave by date.
-- [ ] `npm run verify` green.
+- [x] The table opens newest first with no sort param in the URL or the request (the API's default).
+- [x] Clicking "Date · time" requests `sortField=occurred_at&sortDirection=asc`, writes `sort=asc` to the URL, and shows `↑` with `aria-sort="ascending"`; clicking again returns to newest first and removes `sort` from the URL — asserted against the request made.
+- [x] A URL with `sort=asc` opens oldest first; **Clear** returns to newest first.
+- [x] Under All invoices the request carries the sort and no `currency`, so both invoices' rows interleave by date.
+- [x] Under All invoices in a range or All time, each row is tagged with its country and invoice number.
+- [x] `npm run verify` green.
 
 ---
 
