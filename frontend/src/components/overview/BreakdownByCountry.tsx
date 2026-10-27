@@ -5,7 +5,7 @@ import Corners from "../Corners";
 
 /** The US and Canada cards under one collapsible header. Kept mounted when folded so each card's units toggle survives. */
 export default function BreakdownByCountry({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <section className="ov-card ov-drivers ov-breakdown blueprint" aria-label="Breakdown by country" data-testid="country-breakdown">
       <Corners />

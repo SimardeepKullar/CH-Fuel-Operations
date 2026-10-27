@@ -124,6 +124,7 @@ describe("OverviewPage (T-71)", () => {
   it("the US card's units toggle swaps to CAD and litres", async () => {
     mount("all");
     await screen.findByTestId("invoices-summary");
+    fireEvent.click(screen.getByTestId("breakdown-toggle"));
     const panel = within(screen.getByTestId("us-panel"));
     expect(panel.getAllByTestId("ov-tile")[1]!.textContent).toContain("/ gal");
     fireEvent.click(panel.getByRole("button", { name: "CA units" }));
@@ -161,6 +162,7 @@ describe("OverviewPage (T-71)", () => {
     mount("fxnone");
     expect(await screen.findByTestId("combined-none")).toBeTruthy();
     expect(screen.queryAllByTestId("ov-combined-tile")).toHaveLength(0);
+    fireEvent.click(screen.getByTestId("driver-toggle"));
     expect(screen.getByTestId("driver-split-note").textContent).toContain("can’t be stacked in one currency");
     const columns = () => screen.getAllByTestId("driver-column").length;
     const usColumns = columns();
@@ -183,19 +185,21 @@ describe("OverviewPage (T-71)", () => {
     await screen.findByTestId("country-breakdown");
     const toggle = screen.getByTestId("breakdown-toggle");
     const body = () => screen.getByTestId("us-panel").closest("[hidden]");
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(body()).toBeNull();
-    fireEvent.click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(body()).not.toBeNull();
     fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(body()).toBeNull();
+    fireEvent.click(toggle);
+    expect(body()).not.toBeNull();
   });
 
-  it("spend by driver shows the top five, then all eleven bars, and collapses", async () => {
+  it("spend by driver starts closed, then shows the top five, then all eleven bars", async () => {
     mount("all");
     await screen.findByTestId("driver-spend");
     const bars = () => screen.queryAllByTestId("driver-column").length;
+    expect(bars()).toBe(0);
+    fireEvent.click(screen.getByTestId("driver-toggle"));
     expect(bars()).toBe(5);
     fireEvent.click(screen.getByRole("button", { name: "Show all 11" }));
     expect(bars()).toBe(11);
@@ -211,6 +215,7 @@ describe("OverviewPage (T-71)", () => {
   it("a driver segment's hover title carries both currencies", async () => {
     mount("all");
     await screen.findByTestId("driver-spend");
+    fireEvent.click(screen.getByTestId("driver-toggle"));
     const title = screen.getAllByTestId("driver-seg-us")[2]!.getAttribute("title")!;
     expect(title).toContain("Driver 3 · United States");
     expect(title).toMatch(/US\$[\d,]+\.\d{2} · CA\$[\d,]+\.\d{2}/);

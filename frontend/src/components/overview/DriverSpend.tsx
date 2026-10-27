@@ -28,7 +28,7 @@ export default function DriverSpend({
   splitPossible: boolean;
 }) {
   const [view, setView] = useState<"us" | "ca">("us");
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [all, setAll] = useState(false);
   const model = build(splitPossible ? view : "us");
   const canExpand = model.columns.length > TOP;
