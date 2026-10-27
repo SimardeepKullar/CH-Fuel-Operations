@@ -84,14 +84,15 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
         </div>
         <div className="ov-cb-col ov-cb-attn" data-testid="combined-attention">
           <div className="ov-cb-block">
+            <div className="ov-cb-label">Anomalies flagged</div>
             <div className="ov-cb-count ov-cb-amber">{attention.anomalies.count}</div>
-            <div className="ov-cb-note">Anomalies flagged</div>
             <Link className="ov-link" href={attention.anomalies.link.href} data-testid="anomalies-link">
               {attention.anomalies.link.text}
             </Link>
           </div>
           {attention.receipts !== null && (
             <div className="ov-cb-block">
+              <div className="ov-cb-label">Receipts missing</div>
               <div className="ov-cb-count ov-cb-amber">{attention.receipts.missing}</div>
               <div className="ov-cb-note">{attention.receipts.sub}</div>
               <Link className="ov-link" href={attention.receipts.link.href}>

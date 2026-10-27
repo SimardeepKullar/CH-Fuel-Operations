@@ -87,7 +87,7 @@
 .ov-cb-share i { display: block; width: 11px; height: 11px; }
 .ov-cb-share b { margin-left: 4px; font: 700 14px var(--font-heading); color: #16205c; }
 .ov-cb-block { display: flex; flex-direction: column; }
-.ov-cb-count { font: 600 34px/1 var(--font-heading); font-variant-numeric: tabular-nums; }
+.ov-cb-count { margin-top: 6px; font: 600 34px/1 var(--font-heading); font-variant-numeric: tabular-nums; }
 .ov-cb-amber { color: #b7791f; }
 .ov-cb-attn .ov-link { margin-top: 4px; }
 .ov-combined-none { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding: 10px 0; }

@@ -320,7 +320,7 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
           ? null
           : {
               missing: expected - confirmed,
-              sub: `Receipts missing · ${confirmed} of ${expected} confirmed`,
+              sub: `${confirmed} of ${expected} confirmed`,
               link: { text: "See which stops →", href: "/receipt-queue" },
             },
     },
