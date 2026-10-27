@@ -33,19 +33,19 @@ describe("1a all time", () => {
     expect(v.fxNotice).toBeNull();
   });
   it("has the US tiles with weekly low/high and a CA-units variant", () => {
-    expect(v.us.big[0]!.label).toBe("Average billed price");
-    expect(v.us.big[0]!.sub).toBe("Weekly low $5.52 · high $5.74");
+    expect(v.us.big[1]!.label).toBe("Average billed price");
+    expect(v.us.big[1]!.sub).toBe("Weekly low $5.52 · high $5.74");
     const ca = v.us.caUnits!;
-    expect(ca.big[0]!.value).toMatch(/^\$\d\.\d{4}$/);
-    expect(ca.big[0]!.unit).toBe("/ L");
+    expect(ca.big[1]!.value).toMatch(/^\$\d\.\d{4}$/);
+    expect(ca.big[1]!.unit).toBe("/ L");
     expect(ca.small[0]!.sub).toMatch(/ L$/);
     expect(ca.small.map((t) => t.label)).toEqual(v.us.small.map((t) => t.label));
     expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Other charges", "Discount captured", "Receipt compliance", "Anomalies flagged"]);
     expect(v.us.small[5]!.link).toEqual({ text: "Open in Transactions, all time →", href: "/transactions?side=us" });
   });
   it("has the CA tiles with HST notes", () => {
-    expect(v.ca.big[0]!.label).toBe("Billed price, with HST");
-    expect(v.ca.big[1]!.note).toMatch(/^HST CA\$/);
+    expect(v.ca.big[1]!.label).toBe("Billed price, with HST");
+    expect(v.ca.big[0]!.note).toMatch(/^HST CA\$/);
     expect(v.ca.sub).toBe("14 invoices · Aug 4 – Nov 9 · CAD incl. HST · litres");
   });
   it("has the combined headline, split, price, discount and attention counts", () => {
@@ -67,7 +67,7 @@ describe("1b single week", () => {
     expect(v.invoices.weekChips.map((c) => c.absent)).toEqual([false, false]);
     expect(v.readout).toMatch(/^Billing week · /);
     expect(v.rateMeta).toBe("Exchange rate 1.42 CAD per USD");
-    expect(v.us.big[0]!.sub).toMatch(/^Discount \$\d\.\d{4} \/ gal off retail$/);
+    expect(v.us.big[1]!.sub).toMatch(/^Discount \$\d\.\d{4} \/ gal off retail$/);
     expect(v.us.small[2]!.sub).toBe("Scale, express and fees");
     expect(v.combined.rateLabel).toBe("CAD per USD");
   });
@@ -89,7 +89,7 @@ describe("1d today's real data", () => {
     expect(v.readout).toBe("All time · 1 week · Sep 3 – 9");
     expect(v.us.sub).toBe("Invoice 999210 · Sep 3 – 9 · USD · gallons");
     expect(v.ca.sub).toBe("Invoice 999217 · Sep 3 – 9 · CAD incl. HST · litres");
-    expect(v.us.big[0]!.value).toBe("$5.5479");
+    expect(v.us.big[1]!.value).toBe("$5.5479");
     expect(v.us.small[4]).toMatchObject({ value: "0%", color: "#c13b3b", sub: "0 of 66 confirmed" });
   });
   it("renders no NaN or Infinity in any label", () => {
@@ -120,7 +120,7 @@ describe("1e rate missing for three weeks", () => {
     expect(v.fxNotice!.text).toBe("3 of 14 weeks have no exchange rate. Converted figures cover 11 weeks.");
     expect(v.fxNotice!.missing).toBe("Missing: week of Sep 8, week of Oct 6, week of Oct 27");
     expect(v.combined.sub).toContain("covers 11 of 14 weeks");
-    expect(v.us.caUnits!.big[0]!.sub).toMatch(/· 11 of 14 wks$/);
+    expect(v.us.caUnits!.big[1]!.sub).toMatch(/· 11 of 14 wks$/);
     expect(v.rateMeta).toBe("Exchange rates entered for 11 of 14 weeks");
   });
   it("says the US driver segments cover 11 weeks", () => {
