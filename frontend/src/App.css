@@ -1170,7 +1170,6 @@ select.tx-filter-select {
   font-variant-numeric: tabular-nums;
 }
 .tx-row:hover, .tx-row:focus-visible { background: var(--color-accent-100); outline: none; }
-.tx-row.active { background: var(--color-accent-100); }
 .tx-cell { padding: 8px 8px 8px 0; }
 .tx-cell.num { text-align: right; }
 .tx-chev { font: 600 11px var(--font-body); color: #a4abb9; }
