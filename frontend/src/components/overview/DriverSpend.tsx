@@ -39,15 +39,18 @@ export default function DriverSpend({
   return (
     <section className="ov-card ov-drivers blueprint" aria-label="Top spend by driver" data-testid="driver-spend">
       <Corners />
-      <header className="ov-drivers-head">
-        <div className="ov-drivers-titles">
+      <button type="button" className="ov-drivers-head" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="driver-toggle">
+        <svg className="ov-drivers-icon" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <rect x="1" y="9" width="4" height="10" fill="currentColor" />
+          <rect x="8" y="3" width="4" height="16" fill="currentColor" />
+          <rect x="15" y="12" width="4" height="7" fill="currentColor" />
+        </svg>
+        <span className="ov-drivers-titles">
           <h2 className="ov-section-title">Spend by driver</h2>
-          <div className="ov-region-sub">{model.sub}</div>
-        </div>
-        <button type="button" className="ov-hide" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="driver-toggle">
-          {open ? "Hide ▴" : "Show ▾"}
-        </button>
-      </header>
+          <span className="ov-region-sub">{model.sub}</span>
+        </span>
+        <span className="ov-hide">{open ? "Hide ▴" : "Show ▾"}</span>
+      </button>
       {open && (
         <>
           <div className="ov-drivers-side">

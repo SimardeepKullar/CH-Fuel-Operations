@@ -113,14 +113,16 @@
 
 /* Drivers */
 .ov-drivers { padding: 12px 16px 16px; }
-.ov-drivers-head { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 18px; }
-.ov-drivers-titles { min-width: 0; }
+.ov-drivers-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; text-align: left; color: #16205c; background: none; border: 0; cursor: pointer; }
+.ov-drivers-icon { flex: none; }
+.ov-drivers-titles { display: block; min-width: 0; }
+.ov-drivers-titles .ov-region-sub { display: block; }
 .ov-drivers-side { margin-top: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .ov-legend { display: flex; align-items: center; gap: 6px; font: 500 12px var(--font-body); color: #3c4866; }
 .ov-legend i { display: block; width: 12px; height: 12px; }
 .ov-drivers-note { margin-top: 12px; padding: 9px 12px; background: #fdf6e7; border: 1px solid #e0b45a; font: 500 12.5px var(--font-body); color: #7a4f08; }
 
-.ov-hide { margin-left: auto; padding: 2px 0; font: 600 10px var(--font-heading); letter-spacing: 0.13em; text-transform: uppercase; color: #5b6a8c; background: none; border: 0; cursor: pointer; }
+.ov-hide { margin-left: auto; font: 600 10px var(--font-heading); letter-spacing: 0.13em; text-transform: uppercase; color: #5b6a8c; }
 .ov-hbars { display: flex; flex-direction: column; gap: 9px; margin-top: 16px; }
 .ov-hbar { display: grid; grid-template-columns: 140px minmax(0, 1fr) 84px; align-items: center; gap: 14px; }
 .ov-hbar-name { font: 700 12.5px var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
