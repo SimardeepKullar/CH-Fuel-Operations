@@ -42,15 +42,15 @@
 .ov-tile-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .ov-tile-label { font: 600 9.5px var(--font-heading); letter-spacing: 0.13em; text-transform: uppercase; color: #5b6a8c; }
 .ov-tile-big .ov-tile-label { font-size: 10px; }
-.ov-tile-eq { display: flex; flex-direction: column; align-items: flex-end; font: 700 15px var(--font-heading); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; color: #0b4f9e; white-space: nowrap; }
+.ov-tile-eq { display: flex; flex-direction: column; align-items: flex-end; font: 600 13px var(--font-heading); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; color: #0b4f9e; white-space: nowrap; }
 .ov-tile-eq-qty { display: block; }
-.ov-tile-big .ov-tile-eq { font-size: 18px; }
+.ov-tile-big .ov-tile-eq { font-size: 15px; }
 .ov-tile-num { display: flex; align-items: baseline; margin-top: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ov-tile-big .ov-tile-num { margin-top: 8px; }
 .ov-cc { font: 600 11px var(--font-heading); letter-spacing: 0.04em; color: #7b869e; }
-.ov-big .ov-cc { font-size: 13px; }
-.ov-num { font: 700 26px/1 var(--font-heading); font-variant-numeric: tabular-nums; color: #16205c; }
-.ov-big .ov-num { font-size: 40px; }
+.ov-big .ov-cc { font-size: 12px; }
+.ov-num { font: 600 22px/1 var(--font-heading); font-variant-numeric: tabular-nums; color: #16205c; }
+.ov-big .ov-num { font-size: 32px; }
 .ov-unit { margin-left: 5px; font: 500 14px var(--font-heading); color: #7b869e; }
 .ov-tile-bottom { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 8px; }
 .ov-tile-big .ov-tile-bottom { margin-top: 10px; padding-top: 0; }
@@ -72,10 +72,10 @@
 .ov-combined-chip { display: grid; place-items: center; height: 22px; padding: 0 7px; flex: none; font: 700 11px var(--font-heading); letter-spacing: 0.06em; color: #fff; background: #16205c; }
 .ov-cb-label { font: 600 10px var(--font-heading); letter-spacing: 0.13em; text-transform: uppercase; color: #5b6a8c; }
 .ov-cb-fig { margin-top: 6px; }
-.ov-cb-xl .ov-cc { font-size: 15px; margin-right: 2px; }
-.ov-cb-xl .ov-num { font-size: 60px; }
-.ov-cb-md .ov-cc { font-size: 13px; }
-.ov-cb-md .ov-num { font-size: 36px; }
+.ov-cb-xl .ov-cc { font-size: 13px; margin-right: 2px; }
+.ov-cb-xl .ov-num { font-size: 46px; }
+.ov-cb-md .ov-cc { font-size: 12px; }
+.ov-cb-md .ov-num { font-size: 28px; }
 .ov-cb-md .ov-unit { margin-left: 5px; font-size: 14px; }
 .ov-cb-sub, .ov-cb-note { margin-top: 4px; font: 400 12px var(--font-body); color: #5b6a8c; }
 .ov-cb-bar { display: flex; height: 12px; margin-top: 14px; background: #eef1f6; }
@@ -85,7 +85,7 @@
 .ov-cb-share i { display: block; width: 11px; height: 11px; }
 .ov-cb-share b { margin-left: 4px; font: 700 14px var(--font-heading); color: #16205c; }
 .ov-cb-block { display: flex; flex-direction: column; }
-.ov-cb-count { font: 700 44px/1 var(--font-heading); font-variant-numeric: tabular-nums; }
+.ov-cb-count { font: 600 34px/1 var(--font-heading); font-variant-numeric: tabular-nums; }
 .ov-cb-amber { color: #b7791f; }
 .ov-cb-attn .ov-link { margin-top: 4px; }
 .ov-combined-none { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; padding: 10px 0; }
@@ -98,7 +98,7 @@
 .ov-trend-badge { padding: 2px 6px; font: 700 11px var(--font-heading); letter-spacing: 0.08em; color: #fff; }
 .ov-trend-unit { margin-left: auto; font: 500 11.5px var(--font-body); color: #7b869e; }
 .ov-trend-headline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; }
-.ov-trend-num .ov-num { font-size: 28px; }
+.ov-trend-num .ov-num { font-size: 24px; }
 .ov-trend-num .ov-cc { font-size: 12px; }
 .ov-trend-num .ov-unit { margin-left: 4px; font-size: 13px; }
 .ov-trend-num { margin-top: 0; }
@@ -155,8 +155,8 @@
   .ov-phone-only { display: block; }
   .ov-bars.ov-phone-only { display: flex; }
   .ov-tiles-small { grid-template-columns: repeat(2, 1fr); }
-  .ov-big .ov-num { font-size: 34px; }
+  .ov-big .ov-num { font-size: 28px; }
   .ov-cb-grid { grid-template-columns: 1fr; }
   .ov-cb-col { border-left: 0; border-top: 1px solid #e3e8f1; }
-  .ov-cb-xl .ov-num { font-size: 44px; }
+  .ov-cb-xl .ov-num { font-size: 36px; }
 }
