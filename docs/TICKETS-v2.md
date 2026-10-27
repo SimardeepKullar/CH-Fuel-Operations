@@ -120,6 +120,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-73** | **Top spend by driver — stacked columns, US and Canada** | T-69, T-70 | **12** | **built — not yet merged** |
 | **T-74** | **Overview links carry the scope** | T-70, T-71 | **12** | **built — not yet merged** |
 | **T-75** | **Banner rollout — `PageBanner` on every screen** | T-71 | **12** | **built — not yet merged** |
+| **T-76** | **Frontend UI design — all pages** | T-75 | **12** | **new** · to be specified |
 
 **Phase 11 (Canada invoices)** lands before T-49: T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place, which D21 allows only until the first deploy. Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. Decisions D24–D30 (PROJECT-SCOPE-v2 §A15) govern all seven.
 
@@ -1640,3 +1641,25 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 - [x] Every screen's header is a `PageBanner`.
 - [x] The strip and the segmented control are used by Overview, Transactions, Import and Plans.
 - [ ] A visual pass on Plan vs Actual once T-46 lands.
+
+
+---
+
+## T-76 · Frontend UI design — all pages
+
+**Priority 76. New — to be specified.** The goal, scope and definition of done are filled in by the owner; this entry reserves the number and the place in the register.
+
+**Goal.** _To be filled in._
+
+**Pages in scope.** _To be filled in._ (Candidates: Overview, Transactions, Import, New Plan, Plans, and the shared sidebar.)
+
+**Design reference.** _To be filled in._
+
+**Files.** _To be filled in — new vs existing, and what changes in each existing file._
+
+**Depends on.** T-75 (`PageBanner` on every screen).
+
+**Out of scope.** _To be filled in._
+
+**Definition of done.**
+- [ ] _To be filled in._
