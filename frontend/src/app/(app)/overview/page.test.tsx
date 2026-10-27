@@ -118,7 +118,7 @@ describe("OverviewPage (T-71)", () => {
     expect(links[0]!.getAttribute("href")).toBe(`/transactions?scope=range&from=${from}&to=${to}&currency=all&anomalyOnly=true`);
     expect(links[1]!.getAttribute("href")).toBe(`/transactions?scope=range&from=${from}&to=${to}&currency=USD&anomalyOnly=true`);
     expect(links[2]!.getAttribute("href")).toContain("currency=CAD");
-    expect(links[1]!.textContent).toBe("Open in Transactions, this range →");
+    expect(links[1]!.closest("[data-testid=ov-tile]")!.textContent).toContain("View →");
   });
 
   it("the US card's units toggle swaps to CAD and litres", async () => {

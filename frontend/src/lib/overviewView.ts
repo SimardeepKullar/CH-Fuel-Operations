@@ -173,7 +173,7 @@ function head(side: Side, inScope: readonly WeekFigures[], currency: string): st
   return `${inScope.length} invoices · ${formatDay(first.start)} – ${formatDay(last.end)} · ${currency}`;
 }
 
-function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, scopeShort: string, wow: string): RegionView {
+function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, wow: string): RegionView {
   const base = { side: "us" as const, code: "US" as const, name: "United States", accent: NAVY, absentMessage: `No US invoice for ${span}` };
   if (agg === null) return { ...base, present: false, sub: "USD · gallons", big: [], small: [] };
   const inScope = weeks.filter((w) => w.us !== null);
@@ -184,7 +184,7 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
   const several = agg.weeks > 1;
   const shared = [
     tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
-    tile("Anomalies flagged", "", String(agg.anomalies), "", "", { color: AMBER, link: { text: `Open in Transactions, ${scopeShort} →`, href: anomaliesHref } }),
+    tile("Anomalies flagged", "", String(agg.anomalies), "", "Review in Transactions", { color: AMBER, link: { text: "View →", href: anomaliesHref } }),
   ];
   const caUnits: RegionView | null =
     conv === null
@@ -228,7 +228,7 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
   };
 }
 
-function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, scopeShort: string, wow: string): RegionView {
+function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, wow: string): RegionView {
   const base = { side: "ca" as const, code: "CA" as const, name: "Canada", accent: CYAN, absentMessage: `No Canadian invoice for ${span}` };
   if (agg === null) return { ...base, present: false, sub: "CAD · litres", big: [], small: [] };
   const inScope = weeks.filter((w) => w.ca !== null);
@@ -252,7 +252,7 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
       tile("Other charges", "CA", usd(agg.other), "", OTHER_SUB),
       tile("Discount captured", "CA", usd(agg.disc), "", agg.discPerLitre === null ? "Before tax" : `Before tax · $${agg.discPerLitre.toFixed(3)} / L`),
       tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
-      tile("Anomalies flagged", "", String(agg.anomalies), "", "", { color: AMBER, link: { text: `Open in Transactions, ${scopeShort} →`, href: anomaliesHref } }),
+      tile("Anomalies flagged", "", String(agg.anomalies), "", "Review in Transactions", { color: AMBER, link: { text: "View →", href: anomaliesHref } }),
     ],
   };
 }
@@ -314,7 +314,7 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
             { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "" },
           ],
     attention: {
-      anomalies: { count: anomalies, link: { text: "Review in Transactions →", href: anomaliesHref } },
+      anomalies: { count: anomalies, link: { text: "View →", href: anomaliesHref } },
       receipts:
         expected === 0
           ? null
@@ -343,7 +343,6 @@ export function buildOverviewView(all: readonly WeekFigures[], scope: Scope, tra
   const first = weeks[0];
   const last = weeks[weeks.length - 1];
   const span = first === undefined || last === undefined ? "" : single ? weekRange(first) : `${formatDay(first.start)} – ${formatDay(last.end)}`;
-  const scopeShort = scope.mode === "all" ? "all time" : scope.mode === "week" ? "this week" : "this range";
   const usCount = weeks.filter((w) => w.us).length;
   const caCount = weeks.filter((w) => w.ca).length;
   const { fx } = agg;
@@ -385,8 +384,8 @@ export function buildOverviewView(all: readonly WeekFigures[], scope: Scope, tra
     },
     fxNotice,
     showTrend: weeks.length > 1,
-    us: usRegion(agg.us, weeks, span, transactionsHref("us"), scopeShort, single && first ? weekOverWeek(all, first, "us") : ""),
-    ca: caRegion(agg.ca, weeks, span, transactionsHref("ca"), scopeShort, single && first ? weekOverWeek(all, first, "ca") : ""),
+    us: usRegion(agg.us, weeks, span, transactionsHref("us"), single && first ? weekOverWeek(all, first, "us") : ""),
+    ca: caRegion(agg.ca, weeks, span, transactionsHref("ca"), single && first ? weekOverWeek(all, first, "ca") : ""),
     combined: combinedView(agg, single, usCount > 0, caCount > 0, transactionsHref("all")),
   };
 }

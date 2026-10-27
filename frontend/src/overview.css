@@ -6,6 +6,11 @@
 .ov { display: flex; flex-direction: column; gap: 14px; padding: 14px 20px 26px; background: #f4f6fa; color: #16205c; font-family: var(--font-body); flex: 1; min-width: 0; }
 .ov-page { display: flex; flex-direction: column; flex: 1; min-width: 0; background: #f4f6fa; }
 .ov-card { position: relative; background: #fff; border: 1px solid #dfe4ee; min-width: 0; }
+.ov-tile-cover { position: absolute; inset: 0; z-index: 1; }
+.ov-tile:has(.ov-tile-cover), .ov-linked { position: relative; }
+.ov-tile:has(.ov-tile-cover):hover, .ov-linked:hover { background: #f7f9fd; }
+.ov-view { font: 600 12px var(--font-body); color: #0b4f9e; white-space: nowrap; }
+.ov-cb-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 4px; }
 .ov-link { font-weight: 600; font-size: 13px; color: #0b4f9e; }
 .ov-link:hover { color: #00a6e2; }
 .ov-push { margin-left: auto; }

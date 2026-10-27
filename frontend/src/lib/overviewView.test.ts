@@ -41,7 +41,7 @@ describe("1a all time", () => {
     expect(ca.small[0]!.sub).toMatch(/ L$/);
     expect(ca.small.map((t) => t.label)).toEqual(v.us.small.map((t) => t.label));
     expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Other charges", "Discount captured", "Receipt compliance", "Anomalies flagged"]);
-    expect(v.us.small[5]!.link).toEqual({ text: "Open in Transactions, all time →", href: "/transactions?side=us" });
+    expect(v.us.small[5]!.link).toEqual({ text: "View →", href: "/transactions?side=us" });
   });
   it("has the CA tiles with HST notes", () => {
     expect(v.ca.big[1]!.label).toBe("Billed price, with HST");
@@ -78,7 +78,7 @@ describe("1c four-week range", () => {
     expect(v.readout).toMatch(/^Range · 4 weeks · /);
     expect(v.invoices.summaryLabel).toBe("Invoices in range");
     expect(v.invoices.count).toBe(8);
-    expect(v.us.small[5]!.link!.text).toBe("Open in Transactions, this range →");
+    expect(v.us.small[5]!.link!.href).toBe("/transactions?side=us");
   });
 });
 

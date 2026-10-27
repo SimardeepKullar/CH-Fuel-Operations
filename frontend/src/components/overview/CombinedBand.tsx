@@ -83,12 +83,14 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
           ))}
         </div>
         <div className="ov-cb-col ov-cb-attn" data-testid="combined-attention">
-          <div className="ov-cb-block">
+          <div className="ov-cb-block ov-linked">
             <div className="ov-cb-label">Anomalies flagged</div>
             <div className="ov-cb-count ov-cb-amber">{attention.anomalies.count}</div>
-            <Link className="ov-link" href={attention.anomalies.link.href} data-testid="anomalies-link">
-              {attention.anomalies.link.text}
-            </Link>
+            <div className="ov-cb-row">
+              <span className="ov-cb-note">Review in Transactions</span>
+              <span className="ov-view">{attention.anomalies.link.text}</span>
+            </div>
+            <Link className="ov-tile-cover" href={attention.anomalies.link.href} aria-label="Anomalies flagged: review in Transactions" data-testid="anomalies-link" />
           </div>
           {attention.receipts !== null && (
             <div className="ov-cb-block">

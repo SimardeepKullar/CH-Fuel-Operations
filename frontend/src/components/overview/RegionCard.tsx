@@ -25,16 +25,10 @@ function TileBox({ tile, big }: { tile: Tile; big?: boolean }) {
       </div>
       <Money tile={tile} big={big} />
       <div className="ov-tile-bottom">
-        <span className="ov-tile-sub">
-          {tile.sub}
-          {tile.link !== null && (
-            <Link className="ov-link" href={tile.link.href} data-testid="anomalies-link">
-              {tile.link.text}
-            </Link>
-          )}
-        </span>
-        <span className="ov-tile-note">{tile.note}</span>
+        <span className="ov-tile-sub">{tile.sub}</span>
+        {tile.link !== null ? <span className="ov-view">{tile.link.text}</span> : <span className="ov-tile-note">{tile.note}</span>}
       </div>
+      {tile.link !== null && <Link className="ov-tile-cover" href={tile.link.href} aria-label={`${tile.label}: review in Transactions`} data-testid="anomalies-link" />}
     </div>
   );
 }
