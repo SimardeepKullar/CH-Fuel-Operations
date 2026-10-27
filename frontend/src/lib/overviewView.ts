@@ -34,10 +34,6 @@ export interface Tile {
   value: string;
   unit: string;
   sub: string;
-  /** Top right: the CAD equivalent. */
-  eq: string;
-  /** Under it: the same quantity in litres. */
-  eqQty: string;
   /** Bottom right note. */
   note: string;
   color: string;
@@ -45,8 +41,8 @@ export interface Tile {
   link: { text: string; href: string } | null;
 }
 
-function tile(label: string, cc: string, value: string, unit: string, sub: string, o: Partial<Pick<Tile, "eq" | "eqQty" | "note" | "color" | "link">> = {}): Tile {
-  return { label, cc, value, unit, sub, eq: o.eq ?? "", eqQty: o.eqQty ?? "", note: o.note ?? "", color: o.color ?? NAVY, link: o.link ?? null };
+function tile(label: string, cc: string, value: string, unit: string, sub: string, o: Partial<Pick<Tile, "note" | "color" | "link">> = {}): Tile {
+  return { label, cc, value, unit, sub, note: o.note ?? "", color: o.color ?? NAVY, link: o.link ?? null };
 }
 
 const receiptColor = (pct: number | null): string => (pct === null ? NAVY : pct < 50 ? RED : pct < 85 ? AMBER : NAVY);
@@ -63,6 +59,8 @@ export interface RegionView {
   absentMessage: string;
   big: Tile[];
   small: Tile[];
+  /** The US card in CA units (CAD, litres) at each week's rate; `null` when no week has a rate. */
+  caUnits?: RegionView | null;
 }
 
 export interface StripChip {
@@ -166,30 +164,49 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
   const conv = agg.converted;
   const partial = conv !== null && conv.coveredWeeks < agg.weeks;
   const suffix = partial ? ` · ${conv.coveredWeeks} of ${agg.weeks} wks` : "";
-  const eq = (cad: number | null, withSuffix = false): string => (cad === null || conv === null ? "" : `CA${usd(cad)}${withSuffix ? suffix : ""}`);
-  const litres = (l: number | null): string => (l === null || conv === null ? "" : `${qty(l)} L`);
   const pct = receiptPercent(agg.receiptsConfirmed, agg.receiptsExpected);
   const several = agg.weeks > 1;
+  const shared = [
+    tile("Stops", "", count(agg.stops), "", several ? `About ${Math.round(agg.stops / agg.weeks)} per week` : "Fuel stops on this invoice"),
+    tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
+    tile("Anomalies flagged", "", String(agg.anomalies), "", "", { color: AMBER, link: { text: `Open in Transactions, ${scopeShort} →`, href: anomaliesHref } }),
+  ];
+  const caUnits: RegionView | null =
+    conv === null
+      ? null
+      : {
+          ...base,
+          present: true,
+          sub: head("us", inScope, `CAD · litres, at each week’s rate${suffix}`),
+          big: [
+            tile("Average billed price", "CA", conv.pricePerLitre === null ? "—" : price4(conv.pricePerLitre), "/ L", `Converted at each week’s rate${suffix}`),
+            tile("Total spend", "CA", usd(conv.total), "", `Includes CA${usd(conv.other)} other charges`),
+          ],
+          small: [
+            tile("Diesel", "CA", usd(conv.diesel), "", `${qty(conv.litres)} L`),
+            tile("DEF", "CA", usd(conv.def), "", `${qty(conv.defLitres)} L`),
+            tile("Discount captured", "CA", usd(conv.disc), "", conv.litres > 0 ? `$${(conv.disc / conv.litres).toFixed(3)} / L average` : ""),
+            ...shared,
+          ],
+        };
 
   return {
     ...base,
     present: true,
+    caUnits,
     sub: head("us", inScope, "USD · gallons"),
     big: [
       tile("Average billed price", "US", agg.avgPrice === null ? "—" : price4(agg.avgPrice), "/ gal",
         several
           ? agg.weeklyLow === null ? "" : `Weekly low $${agg.weeklyLow.toFixed(2)} · high $${agg.weeklyHigh!.toFixed(2)}`
-          : agg.discPerGal === null ? "" : `Discount ${price4(agg.discPerGal)} / gal off retail`,
-        { eq: conv?.pricePerLitre == null ? "" : `CA${price4(conv.pricePerLitre)} / L${suffix}` }),
-      tile("Total spend", "US", usd(agg.total), "", `Includes US${usd(agg.other)} other charges`, { eq: eq(conv?.total ?? null, true) }),
+          : agg.discPerGal === null ? "" : `Discount ${price4(agg.discPerGal)} / gal off retail`),
+      tile("Total spend", "US", usd(agg.total), "", `Includes US${usd(agg.other)} other charges`),
     ],
     small: [
-      tile("Diesel", "US", usd(agg.diesel), "", `${qty(agg.gal)} gal`, { eq: eq(conv?.diesel ?? null), eqQty: litres(conv?.litres ?? null) }),
-      tile("DEF", "US", usd(agg.def), "", `${qty(agg.defGal)} gal`, { eq: eq(conv?.def ?? null), eqQty: litres(conv?.defLitres ?? null) }),
-      tile("Discount captured", "US", usd(agg.disc), "", agg.discPerGal === null ? "" : `$${agg.discPerGal.toFixed(3)} / gal average`, { eq: eq(conv?.disc ?? null) }),
-      tile("Stops", "", count(agg.stops), "", several ? `About ${Math.round(agg.stops / agg.weeks)} per week` : "Fuel stops on this invoice"),
-      tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
-      tile("Anomalies flagged", "", String(agg.anomalies), "", "", { color: AMBER, link: { text: `Open in Transactions, ${scopeShort} →`, href: anomaliesHref } }),
+      tile("Diesel", "US", usd(agg.diesel), "", `${qty(agg.gal)} gal`),
+      tile("DEF", "US", usd(agg.def), "", `${qty(agg.defGal)} gal`),
+      tile("Discount captured", "US", usd(agg.disc), "", agg.discPerGal === null ? "" : `$${agg.discPerGal.toFixed(3)} / gal average`),
+      ...shared,
     ],
   };
 }

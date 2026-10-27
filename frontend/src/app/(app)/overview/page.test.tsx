@@ -121,6 +121,18 @@ describe("OverviewPage (T-71)", () => {
     expect(links[1]!.textContent).toBe("Open in Transactions, this range →");
   });
 
+  it("the US card's units toggle swaps to CAD and litres", async () => {
+    mount("all");
+    await screen.findByTestId("invoices-summary");
+    const panel = within(screen.getByTestId("us-panel"));
+    expect(panel.getAllByTestId("ov-tile")[0]!.textContent).toContain("/ gal");
+    fireEvent.click(panel.getByRole("button", { name: "CA units" }));
+    expect(panel.getAllByTestId("ov-tile")[0]!.textContent).toContain("/ L");
+    expect(panel.getAllByTestId("ov-tile")[0]!.textContent).toContain("CA");
+    fireEvent.click(panel.getByRole("button", { name: "US units" }));
+    expect(panel.getAllByTestId("ov-tile")[0]!.textContent).toContain("/ gal");
+  });
+
   it("all time: both trend charts are drawn", async () => {
     mount("all");
     await screen.findByTestId("invoices-summary");

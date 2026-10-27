@@ -42,9 +42,10 @@
 .ov-tile-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .ov-tile-label { font: 600 9.5px var(--font-heading); letter-spacing: 0.13em; text-transform: uppercase; color: #5b6a8c; }
 .ov-tile-big .ov-tile-label { font-size: 10px; }
-.ov-tile-eq { display: flex; flex-direction: column; align-items: flex-end; font: 600 13px var(--font-heading); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; color: #0b4f9e; white-space: nowrap; }
-.ov-tile-eq-qty { display: block; }
-.ov-tile-big .ov-tile-eq { font-size: 15px; }
+.ov-units { margin-left: auto; display: flex; border: 1px solid #cdd6e5; }
+.ov-units button { padding: 4px 10px; font: 600 11px var(--font-heading); letter-spacing: 0.08em; text-transform: uppercase; color: #5b6a8c; background: #fff; border: 0; cursor: pointer; }
+.ov-units button[aria-pressed="true"] { color: #fff; background: #16205c; }
+.ov-units button:disabled { opacity: 0.45; cursor: not-allowed; }
 .ov-tile-num { display: flex; align-items: baseline; margin-top: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ov-tile-big .ov-tile-num { margin-top: 8px; }
 .ov-cc { font: 600 11px var(--font-heading); letter-spacing: 0.04em; color: #7b869e; }

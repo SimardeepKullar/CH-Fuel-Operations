@@ -32,10 +32,14 @@ describe("1a all time", () => {
     expect(v.invoices).toMatchObject({ single: false, summaryLabel: "All invoices", count: 28, split: "14 US · 14 CA" });
     expect(v.fxNotice).toBeNull();
   });
-  it("has the US tiles with a CAD equivalent and weekly low/high", () => {
+  it("has the US tiles with weekly low/high and a CA-units variant", () => {
     expect(v.us.big[0]!.label).toBe("Average billed price");
     expect(v.us.big[0]!.sub).toBe("Weekly low $5.52 · high $5.74");
-    expect(v.us.big[0]!.eq).toMatch(/^CA\$\d\.\d{4} \/ L$/);
+    const ca = v.us.caUnits!;
+    expect(ca.big[0]!.value).toMatch(/^\$\d\.\d{4}$/);
+    expect(ca.big[0]!.unit).toBe("/ L");
+    expect(ca.small[0]!.sub).toMatch(/ L$/);
+    expect(ca.small.map((t) => t.label)).toEqual(v.us.small.map((t) => t.label));
     expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Discount captured", "Stops", "Receipt compliance", "Anomalies flagged"]);
     expect(v.us.small[5]!.link).toEqual({ text: "Open in Transactions, all time →", href: "/transactions?side=us" });
   });
@@ -116,7 +120,7 @@ describe("1e rate missing for three weeks", () => {
     expect(v.fxNotice!.text).toBe("3 of 14 weeks have no exchange rate. Converted figures cover 11 weeks.");
     expect(v.fxNotice!.missing).toBe("Missing: week of Sep 8, week of Oct 6, week of Oct 27");
     expect(v.combined.sub).toContain("covers 11 of 14 weeks");
-    expect(v.us.big[0]!.eq).toMatch(/· 11 of 14 wks$/);
+    expect(v.us.caUnits!.big[0]!.sub).toMatch(/· 11 of 14 wks$/);
     expect(v.rateMeta).toBe("Exchange rates entered for 11 of 14 weeks");
   });
   it("says the US driver segments cover 11 weeks", () => {
@@ -129,8 +133,7 @@ describe("1f no rate anywhere", () => {
   it("hides converted figures and asks for a rate", () => {
     expect(v.fxNotice!.text).toBe("None of the 14 weeks have an exchange rate. Converted (CAD) figures are hidden.");
     expect(v.combined).toMatchObject({ show: false, none: true, rate: "—" });
-    expect(v.us.big[0]!.eq).toBe("");
-    expect(v.us.big[1]!.eq).toBe("");
+    expect(v.us.caUnits).toBeNull();
   });
   it("splits the drivers into one currency per view", () => {
     const us = buildDriverView(overviewFixture("fxnone"), { mode: "all" }, "us");
