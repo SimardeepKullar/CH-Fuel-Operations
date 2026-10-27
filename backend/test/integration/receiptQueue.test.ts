@@ -88,6 +88,13 @@ async function seed(pool: Pool): Promise<SeedIds> {
     [stopA1],
   );
 
+  // Only stopA1 carries a diesel line, so a queue item with no TA line (qty null) is covered too (T-43).
+  await pool.query(
+    `INSERT INTO fuel_stop_lines (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
+     VALUES ($1, 'TA', 120.50, 4.0000, 3.9000, 100.00)`,
+    [stopA1],
+  );
+
   await pool.query(
     `INSERT INTO users (email, password_hash, display_name) VALUES ('checker@example.com', 'x', 'Checker')`,
   );
@@ -142,7 +149,10 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
         occurredAt: string;
         driver: { resolved: string | null; raw: string; agrees: boolean | null };
         truck: { resolved: string | null; raw: string; agrees: boolean | null };
+        driverId: string | null;
         station: unknown;
+        qty: number | null;
+        qtyUnit: string;
         total: number;
         receiptStatus: string;
       }>;
@@ -159,6 +169,12 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     expect(item.truck.resolved).toBe("201");
     expect(item.total).toBe(100);
     expect(item.receiptStatus).toBe("pending");
+    // T-43: what the card shows (gallons) and what batch confirm posts (the driver).
+    expect(item.driverId).toBe(ids.driverA);
+    expect(item.qty).toBe(120.5);
+    expect(item.qtyUnit).toBe("gal");
+    const noFuelLine = body.items.find((i) => i.id === ids.stopB1)!;
+    expect(noFuelLine.qty).toBeNull();
 
     expect(body.progress).toEqual({ done: 1, total: 5 }); // stopBConfirmed is the one "done" stop
   });

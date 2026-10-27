@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { InvoiceCurrency, ReceiptOutcome, ReceiptStatus } from "../db/types.js";
+import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptOutcome, ReceiptStatus } from "../db/types.js";
 import {
   driverRawResolved,
   stationSummary,
@@ -58,8 +58,13 @@ export interface ReceiptQueueItem {
   id: string;
   occurredAt: string;
   driver: RawResolvedString;
+  /** The resolved driver, which is what a batch confirm posts; `null` when the card's driver never resolved. */
+  driverId: string | null;
   truck: RawResolvedString;
   station: TransactionStationSummary | null;
+  /** The diesel (TA) line's quantity in `qtyUnit`, as BVD printed it; `null` when the stop has no TA line. */
+  qty: number | null;
+  qtyUnit: InvoiceQtyUnit;
   /** In `currency`, as billed. */
   total: number;
   currency: InvoiceCurrency;
@@ -84,7 +89,10 @@ interface QueueRow {
   occurred_at: Date;
   total: string;
   currency: InvoiceCurrency;
+  qty_unit: InvoiceQtyUnit;
+  ta_qty: string | null;
   receipt_status: ReceiptStatus;
+  driver_id: string | null;
   unit_raw: string;
   driver_name_raw: string;
   truck_unit_number: string | null;
@@ -101,8 +109,11 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
     id: row.id,
     occurredAt: row.occurred_at.toISOString(),
     driver: driverRawResolved(row),
+    driverId: row.driver_id,
     truck: truckRawResolved(row),
     station: stationSummary(row),
+    qty: row.ta_qty === null ? null : Number(row.ta_qty),
+    qtyUnit: row.qty_unit,
     total: Number(row.total),
     currency: row.currency,
     receiptStatus: row.receipt_status,
@@ -166,8 +177,8 @@ export async function listReceiptQueue(
 
   const [{ rows }, progress] = await Promise.all([
     pool.query<QueueRow>(
-      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, fs.receipt_status,
-              fs.unit_raw, fs.driver_name_raw,
+      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, i.qty_unit, ta.qty AS ta_qty, fs.receipt_status,
+              fs.driver_id, fs.unit_raw, fs.driver_name_raw,
               t.unit_number AS truck_unit_number,
               d.display_name AS driver_display_name,
               s.id AS station_id, s.name_raw AS station_name_raw,
@@ -181,6 +192,9 @@ export async function listReceiptQueue(
        LEFT JOIN trucks t ON t.id = fs.truck_id
        LEFT JOIN drivers d ON d.id = fs.driver_id
        LEFT JOIN stations s ON s.id = fs.station_id
+       LEFT JOIN LATERAL (
+         SELECT qty FROM fuel_stop_lines WHERE fuel_stop_id = fs.id AND product_code = 'TA' LIMIT 1
+       ) ta ON true
        WHERE fs.receipt_status <> 'confirmed'${scopeSql}
        ${orderClause}`,
       scopeParams,
