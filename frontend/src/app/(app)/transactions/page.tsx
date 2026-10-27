@@ -57,7 +57,6 @@ export default function TransactionsPage() {
   const period = anchorWeek(scope, weekEnds);
   const inScopeEnds = new Set(weekEndsInScope(scope, weekEnds));
   const inScope = periods.filter((w) => inScopeEnds.has(w.weekEnd));
-  const weekEntry = scope.mode === "week" ? (inScope[0] ?? null) : null;
 
   // One side, picked on the strip (or by a link), or both. A week holds at most one imported
   // invoice per currency (D26), so a side is an invoice there.
