@@ -40,7 +40,7 @@ describe("1a all time", () => {
     expect(ca.big[0]!.unit).toBe("/ L");
     expect(ca.small[0]!.sub).toMatch(/ L$/);
     expect(ca.small.map((t) => t.label)).toEqual(v.us.small.map((t) => t.label));
-    expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Discount captured", "Stops", "Receipt compliance", "Anomalies flagged"]);
+    expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Other charges", "Discount captured", "Receipt compliance", "Anomalies flagged"]);
     expect(v.us.small[5]!.link).toEqual({ text: "Open in Transactions, all time →", href: "/transactions?side=us" });
   });
   it("has the CA tiles with HST notes", () => {
@@ -68,7 +68,7 @@ describe("1b single week", () => {
     expect(v.readout).toMatch(/^Billing week · /);
     expect(v.rateMeta).toBe("Exchange rate 1.42 CAD per USD");
     expect(v.us.big[0]!.sub).toMatch(/^Discount \$\d\.\d{4} \/ gal off retail$/);
-    expect(v.us.small[3]!.sub).toBe("Fuel stops on this invoice");
+    expect(v.us.small[2]!.sub).toBe("Scale, express and fees");
     expect(v.combined.rateLabel).toBe("CAD per USD");
   });
 });
