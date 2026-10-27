@@ -74,7 +74,7 @@
 /* Combined band: navy hero + hairline tile grid */
 .ov-cb { display: flex; flex-wrap: wrap; gap: 20px; align-items: stretch; }
 .ov-cb-hero { flex: 2 1 420px; display: flex; flex-direction: column; min-width: 0; background: #fff; border: 1px solid #e1e5ee; }
-.ov-cb-hero-top { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 24px 28px; background: #121852; color: #fff; }
+.ov-cb-hero-top { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 20px 28px; background: #121852; color: #fff; }
 .ov-cb-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; }
 .ov-cb-chip { padding: 3px 8px; background: #19a7e0; color: #121852; font: 700 11px var(--font-heading); letter-spacing: 0.1em; text-transform: uppercase; }
 .ov-cb-hero-label { font: 600 12px var(--font-heading); letter-spacing: 0.12em; text-transform: uppercase; color: #b9c1e6; }
@@ -93,8 +93,8 @@
 .ov-cb-cc { margin-right: 5px; font: 500 14px var(--font-heading); letter-spacing: 0.04em; color: #5a6377; vertical-align: 0.35em; }
 .ov-cb-num { font: 700 28px/1.1 var(--font-heading); color: #121852; }
 .ov-cb-unit { margin-left: 5px; font: 500 14px var(--font-heading); color: #5a6377; }
-.ov-cb-xl .ov-cb-cc { font-size: 22px; color: #b9c1e6; vertical-align: 0.5em; }
-.ov-cb-xl .ov-cb-num { font-size: 64px; line-height: 1; color: #fff; }
+.ov-cb-xl .ov-cb-cc { font-size: 18px; color: #b9c1e6; vertical-align: 0.5em; }
+.ov-cb-xl .ov-cb-num { font-size: 48px; line-height: 1; color: #fff; }
 
 .ov-cb-tiles {
   flex: 3 1 560px;
