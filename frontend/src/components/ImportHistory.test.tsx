@@ -103,4 +103,41 @@ describe("ImportHistory (T-42)", () => {
     expect(panel.textContent).toContain("Import history");
     expect(panel.textContent).toContain("Move an invoice if it landed in the wrong billing week");
   });
+
+  describe("search (T-77)", () => {
+    const rowsFor = () => [
+      row(),
+      row({ id: "inv-ca", invoiceNumber: "999217", currency: "CAD", grandTotal: 46837.33, periodStart: "2026-08-01", periodEnd: "2026-09-09" }),
+      row({ id: "inv-q", invoiceNumber: "100001", status: "quarantined", periodStart: "2026-01-05", periodEnd: "2026-01-11" }),
+    ];
+    const type = (value: string) => fireEvent.change(screen.getByTestId("history-search"), { target: { value } });
+    const shown = () => Array.from(document.querySelectorAll("[data-testid^=import-history-row-]")).map((e) => e.getAttribute("data-testid"));
+
+    it("finds an invoice by number, and shows every row again when cleared", () => {
+      render(<ImportHistory rows={rowsFor()} onReopenQuarantined={vi.fn()} />);
+      type("999217");
+      expect(shown()).toEqual(["import-history-row-inv-ca"]);
+      type("");
+      expect(shown()).toHaveLength(3);
+    });
+
+    it("matches a date, a country, a status and a total", () => {
+      render(<ImportHistory rows={rowsFor()} onReopenQuarantined={vi.fn()} />);
+      type("2026-01-05");
+      expect(shown()).toEqual(["import-history-row-inv-q"]);
+      type("ca");
+      expect(shown()).toEqual(["import-history-row-inv-ca"]);
+      type("quarantined");
+      expect(shown()).toEqual(["import-history-row-inv-q"]);
+      type("46,837");
+      expect(shown()).toEqual(["import-history-row-inv-ca"]);
+    });
+
+    it("needs every term to match, and says so when nothing does", () => {
+      render(<ImportHistory rows={rowsFor()} onReopenQuarantined={vi.fn()} />);
+      type("999217 quarantined");
+      expect(shown()).toEqual([]);
+      expect(screen.getByText("No invoice matches")).toBeTruthy();
+    });
+  });
 });

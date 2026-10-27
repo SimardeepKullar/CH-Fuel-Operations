@@ -1462,6 +1462,8 @@ a.kpi-tile-link:hover .kpi-card-link-hint { text-decoration: underline; }
 
 .import-panel { padding: 14px 18px 16px; }
 .import-panel-head { margin-bottom: 10px; }
+.import-history-head-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.import-history-search { width: 280px; height: 28px; min-height: 0; padding: 0 10px; font: 400 11.5px var(--font-body); }
 .import-panel-title { margin: 0; font: 700 14px var(--font-heading); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-800); }
 .import-panel-sub { margin: 1px 0 0; font: 400 11px var(--font-body); color: var(--color-muted); }
 
@@ -1585,12 +1587,13 @@ a.kpi-tile-link:hover .kpi-card-link-hint { text-decoration: underline; }
 .import-history-head {
   padding-top: 6px;
   padding-bottom: 6px;
-  background: #f6f8fb;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
   font: 600 9.5px var(--font-heading);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-label);
+  color: var(--color-accent-800);
 }
 .import-history-invoice { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .import-history-period { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-size: 12px; color: var(--color-accent-800); }

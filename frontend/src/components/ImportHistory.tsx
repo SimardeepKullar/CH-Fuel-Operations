@@ -22,6 +22,26 @@ const STATUS_LABELS: Record<InvoiceListItem["status"], string> = {
   quarantined: "Quarantined",
 };
 
+/** Every whitespace-separated term must appear in the row's invoice number, either date range,
+ * country, status, or total — so "999217 aug" or "ca quarantined" narrow, never widen. */
+function matchesQuery(row: InvoiceListItem, query: string): boolean {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const haystack = [
+    row.invoiceNumber,
+    row.periodStart,
+    row.periodEnd,
+    row.billingWeekEnd,
+    row.currency === "CAD" ? "ca canada cad" : "us usa usd",
+    row.status,
+    formatMoneyGrouped(row.grandTotal, row.currency),
+    row.grandTotal.toFixed(2),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return terms.every((term) => haystack.includes(term));
+}
+
 function messageOf(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? err.title;
   if (err instanceof Error) return err.message;
@@ -51,6 +71,8 @@ export default function ImportHistory({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const visible = rows.filter((row) => matchesQuery(row, query));
 
   const move = (row: InvoiceListItem) => {
     const target = drafts[row.id];
@@ -73,15 +95,28 @@ export default function ImportHistory({
 
   return (
     <div className="panel-card import-panel import-history" data-testid="import-history">
-      <div className="import-panel-head">
-        <h2 className="import-panel-title">Import history</h2>
-        <p className="import-panel-sub">Move an invoice if it landed in the wrong billing week</p>
+      <div className="import-panel-head import-history-head-bar">
+        <div>
+          <h2 className="import-panel-title">Import history</h2>
+          <p className="import-panel-sub">Move an invoice if it landed in the wrong billing week</p>
+        </div>
+        <input
+          type="search"
+          className="input import-history-search"
+          placeholder="Search invoice #, date, US/CA, status…"
+          aria-label="Search import history"
+          data-testid="history-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
 
       {loading ? (
         <EmptyState title="Loading history…" />
       ) : rows.length === 0 ? (
         <EmptyState title="No invoices imported yet" />
+      ) : visible.length === 0 ? (
+        <EmptyState title="No invoice matches" detail={`Nothing in the import history matches "${query.trim()}".`} />
       ) : (
         <div className="import-history-table">
           <div className="import-history-row import-history-head">
@@ -92,7 +127,7 @@ export default function ImportHistory({
             <span>Imported</span>
             <span>Belongs to week ending</span>
           </div>
-          {rows.map((row) => {
+          {visible.map((row) => {
             const reopenable = row.status === "quarantined";
             const imported = row.status === "imported";
             const draft = drafts[row.id] ?? row.billingWeekEnd;

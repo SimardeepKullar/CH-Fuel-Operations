@@ -68,7 +68,7 @@ export default function ImportPage() {
 
   const refreshHistory = useCallback(() => {
     setHistoryLoading(true);
-    listInvoices({ pageSize: 50 })
+    listInvoices({ pageSize: 200 })
       .then((result) => setHistoryRows(result.rows))
       .catch(() => setHistoryRows([]))
       .finally(() => setHistoryLoading(false));
@@ -136,7 +136,7 @@ export default function ImportPage() {
   const moveWeek = useCallback(
     async (id: string, weekEnd: string) => {
       await patchInvoiceWeek(id, weekEnd);
-      await Promise.all([reloadPeriods(), listInvoices({ pageSize: 50 }).then((result) => setHistoryRows(result.rows))]);
+      await Promise.all([reloadPeriods(), listInvoices({ pageSize: 200 }).then((result) => setHistoryRows(result.rows))]);
     },
     [reloadPeriods],
   );

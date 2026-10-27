@@ -1694,6 +1694,8 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
   - *Status* — an uppercase pill: green `IMPORTED`, red `QUARANTINED`.
   - *Imported* — muted, `Oct 19, 2026 · 11:35:32 AM` (today `toLocaleString()`'s `10/19/2026, 11:35:32 AM`).
   - *Belongs to week ending* — the date input and a square uppercase `MOVE` ghost button side by side. A refusal's message shows under the control, still inside the row. A quarantined row leaves this cell empty.
+- **Search (added 2026-10-27).** A search box on the right of the history panel's header. Every whitespace-separated term must match the invoice number, the printed period or billing-week dates, the country (`us`/`ca`), the status, or the total (with or without commas); clearing it restores every row. No match shows "No invoice matches". It filters the rows the page already holds, client-side, and the page now asks for 200 (the API's maximum) rather than 50 so that it covers a long history; a server-side search is a separate ticket if the history ever outgrows that.
+- **Table header colours (revised 2026-10-27).** The header row is white with a hairline above and below and navy text, not a grey band — it read as a disabled strip against the white panel.
 - **Behaviour unchanged:** drag-and-drop and the picker, the client-side extension check, upload, reopening a quarantined row by click or Enter/Space, Move's enable rules and its 409 message, and every `data-testid` the existing tests use.
 
 **Files.** Modified: `frontend/src/components/Dropzone.tsx` (icon, heading, primary button), `frontend/src/components/ImportHistory.tsx` (panel header, one-line grid, badge, pills, timestamp format), `frontend/src/app/(app)/import/page.tsx` (the Upload invoice panel wrapping the intake states), `frontend/src/lib/weeks.ts` (`formatImportedAt`), `frontend/src/App.css` (`.import-*` rules), and the co-located tests (`Dropzone.test.tsx`, `ImportHistory.test.tsx`, `import/page.test.tsx`). No backend change.
@@ -1707,6 +1709,7 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 - [ ] The drop area shows the upload icon, `Drop a BVD invoice here`, the two-line note, and a primary (filled) `Browse file…` button; dropping or picking a file behaves exactly as before, and a non-CSV/PDF file is still refused before any request.
 - [ ] Parsing, preview, quarantine, duplicate and error states render inside the Upload invoice panel.
 - [ ] The history table has the six headers above, and each invoice is a **single row** — the week input and `Move` are in the last column of the same row, not a sub-row — asserted in `ImportHistory.test.tsx`.
+- [ ] Searching the history by invoice number, date, country, status or total narrows the rows; every term must match; clearing restores all; no match says so — asserted in `ImportHistory.test.tsx`.
 - [ ] The invoice cell shows a `US`/`CA` `CodeBadge`, not a flag emoji.
 - [ ] Total renders with thousands separators (`CA$46,837.33`, `US$50,929.71`), asserted.
 - [ ] Status renders as a pill, green for Imported and red for Quarantined; a quarantined row is still reopenable by click and Enter/Space, and has no week control.
