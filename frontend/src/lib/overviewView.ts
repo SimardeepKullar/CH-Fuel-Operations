@@ -24,6 +24,7 @@ export function rangeLabel(start: string, end: string): string {
 const TWO = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
 const usd = (n: number): string => "$" + n.toLocaleString("en-US", TWO);
 const qty = (n: number): string => n.toLocaleString("en-US", TWO);
+const RECEIPTS_HREF = "/receipt-queue";
 const TOTAL_SUB = "Fuel + DEF + Other Charges";
 const OTHER_SUB = "Scale, express and fees";
 const price4 = (n: number): string => "$" + n.toFixed(4);
@@ -183,7 +184,7 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
   const pct = receiptPercent(agg.receiptsConfirmed, agg.receiptsExpected);
   const several = agg.weeks > 1;
   const shared = [
-    tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
+    tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct), link: { text: "View →", href: RECEIPTS_HREF } }),
     tile("Anomalies flagged", "", String(agg.anomalies), "", "Review in Transactions", { color: AMBER, link: { text: "View →", href: anomaliesHref } }),
   ];
   const caUnits: RegionView | null =
@@ -251,7 +252,7 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
       tile("DEF", "CA", usd(agg.defWithTax), "", `${qty(agg.defLitres)} L`, { note: hst(agg.defHst) }),
       tile("Other charges", "CA", usd(agg.other), "", OTHER_SUB),
       tile("Discount captured", "CA", usd(agg.disc), "", agg.discPerLitre === null ? "Before tax" : `Before tax · $${agg.discPerLitre.toFixed(3)} / L`),
-      tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
+      tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct), link: { text: "View →", href: RECEIPTS_HREF } }),
       tile("Anomalies flagged", "", String(agg.anomalies), "", "Review in Transactions", { color: AMBER, link: { text: "View →", href: anomaliesHref } }),
     ],
   };
@@ -322,7 +323,7 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
               value: `${receiptPercent(confirmed, expected) ?? 0}%`,
               color: receiptColor(receiptPercent(confirmed, expected)),
               sub: `${confirmed} of ${expected} confirmed`,
-              link: { text: "See which stops →", href: "/receipt-queue" },
+              link: { text: "View →", href: RECEIPTS_HREF },
             },
     },
   };

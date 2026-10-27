@@ -93,15 +93,16 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
             <Link className="ov-tile-cover" href={attention.anomalies.link.href} aria-label="Anomalies flagged: review in Transactions" data-testid="anomalies-link" />
           </div>
           {attention.receipts !== null && (
-            <div className="ov-cb-block">
+            <div className="ov-cb-block ov-linked">
               <div className="ov-cb-label">Receipt compliance</div>
               <div className="ov-cb-count" style={{ color: attention.receipts.color }}>
                 {attention.receipts.value}
               </div>
-              <div className="ov-cb-note">{attention.receipts.sub}</div>
-              <Link className="ov-link" href={attention.receipts.link.href}>
-                {attention.receipts.link.text}
-              </Link>
+              <div className="ov-cb-row">
+                <span className="ov-cb-note">{attention.receipts.sub}</span>
+                <span className="ov-view">{attention.receipts.link.text}</span>
+              </div>
+              <Link className="ov-tile-cover" href={attention.receipts.link.href} aria-label="Receipt compliance: view the receipt queue" data-testid="receipts-link" />
             </div>
           )}
         </div>

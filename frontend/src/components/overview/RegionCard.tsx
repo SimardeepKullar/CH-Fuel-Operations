@@ -28,7 +28,7 @@ function TileBox({ tile, big }: { tile: Tile; big?: boolean }) {
         <span className="ov-tile-sub">{tile.sub}</span>
         {tile.link !== null ? <span className="ov-view">{tile.link.text}</span> : <span className="ov-tile-note">{tile.note}</span>}
       </div>
-      {tile.link !== null && <Link className="ov-tile-cover" href={tile.link.href} aria-label={`${tile.label}: review in Transactions`} data-testid="anomalies-link" />}
+      {tile.link !== null && <Link className="ov-tile-cover" href={tile.link.href} aria-label={`${tile.label}: review in Transactions`} data-testid={tile.label === "Anomalies flagged" ? "anomalies-link" : "receipts-link"} />}
     </div>
   );
 }
