@@ -40,8 +40,7 @@ export default function RegionCard({ region: native }: { region: RegionView }) {
   const region = caUnits && alt !== null ? alt : native;
   return (
     <section
-      className="ov-card ov-region blueprint"
-      style={{ borderTopColor: region.accent }}
+      className="ov-card ov-region"
       aria-label={region.name}
       data-testid={`${region.side}-panel`}
     >
