@@ -83,7 +83,6 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
           ))}
         </div>
         <div className="ov-cb-col ov-cb-attn" data-testid="combined-attention">
-          <div className="ov-cb-label">Needs attention</div>
           <div className="ov-cb-block">
             <div className="ov-cb-count ov-cb-amber">{attention.anomalies.count}</div>
             <div className="ov-cb-note">Anomalies flagged</div>
