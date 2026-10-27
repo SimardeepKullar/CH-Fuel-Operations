@@ -52,7 +52,7 @@ export default function DriverSpend({
         <span className="ov-hide">{open ? "Hide ▴" : "Show ▾"}</span>
       </button>
       {open && (
-        <>
+        <div className="ov-drivers-body">
           <div className="ov-drivers-side">
             {model.split && (
               <SegmentedControl
@@ -98,7 +98,7 @@ export default function DriverSpend({
               {all ? `Show top ${TOP}` : `Show all ${model.columns.length}`}
             </button>
           )}
-        </>
+        </div>
       )}
     </section>
   );
