@@ -28,13 +28,14 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
         <div className="ov-cb-main">
           {view.show && total !== null ? (
             <>
-              <div className="ov-cb-head" data-testid="ov-combined-tile" data-label="Total fuel spend, combined">
+              <div className="ov-cb-head" data-testid="ov-combined-tile" data-label={total.label}>
                 <span className="ov-combined-chip">US + CA</span>
                 <span className="ov-cb-label">{total.label}</span>
               </div>
               <Figure tile={total} size="xl" />
+              <div className="ov-cb-sub">{total.sub}</div>
               <div className="ov-cb-sub">
-                {total.sub} · <span data-testid="combined-rate">{view.rate}</span> {view.rateLabel.toLowerCase()}
+                {view.sub} · <span data-testid="combined-rate">{view.rate}</span> {view.rateLabel.toLowerCase()}
               </div>
               {shares !== null && (
                 <>

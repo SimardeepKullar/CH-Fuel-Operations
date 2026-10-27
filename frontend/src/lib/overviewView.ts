@@ -24,6 +24,7 @@ export function rangeLabel(start: string, end: string): string {
 const TWO = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
 const usd = (n: number): string => "$" + n.toLocaleString("en-US", TWO);
 const qty = (n: number): string => n.toLocaleString("en-US", TWO);
+const TOTAL_SUB = "Fuel + DEF + Other Charges";
 const OTHER_SUB = "Scale, express and fees";
 const price4 = (n: number): string => "$" + n.toFixed(4);
 
@@ -193,7 +194,7 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
           present: true,
           sub: head("us", inScope, `CAD · litres, at each week’s rate${suffix}`),
           big: [
-            tile("Total spend", "CA", usd(conv.total), "", `Includes CA${usd(conv.other)} other charges`),
+            tile("Total spend", "CA", usd(conv.total), "", TOTAL_SUB),
             tile("Average billed price", "CA", conv.pricePerLitre === null ? "—" : price4(conv.pricePerLitre), "/ L", `Converted at each week’s rate${suffix}`),
           ],
           small: [
@@ -211,7 +212,7 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
     caUnits,
     sub: head("us", inScope, "USD · gallons"),
     big: [
-      tile("Total spend", "US", usd(agg.total), "", `Includes US${usd(agg.other)} other charges`),
+      tile("Total spend", "US", usd(agg.total), "", TOTAL_SUB),
       tile("Average billed price", "US", agg.avgPrice === null ? "—" : price4(agg.avgPrice), "/ gal",
         several
           ? agg.weeklyLow === null ? "" : `Weekly low $${agg.weeklyLow.toFixed(2)} · high $${agg.weeklyHigh!.toFixed(2)}`
@@ -240,7 +241,7 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
     present: true,
     sub: head("ca", inScope, "CAD incl. HST · litres"),
     big: [
-      tile("Total spend, with HST", "CA", usd(agg.total), "", agg.other > 0 ? `Includes CA${usd(agg.other)} other charges` : `${qty(agg.litres)} L diesel`, { note: hst(agg.hst) }),
+      tile("Total spend, with HST", "CA", usd(agg.total), "", TOTAL_SUB, { note: hst(agg.hst) }),
       tile("Billed price, with HST", "CA", agg.avgPrice === null ? "—" : price4(agg.avgPrice), "/ L",
         lead(wow, agg.avgPricePreTax === null ? "" : `CA${price4(agg.avgPricePreTax)} / L before HST`),
         { note: several && agg.weeklyLow !== null ? `Weekly $${agg.weeklyLow.toFixed(2)} – $${agg.weeklyHigh!.toFixed(2)}` : "" }),
@@ -288,7 +289,7 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
     sub,
     rate: fx.meanRate === null ? "—" : fx.meanRate.toFixed(2),
     rateLabel: single ? "CAD per USD" : fx.covered > 0 ? `CAD per USD · avg of ${fx.covered} wk${fx.covered > 1 ? "s" : ""}` : "CAD per USD",
-    total: combined === null ? null : { label: "Total fuel spend, combined", cc: "CA", value: usd(combined.total), unit: "", sub },
+    total: combined === null ? null : { label: "Total Spend - Combined", cc: "CA", value: usd(combined.total), unit: "", sub: TOTAL_SUB },
     shares:
       combined === null || !hasUs || !hasCa || combined.total <= 0
         ? null
