@@ -1146,6 +1146,21 @@ select.tx-filter-select {
 }
 .tx-head-cell { padding: 9px 8px 9px 0; }
 .tx-head-cell.num { text-align: right; }
+.tx-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.tx-sort:hover, .tx-sort:focus-visible { color: var(--color-control-fg); }
+.tx-sort-mark { color: var(--color-accent-800); }
 .tx-head-billed { color: var(--color-accent-800); }
 .tx-row-wrap { border-bottom: 1px solid var(--color-divider); }
 .tx-row {

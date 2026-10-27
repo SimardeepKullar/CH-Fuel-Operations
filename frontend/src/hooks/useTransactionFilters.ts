@@ -10,6 +10,8 @@ export interface TransactionFiltersState {
   product: string;
   receiptStatus: string;
   anomalyOnly: boolean;
+  /** `asc` = oldest first (T-40J); empty is the default, newest first, and stays out of the URL. */
+  sort: "" | "asc";
 }
 
 const EMPTY: TransactionFiltersState = {
@@ -21,6 +23,7 @@ const EMPTY: TransactionFiltersState = {
   product: "",
   receiptStatus: "",
   anomalyOnly: false,
+  sort: "",
 };
 
 const FILTER_KEYS = Object.keys(EMPTY) as (keyof TransactionFiltersState)[];
@@ -53,6 +56,7 @@ export function useTransactionFilters(): UseTransactionFiltersResult {
       product: searchParams.get("product") ?? "",
       receiptStatus: searchParams.get("receiptStatus") ?? "",
       anomalyOnly: searchParams.get("anomalyOnly") === "true",
+      sort: searchParams.get("sort") === "asc" ? "asc" : "",
     }),
     [searchParams],
   );

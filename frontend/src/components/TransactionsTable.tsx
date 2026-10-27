@@ -310,6 +310,11 @@ export default function TransactionsTable({
     if (activeIndex >= rows.length) setActiveIndex(Math.max(0, rows.length - 1));
   }, [rows.length, activeIndex]);
 
+  // A new order puts a different row first (T-40J).
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [filters.sort]);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "/" && !isTypingTarget(e.target)) {
@@ -540,8 +545,25 @@ export default function TransactionsTable({
                 <span
                   key={header.id}
                   className={`tx-head-cell${["gallons", "billed", "retail", "total"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
+                  {...(header.id === "occurredAt"
+                    ? { role: "columnheader", "aria-sort": filters.sort === "asc" ? ("ascending" as const) : ("descending" as const) }
+                    : {})}
                 >
-                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  {header.id === "occurredAt" ? (
+                    <button
+                      type="button"
+                      className="tx-sort"
+                      onClick={() => setFilter("sort", filters.sort === "asc" ? "" : "asc")}
+                      title={filters.sort === "asc" ? "Oldest first — click for newest first" : "Newest first — click for oldest first"}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      <span className="tx-sort-mark" aria-hidden="true">
+                        {filters.sort === "asc" ? "↑" : "↓"}
+                      </span>
+                    </button>
+                  ) : (
+                    flexRender(header.column.columnDef.header, header.getContext())
+                  )}
                 </span>
               ))}
             </div>

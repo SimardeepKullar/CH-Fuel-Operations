@@ -16,6 +16,7 @@ const EMPTY_FILTERS: TransactionFiltersState = {
   product: "",
   receiptStatus: "",
   anomalyOnly: false,
+  sort: "",
 };
 
 function stop(overrides: Partial<TransactionListItem> = {}): TransactionListItem {
@@ -365,5 +366,48 @@ describe("TransactionsTable", () => {
   it("a single invoice's rows carry no tag", () => {
     render(<TransactionsTable {...baseProps([stop()])} />);
     expect(screen.queryByTestId("tx-invoice-tag")).toBeNull();
+  });
+
+  it("the Date · time header is a sort button: ↓ and aria-sort=descending by default (T-40J)", () => {
+    render(<TransactionsTable {...baseProps([stop()])} />);
+    const button = screen.getByRole("button", { name: /Date · time/ });
+    expect(button.textContent).toContain("↓");
+    expect(button.closest("[aria-sort]")!.getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("oldest first shows ↑ and aria-sort=ascending", () => {
+    render(<TransactionsTable {...baseProps([stop()])} filters={{ ...EMPTY_FILTERS, sort: "asc" }} />);
+    const button = screen.getByRole("button", { name: /Date · time/ });
+    expect(button.textContent).toContain("↑");
+    expect(button.closest("[aria-sort]")!.getAttribute("aria-sort")).toBe("ascending");
+  });
+
+  it("clicking the header flips the sort through setFilter", () => {
+    const props = baseProps([stop()]);
+    const { unmount } = render(<TransactionsTable {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /Date · time/ }));
+    expect(props.setFilter).toHaveBeenLastCalledWith("sort", "asc");
+    unmount();
+
+    const props2 = baseProps([stop()]);
+    render(<TransactionsTable {...props2} filters={{ ...EMPTY_FILTERS, sort: "asc" }} />);
+    fireEvent.click(screen.getByRole("button", { name: /Date · time/ }));
+    expect(props2.setFilter).toHaveBeenLastCalledWith("sort", "");
+  });
+
+  it("rows render in the order given, and the active row resets to the first when the sort changes", () => {
+    const a = stop({ id: "a", baseAuthCode: "A1", occurredAt: "2026-09-01T10:00:00.000Z" });
+    const b = stop({ id: "b", baseAuthCode: "A2", occurredAt: "2026-09-02T10:00:00.000Z" });
+    const { rerender } = render(<TransactionsTable {...baseProps([b, a])} />);
+    fireEvent.keyDown(document.querySelectorAll(".tx-row")[0]!, { key: "ArrowDown" });
+    expect(document.querySelectorAll(".tx-row")[1]!.className).toContain("active");
+
+    rerender(<TransactionsTable {...baseProps([a, b])} filters={{ ...EMPTY_FILTERS, sort: "asc" }} />);
+    const rowEls = document.querySelectorAll(".tx-row");
+    expect(rowEls[0]!.className).toContain("active");
+    expect(rowEls[1]!.className).not.toContain("active");
+    // Keyboard navigation still works on the sorted rows.
+    fireEvent.keyDown(rowEls[0]!, { key: "ArrowDown" });
+    expect(document.querySelectorAll(".tx-row")[1]!.className).toContain("active");
   });
 });

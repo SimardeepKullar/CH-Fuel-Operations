@@ -147,6 +147,8 @@ export default function TransactionsPage() {
         ? (filters.receiptStatus as "pending" | "confirmed" | "missing")
         : undefined,
       anomalyOnly: filters.anomalyOnly || undefined,
+      // Newest first is the API's default, so only oldest first is asked for (T-40J).
+      ...(filters.sort === "asc" ? { sortField: "occurred_at" as const, sortDirection: "asc" as const } : {}),
     })
       .then((result) => {
         if (!cancelled) setRows(result.rows);
@@ -177,6 +179,7 @@ export default function TransactionsPage() {
     filters.product,
     filters.receiptStatus,
     filters.anomalyOnly,
+    filters.sort,
   ]);
 
   const searched = useMemo(() => rows.filter((row) => matchesSearch(row, filters.q)), [rows, filters.q]);

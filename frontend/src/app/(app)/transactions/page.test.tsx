@@ -414,3 +414,51 @@ describe("TransactionsPage — the Overview's scope in the URL (T-74)", () => {
     expect(replace).toHaveBeenCalledWith("/transactions?scope=all");
   });
 });
+
+describe("TransactionsPage — date sort (T-40J)", () => {
+  it("opens newest first: no sort in the request", async () => {
+    setupWeeks([PAIRED_WEEK]);
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    expect(lastTableRequest()).not.toHaveProperty("sortField");
+    expect(lastTableRequest()).not.toHaveProperty("sortDirection");
+  });
+
+  it("sort=asc in the URL requests occurred_at ascending; clicking the header removes the key", async () => {
+    searchParams = new URLSearchParams({ sort: "asc" });
+    setupWeeks([PAIRED_WEEK]);
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    expect(lastTableRequest()).toMatchObject({ sortField: "occurred_at", sortDirection: "asc" });
+
+    fireEvent.click(screen.getByRole("button", { name: /Date · time/ }));
+    expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.has("sort")).toBe(false);
+  });
+
+  it("clicking the header on the default order writes sort=asc", async () => {
+    setupWeeks([PAIRED_WEEK]);
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Date · time/ }));
+    expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.get("sort")).toBe("asc");
+  });
+
+  it("under All invoices the request carries the sort and no currency", async () => {
+    searchParams = new URLSearchParams({ invoice: "all", sort: "asc" });
+    setupWeeks([PAIRED_WEEK]);
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
+    const req = lastTableRequest();
+    expect(req.currency).toBeUndefined();
+    expect(req).toMatchObject({ sortField: "occurred_at", sortDirection: "asc" });
+  });
+
+  it("the filter-option seed fetch stays unsorted", async () => {
+    searchParams = new URLSearchParams({ sort: "asc" });
+    setupWeeks([PAIRED_WEEK]);
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    const seeds = listTransactions.mock.calls.filter((c) => !(c[0] as { includeLines?: boolean }).includeLines);
+    for (const c of seeds) expect(c[0]).not.toHaveProperty("sortDirection");
+  });
+});
