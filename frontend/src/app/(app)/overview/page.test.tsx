@@ -179,15 +179,28 @@ describe("OverviewPage (T-71)", () => {
     expect(screen.getByText(/US only this week/)).toBeTruthy();
   });
 
-  it("hovering a driver segment shows the tooltip with both currencies", async () => {
+  it("spend by driver shows the top five, then all eleven bars, and collapses", async () => {
     mount("all");
     await screen.findByTestId("driver-spend");
-    fireEvent.mouseEnter(screen.getAllByTestId("driver-seg-us")[2]!);
-    const tip = screen.getByTestId("driver-tooltip");
-    expect(tip.textContent).toContain("Driver 3 · United States");
-    expect(tip.textContent).toMatch(/US\$[\d,]+\.\d{2} · CA\$[\d,]+\.\d{2}/);
-    fireEvent.mouseLeave(screen.getAllByTestId("driver-column")[2]!);
-    expect(screen.queryByTestId("driver-tooltip")).toBeNull();
+    const bars = () => screen.queryAllByTestId("driver-column").length;
+    expect(bars()).toBe(5);
+    fireEvent.click(screen.getByRole("button", { name: "Show all 11" }));
+    expect(bars()).toBe(11);
+    expect(screen.getByText("All other drivers")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show top 5" }));
+    expect(bars()).toBe(5);
+    fireEvent.click(screen.getByTestId("driver-toggle"));
+    expect(bars()).toBe(0);
+    fireEvent.click(screen.getByTestId("driver-toggle"));
+    expect(bars()).toBe(5);
+  });
+
+  it("a driver segment's hover title carries both currencies", async () => {
+    mount("all");
+    await screen.findByTestId("driver-spend");
+    const title = screen.getAllByTestId("driver-seg-us")[2]!.getAttribute("title")!;
+    expect(title).toContain("Driver 3 · United States");
+    expect(title).toMatch(/US\$[\d,]+\.\d{2} · CA\$[\d,]+\.\d{2}/);
   });
 });
 
