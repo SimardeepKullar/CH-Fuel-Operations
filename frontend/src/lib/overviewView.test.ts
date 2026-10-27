@@ -44,8 +44,13 @@ describe("1a all time", () => {
     expect(v.ca.big[1]!.note).toMatch(/^HST CA\$/);
     expect(v.ca.sub).toBe("14 invoices · Aug 4 – Nov 9 · CAD incl. HST · litres");
   });
-  it("has five combined tiles and the average rate", () => {
-    expect(v.combined.tiles.map((t) => t.label)).toEqual(["Total spend, with HST", "Diesel", "DEF", "Discount captured", "Billed price, with HST"]);
+  it("has the combined headline, split, price, discount and attention counts", () => {
+    expect(v.combined.total!.label).toBe("Total fuel spend, combined");
+    expect(v.combined.price!.label).toBe("Average billed price");
+    expect(v.combined.disc!.label).toBe("Discount captured");
+    const [us, ca] = v.combined.shares!;
+    expect(us.pct + ca.pct).toBe(100);
+    expect(v.combined.attention.anomalies.count).toBe(v.agg.us!.anomalies + v.agg.ca!.anomalies);
     expect(v.combined.rate).toBe("1.42");
     expect(v.combined.rateLabel).toBe("CAD per USD · avg of 14 wks");
   });

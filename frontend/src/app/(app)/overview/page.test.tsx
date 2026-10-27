@@ -115,9 +115,10 @@ describe("OverviewPage (T-71)", () => {
     mount("all", `scope=range&from=${from}&to=${to}`);
     await screen.findByTestId("invoices-summary");
     const links = screen.getAllByTestId("anomalies-link");
-    expect(links[0]!.getAttribute("href")).toBe(`/transactions?scope=range&from=${from}&to=${to}&currency=USD&anomalyOnly=true`);
-    expect(links[1]!.getAttribute("href")).toContain("currency=CAD");
-    expect(links[0]!.textContent).toBe("Open in Transactions, this range →");
+    expect(links[0]!.getAttribute("href")).toBe(`/transactions?scope=range&from=${from}&to=${to}&currency=all&anomalyOnly=true`);
+    expect(links[1]!.getAttribute("href")).toBe(`/transactions?scope=range&from=${from}&to=${to}&currency=USD&anomalyOnly=true`);
+    expect(links[2]!.getAttribute("href")).toContain("currency=CAD");
+    expect(links[1]!.textContent).toBe("Open in Transactions, this range →");
   });
 
   it("all time: both trend charts are drawn", async () => {
@@ -142,7 +143,7 @@ describe("OverviewPage (T-71)", () => {
     mount("fxpartial");
     expect(await screen.findByText("3 of 14 weeks have no exchange rate. Converted figures cover 11 weeks.")).toBeTruthy();
     expect(screen.getByText(/^Missing: week of Sep 8/)).toBeTruthy();
-    expect(screen.getAllByTestId("ov-combined-tile")).toHaveLength(5);
+    expect(screen.getAllByTestId("ov-combined-tile")).toHaveLength(3);
   });
 
   it("no rate anywhere: combined asks for a rate and the drivers split into one currency per view", async () => {

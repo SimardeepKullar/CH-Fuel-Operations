@@ -5,9 +5,9 @@
  */
 import { writeScope, type Scope } from "./overviewScope";
 
-export type SideCurrency = "USD" | "CAD";
+export type SideCurrency = "USD" | "CAD" | "all";
 
-/** Every flagged stop of one side, over the weeks `scope` covers. */
+/** Every flagged stop of one side (or both, with `all`), over the weeks `scope` covers. */
 export function anomaliesLink(scope: Scope, currency: SideCurrency): string {
   const params = new URLSearchParams();
   writeScope(params, scope);

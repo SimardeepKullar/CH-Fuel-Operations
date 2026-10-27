@@ -33,7 +33,7 @@ export default function OverviewPage() {
   const [ratesOpen, setRatesOpen] = useState(false);
 
   const view = useMemo(
-    () => buildOverviewView(weeks, scope, (side: Side) => anomaliesLink(scope, side === "us" ? "USD" : "CAD")),
+    () => buildOverviewView(weeks, scope, (side: Side | "all") => anomaliesLink(scope, side === "us" ? "USD" : side === "ca" ? "CAD" : "all")),
     [weeks, scope],
   );
   const trends = useMemo(() => buildTrends(weeks, scope, view.span), [weeks, scope, view.span]);
@@ -100,11 +100,11 @@ export default function OverviewPage() {
         <InvoicesStrip view={view.invoices} />
         {view.fxNotice !== null && <FxNotice notice={view.fxNotice} onEnter={() => setRatesOpen(true)} />}
         {ratesOpen && <RatesPanel weeks={view.weeks} periods={periods} onSaved={rateSaved} onClose={() => setRatesOpen(false)} />}
+        <CombinedBand view={view.combined} onEnterRates={() => setRatesOpen(true)} />
         <div className="ov-regions">
           <RegionCard region={view.us} />
           <RegionCard region={view.ca} />
         </div>
-        <CombinedBand view={view.combined} onEnterRates={() => setRatesOpen(true)} />
         <div className="ov-trends">
           <TrendCard trend={trends[0]} />
           <TrendCard trend={trends[1]} />

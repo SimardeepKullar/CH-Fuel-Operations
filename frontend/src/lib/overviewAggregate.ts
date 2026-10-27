@@ -108,6 +108,9 @@ export interface CombinedAggregate {
   /** Weeks with any invoice and a rate. */
   coveredWeeks: number;
   total: number;
+  /** The two parts of `total` over the same weeks: US converted at each week's rate, and CA as billed. */
+  usTotal: number;
+  caTotal: number;
   diesel: number;
   def: number;
   disc: number;
@@ -232,6 +235,8 @@ function aggregateCombined(covered: readonly (WeekFigures & { fx: number })[]): 
   return {
     coveredWeeks: covered.length,
     total: sum(covered, (w) => us(w, (u) => u.diesel + u.def + u.other) + ca(w, (c) => c.dieselWithTax + c.defWithTax)),
+    usTotal: sum(covered, (w) => us(w, (u) => u.diesel + u.def + u.other)),
+    caTotal: sum(covered, (w) => ca(w, (c) => c.dieselWithTax + c.defWithTax)),
     diesel,
     def: sum(covered, (w) => us(w, (u) => u.def) + ca(w, (c) => c.defWithTax)),
     disc: sum(covered, (w) => us(w, (u) => u.disc) + ca(w, (c) => c.disc)),

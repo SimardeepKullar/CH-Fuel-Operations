@@ -93,6 +93,21 @@ export interface CombinedTile {
   sub: string;
 }
 
+/** One side's share of the combined total, in CAD. */
+export interface CombinedShare {
+  label: string;
+  value: string;
+  /** Whole percent; the two shares add to 100. */
+  pct: number;
+  color: string;
+}
+
+export interface CombinedAttention {
+  anomalies: { count: number; link: { text: string; href: string } };
+  /** `null` when no stop expected a receipt. */
+  receipts: { missing: number; sub: string; link: { text: string; href: string } } | null;
+}
+
 export interface CombinedView {
   show: boolean;
   /** No week in scope has a rate: the band says it needs one. */
@@ -100,7 +115,14 @@ export interface CombinedView {
   sub: string;
   rate: string;
   rateLabel: string;
-  tiles: CombinedTile[];
+  /** The headline: total fuel spend, combined. */
+  total: CombinedTile | null;
+  /** US (converted) and Canada, each a share of the total; `null` when either is absent. */
+  shares: [CombinedShare, CombinedShare] | null;
+  price: CombinedTile | null;
+  disc: CombinedTile | null;
+  /** Counts across both sides, so shown whether or not a rate exists. */
+  attention: CombinedAttention;
 }
 
 export interface OverviewView {
@@ -209,8 +231,12 @@ function weekChip(side: Side, week: WeekFigures): StripChip {
   return { code: side === "us" ? "US" : "CA", text: side === "us" ? "No US invoice this week" : "No Canadian invoice this week", absent: true };
 }
 
-function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasCa: boolean): CombinedView {
+function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasCa: boolean, anomaliesHref: string): CombinedView {
   const { combined, fx } = agg;
+  const anomalies = (agg.us?.anomalies ?? 0) + (agg.ca?.anomalies ?? 0);
+  const expected = (agg.us?.receiptsExpected ?? 0) + (agg.ca?.receiptsExpected ?? 0);
+  const confirmed = (agg.us?.receiptsConfirmed ?? 0) + (agg.ca?.receiptsConfirmed ?? 0);
+  const usPct = combined === null || combined.total <= 0 ? 0 : Math.round((combined.usTotal / combined.total) * 100);
   const partial = fx.covered < fx.weeksWithData && fx.covered > 0;
   const none = fx.weeksWithData > 0 && fx.covered === 0;
   const sub =
@@ -224,22 +250,36 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
     sub,
     rate: fx.meanRate === null ? "—" : fx.meanRate.toFixed(2),
     rateLabel: single ? "CAD per USD" : fx.covered > 0 ? `CAD per USD · avg of ${fx.covered} wk${fx.covered > 1 ? "s" : ""}` : "CAD per USD",
-    tiles:
-      combined === null
-        ? []
+    total: combined === null ? null : { label: "Total fuel spend, combined", cc: "CA", value: usd(combined.total), unit: "", sub },
+    shares:
+      combined === null || !hasUs || !hasCa || combined.total <= 0
+        ? null
         : [
-            { label: "Total spend, with HST", cc: "CA", value: usd(combined.total), unit: "", sub: `Includes HST CA${usd(combined.hst)}` },
-            { label: "Diesel", cc: "CA", value: usd(combined.diesel), unit: "", sub: `${qty(combined.litres)} L` },
-            { label: "DEF", cc: "CA", value: usd(combined.def), unit: "", sub: `${qty(combined.defLitres)} L` },
-            { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "Both sides, before tax" },
-            {
-              label: "Billed price, with HST",
-              cc: "CA",
-              value: combined.pricePerLitre === null ? "—" : price4(combined.pricePerLitre),
-              unit: "/ L",
-              sub: "Diesel, weighted by litres",
-            },
+            { label: "United States", value: `CA${usd(combined.usTotal)}`, pct: usPct, color: NAVY },
+            { label: "Canada", value: `CA${usd(combined.caTotal)}`, pct: 100 - usPct, color: CYAN },
           ],
+    price:
+      combined === null
+        ? null
+        : {
+            label: "Average billed price",
+            cc: "CA",
+            value: combined.pricePerLitre === null ? "—" : price4(combined.pricePerLitre),
+            unit: "/ L",
+            sub: `With HST · ${qty(combined.litres)} L`,
+          },
+    disc: combined === null ? null : { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "" },
+    attention: {
+      anomalies: { count: anomalies, link: { text: "Review in Transactions →", href: anomaliesHref } },
+      receipts:
+        expected === 0
+          ? null
+          : {
+              missing: expected - confirmed,
+              sub: `Receipts missing · ${confirmed} of ${expected} confirmed`,
+              link: { text: "See which stops →", href: "/receipt-queue" },
+            },
+    },
   };
 }
 
@@ -251,7 +291,7 @@ export function scopeReadout(scope: Scope, count: number, span: string): string 
 }
 
 /** Everything but the charts, for `scope` over every imported week. `transactionsHref(side)` builds the anomalies link. */
-export function buildOverviewView(all: readonly WeekFigures[], scope: Scope, transactionsHref: (side: Side) => string): OverviewView {
+export function buildOverviewView(all: readonly WeekFigures[], scope: Scope, transactionsHref: (side: Side | "all") => string): OverviewView {
   const weeks = weeksInScope(all, scope);
   const agg = aggregateWeeks(weeks);
   const single = weeks.length === 1;
@@ -301,6 +341,6 @@ export function buildOverviewView(all: readonly WeekFigures[], scope: Scope, tra
     fxNotice,
     us: usRegion(agg.us, weeks, span, transactionsHref("us"), scopeShort),
     ca: caRegion(agg.ca, weeks, span, transactionsHref("ca"), scopeShort),
-    combined: combinedView(agg, single, usCount > 0, caCount > 0),
+    combined: combinedView(agg, single, usCount > 0, caCount > 0, transactionsHref("all")),
   };
 }
