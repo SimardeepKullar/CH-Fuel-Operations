@@ -24,7 +24,6 @@ export function rangeLabel(start: string, end: string): string {
 const TWO = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
 const usd = (n: number): string => "$" + n.toLocaleString("en-US", TWO);
 const qty = (n: number): string => n.toLocaleString("en-US", TWO);
-const count = (n: number): string => Math.round(n).toLocaleString("en-US");
 const OTHER_SUB = "Scale, express and fees";
 const price4 = (n: number): string => "$" + n.toFixed(4);
 
