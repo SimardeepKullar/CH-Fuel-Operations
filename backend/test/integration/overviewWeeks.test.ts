@@ -68,6 +68,7 @@ describe.skipIf(!hasDatabase)("GET /overview/weeks (integration, T-70)", () => {
       defWithTax: ca!.kpis.def.amount,
       defPreTax: ca!.kpis.def.preTax,
       defLitres: ca!.kpis.def.qty,
+      other: ca!.kpis.otherCharges.total,
     });
     expect(week.ca!.dieselWithTax).toBeGreaterThan(week.ca!.dieselPreTax);
   });

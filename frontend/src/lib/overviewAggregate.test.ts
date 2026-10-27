@@ -27,7 +27,7 @@ describe("aggregateWeeks — sums and weighted prices", () => {
 
   it("CA before-HST price uses the pre-tax dollars", () => {
     expect(agg.ca!.avgPricePreTax).toBeCloseTo(sumOf(weeks, (w) => w.ca!.dieselPreTax) / agg.ca!.litres, 10);
-    expect(agg.ca!.hst).toBeCloseTo(agg.ca!.total - agg.ca!.dieselPreTax - agg.ca!.defPreTax, 6);
+    expect(agg.ca!.hst).toBeCloseTo(agg.ca!.total - agg.ca!.other - agg.ca!.dieselPreTax - agg.ca!.defPreTax, 6);
   });
 
   it("weekly low/high are each week's own weighted price", () => {
@@ -122,7 +122,8 @@ describe("today's real data — invoices 999210 and 999217", () => {
   it("reproduces the printed totals", () => {
     expect(agg.us!.avgPrice).toBeCloseTo(48450.68 / 8733.11, 10);
     expect(agg.us!.total).toBeCloseTo(48450.68 + 845.4 + 1633.63, 6);
-    expect(agg.ca!.total).toBeCloseTo(46559.28 + 174.05, 6);
+    // 999217's printed grand total: fuel with HST plus the Scale charge, which prints a final amount alone.
+    expect(agg.ca!.total).toBeCloseTo(46837.33, 6);
     expect(receiptPercent(agg.us!.receiptsConfirmed, agg.us!.receiptsExpected)).toBe(0);
   });
 

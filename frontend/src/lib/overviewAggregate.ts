@@ -87,9 +87,11 @@ export interface CaAggregate {
   defWithTax: number;
   defPreTax: number;
   defLitres: number;
+  /** Scale and express charges. */
+  other: number;
   disc: number;
   stops: number;
-  /** Diesel + DEF, as printed (with tax). */
+  /** Diesel + DEF with tax, plus other charges: the invoice grand total. */
   total: number;
   hst: number;
   dieselHst: number;
@@ -208,9 +210,10 @@ function aggregateCa(weeks: readonly WeekFigures[]): CaAggregate | null {
       defWithTax,
     defPreTax,
     defLitres: ca((c) => c.defLitres),
+    other: ca((c) => c.other),
     disc,
     stops: ca((c) => c.stops),
-    total: dieselWithTax + defWithTax,
+    total: dieselWithTax + defWithTax + ca((c) => c.other),
     hst: dieselWithTax - dieselPreTax + defWithTax - defPreTax,
     dieselHst: dieselWithTax - dieselPreTax,
     defHst: defWithTax - defPreTax,
@@ -234,9 +237,9 @@ function aggregateCombined(covered: readonly (WeekFigures & { fx: number })[]): 
   const litres = sum(covered, (w) => (w.us === null ? 0 : w.us.gal * LITRES_PER_GALLON) + ca(w, (c) => c.litres));
   return {
     coveredWeeks: covered.length,
-    total: sum(covered, (w) => us(w, (u) => u.diesel + u.def + u.other) + ca(w, (c) => c.dieselWithTax + c.defWithTax)),
+    total: sum(covered, (w) => us(w, (u) => u.diesel + u.def + u.other) + ca(w, (c) => c.dieselWithTax + c.defWithTax + c.other)),
     usTotal: sum(covered, (w) => us(w, (u) => u.diesel + u.def + u.other)),
-    caTotal: sum(covered, (w) => ca(w, (c) => c.dieselWithTax + c.defWithTax)),
+    caTotal: sum(covered, (w) => ca(w, (c) => c.dieselWithTax + c.defWithTax + c.other)),
     diesel,
     def: sum(covered, (w) => us(w, (u) => u.def) + ca(w, (c) => c.defWithTax)),
     disc: sum(covered, (w) => us(w, (u) => u.disc) + ca(w, (c) => c.disc)),

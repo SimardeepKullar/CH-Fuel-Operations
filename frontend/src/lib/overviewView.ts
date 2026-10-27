@@ -227,7 +227,7 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
       tile("Billed price, with HST", "CA", agg.avgPrice === null ? "—" : price4(agg.avgPrice), "/ L",
         agg.avgPricePreTax === null ? "" : `CA${price4(agg.avgPricePreTax)} / L before HST`,
         { note: several && agg.weeklyLow !== null ? `Weekly $${agg.weeklyLow.toFixed(2)} – $${agg.weeklyHigh!.toFixed(2)}` : "" }),
-      tile("Total spend, with HST", "CA", usd(agg.total), "", `${qty(agg.litres)} L diesel`, { note: hst(agg.hst) }),
+      tile("Total spend, with HST", "CA", usd(agg.total), "", agg.other > 0 ? `Includes CA${usd(agg.other)} other charges` : `${qty(agg.litres)} L diesel`, { note: hst(agg.hst) }),
     ],
     small: [
       tile("Diesel", "CA", usd(agg.dieselWithTax), "", `${qty(agg.litres)} L`, { note: hst(agg.dieselHst) }),

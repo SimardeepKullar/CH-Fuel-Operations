@@ -28,6 +28,8 @@ export interface OverviewWeekCa {
   defWithTax: number;
   defPreTax: number;
   defLitres: number;
+  /** Scale and express charges, which print a final amount alone (no HST column). */
+  other: number;
   disc: number;
   stops: number;
   receiptsExpected: number;
@@ -102,6 +104,7 @@ function caWeek(side: OverviewSide, invoice: string): OverviewWeekCa {
     defWithTax: kpis.def.amount,
     defPreTax: kpis.def.preTax,
     defLitres: kpis.def.qty,
+    other: kpis.otherCharges.total,
     disc: kpis.discount.total,
     stops: kpis.receiptCompliance.total,
     receiptsExpected: kpis.receiptCompliance.total,
