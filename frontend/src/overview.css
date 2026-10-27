@@ -116,6 +116,8 @@
 .ov-drivers-body { display: flex; flex-direction: column; padding: 0 16px 16px; }
 .ov-drivers-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; text-align: left; color: #16205c; background: none; border: 0; cursor: pointer; }
 .ov-drivers-head[aria-expanded="true"] { border-bottom: 1px solid #e3e8f1; }
+.ov-breakdown-body { padding-top: 14px; }
+.ov-breakdown-body[hidden] { display: none; }
 .ov-drivers-icon { flex: none; }
 .ov-drivers-titles { display: block; min-width: 0; }
 .ov-drivers-titles .ov-region-sub { display: block; }

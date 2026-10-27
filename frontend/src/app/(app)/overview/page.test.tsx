@@ -178,6 +178,20 @@ describe("OverviewPage (T-71)", () => {
     expect(screen.getByText(/US only this week/)).toBeTruthy();
   });
 
+  it("the two country cards fold under one Breakdown by country header", async () => {
+    mount("all");
+    await screen.findByTestId("country-breakdown");
+    const toggle = screen.getByTestId("breakdown-toggle");
+    const body = () => screen.getByTestId("us-panel").closest("[hidden]");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(body()).toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(body()).not.toBeNull();
+    fireEvent.click(toggle);
+    expect(body()).toBeNull();
+  });
+
   it("spend by driver shows the top five, then all eleven bars, and collapses", async () => {
     mount("all");
     await screen.findByTestId("driver-spend");

@@ -7,6 +7,7 @@ import { useWeek } from "../../../hooks/useWeek";
 import { buildDriverView, buildTrends } from "../../../lib/overviewCharts";
 import { buildOverviewView, rangeLabel, type Side } from "../../../lib/overviewView";
 import { anomaliesLink } from "../../../lib/transactionsLink";
+import BreakdownByCountry from "../../../components/overview/BreakdownByCountry";
 import CombinedBand from "../../../components/overview/CombinedBand";
 import DriverSpend from "../../../components/overview/DriverSpend";
 import EmptyState from "../../../components/EmptyState";
@@ -101,10 +102,12 @@ export default function OverviewPage() {
         {view.fxNotice !== null && <FxNotice notice={view.fxNotice} onEnter={() => setRatesOpen(true)} />}
         {ratesOpen && <RatesPanel weeks={view.weeks} periods={periods} onSaved={rateSaved} onClose={() => setRatesOpen(false)} />}
         <CombinedBand view={view.combined} onEnterRates={() => setRatesOpen(true)} />
-        <div className="ov-regions">
-          <RegionCard region={view.us} />
-          <RegionCard region={view.ca} />
-        </div>
+        <BreakdownByCountry>
+          <div className="ov-regions">
+            <RegionCard region={view.us} />
+            <RegionCard region={view.ca} />
+          </div>
+        </BreakdownByCountry>
         {view.showTrend && (
           <div className="ov-trends">
             <TrendCard trend={trends[0]} />
