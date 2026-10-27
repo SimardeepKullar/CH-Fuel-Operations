@@ -44,6 +44,17 @@ describe("aggregateWeeks — sums and weighted prices", () => {
   });
 });
 
+describe("total spend is fuel + DEF + other charges", () => {
+  const agg = aggregateWeeks(overviewFixture("all"));
+  it("US, CA and combined each add the three parts", () => {
+    expect(agg.us!.total).toBeCloseTo(agg.us!.diesel + agg.us!.def + agg.us!.other, 6);
+    expect(agg.ca!.total).toBeCloseTo(agg.ca!.dieselWithTax + agg.ca!.defWithTax + agg.ca!.other, 6);
+    const c = agg.combined!;
+    expect(c.total).toBeCloseTo(c.usTotal + c.caTotal, 6);
+    expect(agg.us!.converted!.total).toBeCloseTo(agg.us!.converted!.diesel + agg.us!.converted!.def + agg.us!.converted!.other, 6);
+  });
+});
+
 describe("aggregateWeeks — conversion and the combined band", () => {
   it("converts each week at its own rate, never another week's", () => {
     const [a, b] = overviewFixture("all").slice(0, 2) as [WeekFigures, WeekFigures];
