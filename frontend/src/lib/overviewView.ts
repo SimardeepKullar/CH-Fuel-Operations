@@ -122,8 +122,8 @@ export interface CombinedView {
   total: CombinedTile | null;
   /** US (converted) and Canada, each a share of the total; `null` when either is absent. */
   shares: [CombinedShare, CombinedShare] | null;
-  price: CombinedTile | null;
-  disc: CombinedTile | null;
+  /** Average billed price, diesel, DEF, other charges, discount captured; empty with no rate. */
+  kpis: CombinedTile[];
   /** Counts across both sides, so shown whether or not a rate exists. */
   attention: CombinedAttention;
 }
@@ -297,17 +297,22 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
             { label: "United States", value: `CA${usd(combined.usTotal)}`, pct: usPct, color: NAVY },
             { label: "Canada", value: `CA${usd(combined.caTotal)}`, pct: 100 - usPct, color: CYAN },
           ],
-    price:
+    kpis:
       combined === null
-        ? null
-        : {
-            label: "Average billed price",
-            cc: "CA",
-            value: combined.pricePerLitre === null ? "—" : price4(combined.pricePerLitre),
-            unit: "/ L",
-            sub: `With HST · ${qty(combined.litres)} L`,
-          },
-    disc: combined === null ? null : { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "" },
+        ? []
+        : [
+            {
+              label: "Average billed price",
+              cc: "CA",
+              value: combined.pricePerLitre === null ? "—" : price4(combined.pricePerLitre),
+              unit: "/ L",
+              sub: `With HST · ${qty(combined.litres)} L`,
+            },
+            { label: "Diesel", cc: "CA", value: usd(combined.diesel), unit: "", sub: `${qty(combined.litres)} L` },
+            { label: "DEF", cc: "CA", value: usd(combined.def), unit: "", sub: `${qty(combined.defLitres)} L` },
+            { label: "Other charges", cc: "CA", value: usd(combined.other), unit: "", sub: OTHER_SUB },
+            { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "" },
+          ],
     attention: {
       anomalies: { count: anomalies, link: { text: "Review in Transactions →", href: anomaliesHref } },
       receipts:

@@ -50,8 +50,7 @@ describe("1a all time", () => {
   });
   it("has the combined headline, split, price, discount and attention counts", () => {
     expect(v.combined.total!.label).toBe("Total Spend - Combined");
-    expect(v.combined.price!.label).toBe("Average billed price");
-    expect(v.combined.disc!.label).toBe("Discount captured");
+    expect(v.combined.kpis.map((k) => k.label)).toEqual(["Average billed price", "Diesel", "DEF", "Other charges", "Discount captured"]);
     const [us, ca] = v.combined.shares!;
     expect(us.pct + ca.pct).toBe(100);
     expect(v.combined.attention.anomalies.count).toBe(v.agg.us!.anomalies + v.agg.ca!.anomalies);

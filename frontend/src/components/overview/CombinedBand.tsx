@@ -20,7 +20,7 @@ function Figure({ tile, size }: { tile: CombinedTile; size: "xl" | "md" }) {
  * converted to CAD at each week's rate; counts need no rate.
  */
 export default function CombinedBand({ view, onEnterRates }: { view: CombinedView; onEnterRates: () => void }) {
-  const { total, shares, price, disc, attention } = view;
+  const { total, shares, kpis, attention } = view;
   return (
     <section className="ov-card ov-combined blueprint" aria-label="Combined" data-testid="combined-panel">
       <Corners />
@@ -73,20 +73,14 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
             </div>
           )}
         </div>
-        <div className="ov-cb-col">
-          {price !== null && disc !== null && (
-            <>
-              <div className="ov-cb-block" data-testid="ov-combined-tile" data-label={price.label}>
-                <div className="ov-cb-label">{price.label}</div>
-                <Figure tile={price} size="md" />
-                <div className="ov-cb-note">{price.sub}</div>
-              </div>
-              <div className="ov-cb-block" data-testid="ov-combined-tile" data-label={disc.label}>
-                <div className="ov-cb-label">{disc.label}</div>
-                <Figure tile={disc} size="md" />
-              </div>
-            </>
-          )}
+        <div className="ov-cb-col ov-cb-kpis">
+          {kpis.map((k) => (
+            <div key={k.label} className="ov-cb-block" data-testid="ov-combined-tile" data-label={k.label}>
+              <div className="ov-cb-label">{k.label}</div>
+              <Figure tile={k} size="md" />
+              {k.sub !== "" && <div className="ov-cb-note">{k.sub}</div>}
+            </div>
+          ))}
         </div>
         <div className="ov-cb-col ov-cb-attn" data-testid="combined-attention">
           <div className="ov-cb-label">Needs attention</div>

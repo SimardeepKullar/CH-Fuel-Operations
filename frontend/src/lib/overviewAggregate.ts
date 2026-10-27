@@ -115,6 +115,8 @@ export interface CombinedAggregate {
   caTotal: number;
   diesel: number;
   def: number;
+  /** Scale and express charges, US converted at each week's rate plus CA. */
+  other: number;
   disc: number;
   hst: number;
   litres: number;
@@ -242,6 +244,7 @@ function aggregateCombined(covered: readonly (WeekFigures & { fx: number })[]): 
     caTotal: sum(covered, (w) => ca(w, (c) => c.dieselWithTax + c.defWithTax + c.other)),
     diesel,
     def: sum(covered, (w) => us(w, (u) => u.def) + ca(w, (c) => c.defWithTax)),
+    other: sum(covered, (w) => us(w, (u) => u.other) + ca(w, (c) => c.other)),
     disc: sum(covered, (w) => us(w, (u) => u.disc) + ca(w, (c) => c.disc)),
     hst: sum(covered, (w) => ca(w, (c) => c.dieselWithTax - c.dieselPreTax + c.defWithTax - c.defPreTax)),
     litres,

@@ -154,7 +154,7 @@ describe("OverviewPage (T-71)", () => {
     mount("fxpartial");
     expect(await screen.findByText("3 of 14 weeks have no exchange rate. Converted figures cover 11 weeks.")).toBeTruthy();
     expect(screen.getByText(/^Missing: week of Sep 8/)).toBeTruthy();
-    expect(screen.getAllByTestId("ov-combined-tile")).toHaveLength(3);
+    expect(screen.getAllByTestId("ov-combined-tile")).toHaveLength(6);
   });
 
   it("no rate anywhere: combined asks for a rate and the drivers split into one currency per view", async () => {
