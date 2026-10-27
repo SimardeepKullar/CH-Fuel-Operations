@@ -395,6 +395,15 @@ describe("TransactionsPage — the Overview's scope in the URL (T-74)", () => {
     expect(screen.getByText(/^All time · 2 weeks · /)).toBeTruthy();
   });
 
+  it("all time tags each row with its country, since rows from both invoices are mixed", async () => {
+    searchParams = new URLSearchParams("scope=all");
+    twoWeeks();
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    const tags = screen.getAllByTestId("tx-invoice-tag");
+    expect(tags.map((t) => (t as HTMLElement).dataset.currency).sort()).toEqual(["CAD", "USD"]);
+  });
+
   it("the strip counts each side's invoices in a range and picks a side through the URL", async () => {
     searchParams = new URLSearchParams("scope=all");
     twoWeeks();

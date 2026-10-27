@@ -208,7 +208,7 @@ export default function TransactionsPage() {
           loading={loading}
           error={error}
           invoiceNumbers={invoiceNumbers}
-          showInvoice={scope.mode === "week" && side === "all"}
+          showInvoice={side === "all"}
           week={period}
           currency={shown === null ? "USD" : choiceCurrency(shown)}
           qtyUnit={shown === null ? "gal" : choiceUnit(shown)}
