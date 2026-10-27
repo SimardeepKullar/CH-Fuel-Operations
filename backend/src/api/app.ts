@@ -4,7 +4,7 @@ import { handleGetDriver, handleListDrivers } from "./routes/drivers.js";
 import { handleListExpressCharges } from "./routes/expressCharges.js";
 import { handleGetInvoice, handleImportInvoice, handleListInvoices, handlePatchInvoice } from "./routes/invoices.js";
 import { handleGetHealth } from "./routes/health.js";
-import { handleGetOverview } from "./routes/overview.js";
+import { handleGetOverview, handleGetOverviewWeeks } from "./routes/overview.js";
 import { handleListPeriods } from "./routes/periods.js";
 import { handleGetPlanActual, handleGetPlanActualBacktest } from "./routes/planActual.js";
 import { handlePatchPlan } from "./routes/planPatch.js";
@@ -112,6 +112,10 @@ export function createApp(options: CreateAppOptions = {}): App {
       const transactionDetailMatch = /^\/transactions\/([^/]+)$/.exec(path);
       if (transactionDetailMatch && request.method === "GET") {
         return handleGetTransaction(options.pool ?? getPool(), transactionDetailMatch[1]!, url);
+      }
+
+      if (path === "/overview/weeks" && request.method === "GET") {
+        return handleGetOverviewWeeks(options.pool ?? getPool());
       }
 
       if (path === "/overview" && request.method === "GET") {

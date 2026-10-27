@@ -5,6 +5,9 @@ import type { ImportInvoiceResponse, InvoiceListItem } from "@ch/core/api/routes
 import { ApiError, getInvoice, listInvoices, patchInvoiceWeek, uploadInvoice } from "../../../lib/api";
 import { useWeek } from "../../../hooks/useWeek";
 import Dropzone from "../../../components/Dropzone";
+import PageBanner from "../../../components/PageBanner";
+import { StripChip, SubStrip } from "../../../components/SubStrip";
+import { formatDayYear } from "../../../lib/weeks";
 import ParsingState from "../../../components/ParsingState";
 import ReconciliationPreview from "../../../components/ReconciliationPreview";
 import QuarantineScreen, { type QuarantineRejection } from "../../../components/QuarantineScreen";
@@ -138,43 +141,55 @@ export default function ImportPage() {
     [reloadPeriods],
   );
 
-  return (
-    <div className="import-page">
-      <div className="import-main">
-        {view.phase === "idle" && <Dropzone onFile={handleFile} />}
-        {view.phase === "parsing" && <ParsingState fileName={view.fileName} rowCount={view.rowCount} />}
-        {view.phase === "loading" && <EmptyState title="Loading…" />}
-        {view.phase === "imported" && <ReconciliationPreview report={view.response.report} onConfirm={reset} />}
-        {view.phase === "quarantined" && (
-          <QuarantineScreen invoiceNumber={view.invoiceNumber} rejections={view.rejections} onDismiss={reset} />
-        )}
-        {view.phase === "duplicate" && (
-          <div className="import-duplicate" data-testid="duplicate-notice">
-            <EmptyState
-              title="Already imported"
-              detail={`Invoice ${view.invoiceNumber} was already imported from this exact file — nothing changed.`}
-            />
-            <button className="btn btn-ghost" onClick={reset}>
-              Upload another
-            </button>
-          </div>
-        )}
-        {view.phase === "error" && (
-          <div className="import-error" data-testid="import-error">
-            <EmptyState title="Import failed" detail={view.message} />
-            <button className="btn btn-ghost" onClick={reset}>
-              Try again
-            </button>
-          </div>
-        )}
-      </div>
+  const quarantined = historyRows.filter((r) => r.status === "quarantined").length;
+  const lastImport = historyRows.map((r) => r.importedAt).sort().at(-1);
 
-      <ImportHistory
-        rows={historyRows}
-        loading={historyLoading}
-        onReopenQuarantined={reopenQuarantined}
-        onMoveWeek={moveWeek}
+  return (
+    <>
+      <PageBanner
+        title="Import"
+        meta={lastImport === undefined ? undefined : <span data-testid="last-import">Last import · {formatDayYear(lastImport.slice(0, 10))}</span>}
       />
-    </div>
+      <div className="import-page">
+        <SubStrip label="Quarantine" testId="quarantine-strip">
+          <StripChip absent={quarantined === 0}>{quarantined === 0 ? "Nothing quarantined" : `${quarantined} quarantined`}</StripChip>
+        </SubStrip>
+        <div className="import-main">
+          {view.phase === "idle" && <Dropzone onFile={handleFile} />}
+          {view.phase === "parsing" && <ParsingState fileName={view.fileName} rowCount={view.rowCount} />}
+          {view.phase === "loading" && <EmptyState title="Loading…" />}
+          {view.phase === "imported" && <ReconciliationPreview report={view.response.report} onConfirm={reset} />}
+          {view.phase === "quarantined" && (
+            <QuarantineScreen invoiceNumber={view.invoiceNumber} rejections={view.rejections} onDismiss={reset} />
+          )}
+          {view.phase === "duplicate" && (
+            <div className="import-duplicate" data-testid="duplicate-notice">
+              <EmptyState
+                title="Already imported"
+                detail={`Invoice ${view.invoiceNumber} was already imported from this exact file — nothing changed.`}
+              />
+              <button className="btn btn-ghost" onClick={reset}>
+                Upload another
+              </button>
+            </div>
+          )}
+          {view.phase === "error" && (
+            <div className="import-error" data-testid="import-error">
+              <EmptyState title="Import failed" detail={view.message} />
+              <button className="btn btn-ghost" onClick={reset}>
+                Try again
+              </button>
+            </div>
+          )}
+        </div>
+
+        <ImportHistory
+          rows={historyRows}
+          loading={historyLoading}
+          onReopenQuarantined={reopenQuarantined}
+          onMoveWeek={moveWeek}
+        />
+      </div>
+    </>
   );
 }

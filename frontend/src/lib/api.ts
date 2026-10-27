@@ -21,6 +21,8 @@ import type { ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { DriversResult } from "@ch/core/actuals/drivers";
 import type { ListTransactionsResult, TransactionSortField } from "@ch/core/actuals/transactions";
 import type { OverviewResult } from "@ch/core/actuals/overview";
+import type { OverviewWeeksResult } from "@ch/core/actuals/overviewWeeks";
+import type { ConversionParams } from "./conversion";
 
 const BASE_URL = "/api/v1";
 
@@ -231,7 +233,17 @@ export function listDrivers(week: string, currency: "USD" | "CAD"): Promise<Driv
   return request<DriversResult>(`/drivers?week=${encodeURIComponent(week)}&currency=${currency}`);
 }
 
-/** `GET /overview?week=` — A8.1's whole landing screen in one call (T-41). */
-export function getOverview(week: string): Promise<OverviewResult> {
-  return request<OverviewResult>(`/overview?week=${encodeURIComponent(week)}`);
+/** `GET /overview/weeks` (T-70): every imported billing week's figures, ascending, for the Overview to aggregate. */
+export function getOverviewWeeks(): Promise<OverviewWeeksResult> {
+  return request<OverviewWeeksResult>("/overview/weeks");
+}
+
+/** `GET /overview?week=` — A8.1's whole landing screen in one call: `{ us, ca,
+ * combined, fx }` (T-41, T-65). `units` sets the unit of every rate and quantity,
+ * `convertTo` the combined panel's currency; neither converts a side's own money. */
+export function getOverview(week: string, params: ConversionParams = {}): Promise<OverviewResult> {
+  const search = new URLSearchParams({ week });
+  if (params.units !== undefined) search.set("units", params.units);
+  if (params.convertTo !== undefined) search.set("convertTo", params.convertTo);
+  return request<OverviewResult>(`/overview?${search.toString()}`);
 }

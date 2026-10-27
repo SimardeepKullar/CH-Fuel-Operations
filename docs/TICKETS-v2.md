@@ -111,6 +111,15 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **done — merged (`cfff981`, PR #18)** |
 | **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
 | **T-66** | **Exchange rate on the CA invoice, entered by the dispatcher** | T-61, T-64 | **11** | **done — merged (`13475b8`, PR #20)** |
+| **T-67** | **Prompt for the exchange rate when a US invoice is imported** | T-42, T-68 | **11** | **new** · waits on T-68 |
+| **T-68** | **Move the exchange rate from the CA invoice to the US invoice** | T-66 | **11** | **decided 2026-10-26 — not started** |
+| **T-69** | **Overview redesign — design sign-off** | T-65 | **12** | **done — signed off from the Claude Design hand-off (nine states, 1a–1i)** |
+| **T-70** | **Overview over a range of billing weeks — data layer** | T-69 | **12** | **built — not yet merged** (as `GET /overview/weeks` plus one client aggregation) |
+| **T-71** | **Overview scope control (all time / week / range)** | T-69, T-70 | **12** | **built — not yet merged** |
+| **T-72** | **Billed price trend — US and Canada charts, scope-aware** | T-69, T-70 | **12** | **built — not yet merged** |
+| **T-73** | **Top spend by driver — stacked columns, US and Canada** | T-69, T-70 | **12** | **built — not yet merged** |
+| **T-74** | **Overview links carry the scope** | T-70, T-71 | **12** | **built — not yet merged** |
+| **T-75** | **Banner rollout — `PageBanner` on every screen** | T-71 | **12** | **built — not yet merged** |
 
 **Phase 11 (Canada invoices)** lands before T-49: T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place, which D21 allows only until the first deploy. Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. Decisions D24–D30 (PROJECT-SCOPE-v2 §A15) govern all seven.
 
@@ -1360,7 +1369,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 - `invoices` gains `billing_week_end date NOT NULL` (defaulted at import to the printed `period_end`), `actual_start date`, `actual_end date` (first/last transaction date) and a unique `(billing_week_end, currency)` — two US invoices in one week is a 409, not a silent merge. *(As built: the unique index is partial, `WHERE status = 'imported'`. A quarantined invoice has no rows and can never be re-imported under its number, so a full constraint would let it hold a week for ever and turn the replacement's import into a unique violation instead of a named conflict.)* `period_start`/`period_end` stay as printed.
 - `PATCH /invoices/{id}` `{ billingWeekEnd }` moves an invoice to another week (the Import screen's override, T-64); a collision is a 409 problem+json.
 - `GET /periods` returns weeks, newest first: `{ weekEnd, invoices: [{ id, invoiceNumber, currency, printedStart, printedEnd, actualStart, actualEnd, datesDiffer }] }` — `datesDiffer` when the printed range ≠ the actual range.
-- Period-scoped endpoints take `?week=YYYY-MM-DD` plus `?currency=USD|CAD` where a screen shows one side (Transactions, Drivers, Trucks, Stations, Other Charges, Receipts). `/overview` takes `week` alone (T-65 shapes its body). Plan vs Actual stays US-only — plans are US-only. *(As built: `week` is required except where the screen has none of its own — `GET /trucks` (the D23 roster), `GET /transactions` (a driver's or truck's history spans weeks) and `GET /receipt-queue` (a standing worklist, D17) — and `currency` defaults to `USD` on the one-sided screens, since gallons and litres cannot be summed, but means "both sides" on Transactions and the receipt queue, whose rows each carry their own. The station billed-price series takes `currency` too, defaulting to the station's own country. `/overview` serves the week's US invoice until T-65.)*
+- Period-scoped endpoints take `?week=YYYY-MM-DD` plus `?currency=USD|CAD` where a screen shows one side (Transactions, Drivers, Trucks, Stations, Other Charges, Receipts). `/overview` takes `week` and returns both sides (T-65). Plan vs Actual stays US-only — plans are US-only. *(As built: `week` is required except where the screen has none of its own — `GET /trucks` (the D23 roster), `GET /transactions` (a driver's or truck's history spans weeks) and `GET /receipt-queue` (a standing worklist, D17) — and `currency` defaults to `USD` on the one-sided screens, since gallons and litres cannot be summed, but means "both sides" on Transactions and the receipt queue, whose rows each carry their own. The station billed-price series takes `currency` too, defaulting to the station's own country. `/overview` serves both sides, `{ us, ca, combined, fx }` (T-65).)*
 - Money fields drop their `Usd` suffix (`amountUsd` → `amount`, `avgBilledUsdPerGal` → `avgBilledPerUnit`, …) beside the existing `currency` field, which now carries the invoice's currency (A13 as amended). `?units=` converts quantities and per-unit prices at the API (D25).
 - The gap report runs over each currency's actual ranges, not printed ones.
 - T-61's temporary `currency = 'USD'` filter is removed.
@@ -1413,11 +1422,13 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 **Design.**
 - `GET /overview?week=` returns `{ us, ca, combined, fx }`; `us`/`ca` are the existing per-invoice overview body (or `null` when that side is not imported), in the invoice's currency and native units.
-- **CA panel:** spend, diesel, DEF, discount and rates shown **before tax, tax, and with tax** — billed per litre both before and with tax (1.9046 / 2.1522 CAD/L on a 999217 line). Tax = HST + GST + PST + QST, labelled "HST" when only HST is non-zero, "Sales tax" otherwise.
-- **US panel:** unchanged figures; one value each (US tax is inside the pump price).
-- **Combined panel:** USD by default, CAD on request, converted at the CA invoice's entered rate (T-66), with the rate and when it was entered shown — and T-66's exchange-rate field moves here, beside the figures it converts. Spend before HST = US + CA before tax; with HST = US + CA with tax; HST separately. Rates in one unit (the toggle's; USD/gal by default).
+- **CA panel:** in CAD/L as printed. Spend, diesel and DEF shown with tax, with the before-tax + tax split beneath; billed per litre with tax as the headline and before tax under it (2.1522 / 1.9046 CAD/L on a 999217 line); its own receipt compliance and anomaly count. Tax = HST + GST + PST + QST, labelled "HST" when only HST is non-zero, "Sales tax" otherwise.
+- **US panel:** in USD/gal as printed; one value each (US tax is inside the pump price).
+- **Combined panel:** in **CAD/L** — the US side converted at the CA invoice's entered rate (T-66), with the rate and when it was entered shown — and T-66's exchange-rate field moves here, beside the figures it converts. Spend before HST = US + CA before tax; with HST = US + CA with tax; HST separately. Rates per litre. Shown as five tiles (total spend, diesel, DEF, discount, billed price), each figure with HST and its HST amount bottom right; there is no separate breakdown table (it repeated the tiles).
 - **States:** one side missing → combined shows the present side's totals labelled **"Partial — CA invoice not imported"** (or US); rate unavailable → "rate pending" in place of every converted figure, never a 1.0 conversion, with the rate field right there to enter it; `datesDiffer` → a footnote with each invoice's actual range.
 - The "Invoices in view" strip shows both chips highlighted.
+- **US tiles show their CAD/L reading top right** (`usConverted`), so no unit control is needed; "rate pending" until the rate is entered.
+- *(As built.)* The Overview has **no units control** (decided 2026-10-26: dropped for now). It asks `/overview?convertTo=CAD`: each side as printed, the combined panel in CAD and — with no `units` — in its currency's own unit, litres. `/overview` gains `convertTo` for that, and still honours an explicit `units` for every rate and quantity. CA `withTax` is `invoices.grand_total`, `tax` the sum of the grand-total rows' four tax columns, `beforeTax` the difference (Scale and Express print a final amount alone, so they fall before tax). Combined converts only `withTax` and `tax` and derives `beforeTax`, so the split adds up after conversion. Saving the rate re-reads the overview. The trend, top-spend and anomaly panels stay US-scoped.
 
 **Files.** Modified: `backend/src/actuals/overview.ts`, `backend/src/api/routes/overview.ts`, the Overview page and KPI components (T-41), `docs/UI-DATA-CONTRACT.md`.
 
@@ -1425,10 +1436,10 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 **Definition of done.**
 - [ ] For the week ending 2026-09-09 the CA panel's with-tax spend equals 999217's grand total, and before-tax + tax = with-tax exactly.
-- [ ] Combined USD spend = US total + CA total ÷ stored rate, computed in integer cents with one documented rounding point.
+- [ ] Combined CAD spend = CA total + US total × stored rate (and in USD, US total + CA total ÷ rate), computed in integer cents with one documented rounding point.
 - [ ] A week with only a US invoice shows the CA panel as "Not imported" and the combined panel as "Partial".
 - [ ] A CA invoice with no rate shows "rate pending" on every converted figure, and none of them is computed.
-- [ ] The units toggle changes CA's per-litre rates to per-gallon and the combined rates accordingly; money is unchanged.
+- [ ] With no unit control, US reads USD/gal, CA reads CAD/L and the combined panel CAD/L; `?units=` on the API still changes rates and quantities and never money.
 
 ---
 
@@ -1443,7 +1454,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 **Design.**
 - **One rate per CA invoice**, quoted as **CAD per 1 USD** (e.g. `1.3712`), up to 6 dp. CAD → USD divides by it; USD → CAD multiplies. `invoices` gains `fx_cad_per_usd numeric(10,6)` and `fx_entered_at timestamptz`, both nullable and both null on a USD invoice (a CHECK keeps them null there).
 - **Entering it.**
-  - **Overview** (the only screen that enters it, for now): for the selected week's CA invoice, the Overview shows "Exchange rate (CAD per USD)" — the entered rate and when it was entered, or "rate pending" — with a field to enter or correct it. A week with no CA invoice shows no field. The Import screen does not ask for it. T-65 moves the field into the combined panel, beside the figures it converts.
+  - **Overview** (the only screen that enters it, for now): for the selected week's CA invoice, the Overview shows "Exchange rate (CAD per USD)" — the entered rate and when it was entered, or "rate pending" — with a field to enter or correct it. A week with no CA invoice shows no field. The Import screen does not ask for it. T-65 moves the field into the combined panel, beside the figures it converts. *(Superseded by T-68: the rate moves to the US invoice, and the Overview field follows it. T-67 adds a prompt on the Import screen when a US invoice imports.)*
   - **API:** `PATCH /invoices/{id}` accepts `{ fxCadPerUsd }` (a number, or `null` to clear it) alone or beside `billingWeekEnd`. On a USD invoice it is a 400; a value ≤ 0 or outside a sanity band of 0.5–3.0 is a 400 (a typo guard, not a market check). The response is the updated invoice, which carries `fx: { rate, enteredAt }` (`null` until entered) — `fxCadPerUsd` is the request key only, since no response key may contain `Usd` (T-63's key walk covers `/invoices` and `/periods`). `GET /periods` carries the same `fx` on each invoice, so the Overview reads the week's rate without a second call.
   - **CLI:** `npm run import-invoice -- <file> --fx-rate 1.3712` sets it at import; the flag on a USD invoice is an error before anything is written.
 - **Correctable, not frozen.** A rate can be changed later — a mistyped rate must be fixable — and `fx_entered_at` records when it last changed. Nothing converted is ever stored, so a corrected rate re-converts every figure the next time it is read; there is no stale converted copy to repair.
@@ -1462,3 +1473,170 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 - [x] `GET /transactions?convertTo=USD` on 999217's week returns each CAD money field ÷ the entered rate, rounded once to the cent, with `fx` and `invoiceCurrency` on the row; with no rate, money is `null` and `ratePending: true`; a USD row is unchanged; correcting the rate changes the next read and nothing stored.
 - [x] On Transactions, `USD/gal` on the CA invoice shows USD money and the rate line; with no rate, "rate pending" and a link to enter it.
 - [x] The full suite runs with no network.
+
+---
+
+## T-67 · Prompt for the exchange rate when a US invoice is imported
+
+**Priority 67. D27. Amends T-66's "the Import screen does not ask for it" (dispatcher's request, 2026-10-26). Waits on T-68, which moves the rate onto the US invoice.**
+
+**Goal.** When the dispatcher uploads a US invoice on the Import screen, they are asked for that invoice's exchange rate straight away, instead of having to find the field on the Overview later.
+
+**Why.** The rate converts the US figures to CAD and litres (T-68). Without a prompt, a freshly imported US invoice sits at "rate pending" until someone remembers to open the Overview, and every CAD reading of it — the US tiles' corners, the combined panel, converted Transactions rows — reads "rate pending" until then. The person importing the invoice is the one who knows the rate it settled at, at the moment they import it.
+
+**Design.**
+- **When.** After a US invoice (`currency = 'USD'`) imports successfully (`status = 'imported'`) on the Import screen. A CA invoice (it never carries a rate), a quarantined file, and a rejected file show no prompt.
+- **What.** "Exchange rate (CAD per USD) for 🇺🇸 999210", reusing T-66's `ExchangeRateField` (same validation: a plain decimal; the API's 0.5–3.0 band and its 400 reason shown beside the field). Saving goes through the existing `PATCH /invoices/{id}` `{ fxCadPerUsd }` — no new endpoint.
+- **Optional, not blocking.** The import has already committed when the prompt appears; the rate is not required to finish. "Enter later" dismisses the prompt and leaves the invoice at "rate pending", entered or corrected on the Overview as today.
+- **Already has a rate.** An invoice that already carries a rate (e.g. imported with the CLI's `--fx-rate`) shows the prompt pre-filled with it and when it was entered, so it can be confirmed or corrected.
+- **After saving.** The shell's weeks re-read (as the Overview does after a save), so the new rate shows everywhere without a reload. The prompt then shows the saved rate and its time, and links to that week's Overview.
+- **Import history.** A US invoice still at "rate pending" is marked as such in the import history, with the same prompt reachable from its row.
+
+**Files.** Modified: `frontend/src/app/(app)/import/page.tsx` (the prompt after a US import), `frontend/src/components/ImportHistory.tsx` (the "rate pending" mark and the row's prompt), `frontend/src/components/ExchangeRateField.tsx` (if a heading or "Enter later" needs a prop), their tests. No backend change beyond T-68: confirm the upload response carries the invoice's `currency` and `fx`; if not, add them to it.
+
+**Dependencies.** T-42, T-68.
+
+**Definition of done.**
+- [ ] Importing a US invoice on the Import screen shows the exchange-rate prompt for that invoice; importing a CA invoice, or a file that quarantines or is rejected, does not.
+- [ ] Entering 1.3712 in the prompt PATCHes that invoice; the prompt then shows the rate and when it was entered, and the Overview for that week shows the same rate without a reload.
+- [ ] "Enter later" leaves the invoice at "rate pending" with nothing PATCHed; the Overview's field still enters it.
+- [ ] A US invoice imported with a rate already set shows the prompt pre-filled with it.
+- [ ] A 400 (outside 0.5–3.0) shows its reason beside the field and keeps what was typed.
+- [ ] The import history marks a US invoice with no rate as "rate pending" and offers the prompt from its row.
+
+---
+
+## T-68 · Move the exchange rate from the CA invoice to the US invoice
+
+**Priority 68. D27 (amended). Decided 2026-10-26 by the dispatcher; not started.** On build, record it as a D-number in PROJECT-SCOPE-v2 §A15 and amend D27 and T-66.
+
+**Decision.** The CA invoice stays in CAD and litres, as BVD printed it; the **US** invoice is the one that gets converted — to CAD and litres — so the exchange rate **comes with the US file** and is stored **on the US invoice**. One US invoice per billing week (D26) makes it a rate per week, so no per-day rate is needed (the "per day" option is dropped). The rate is **CAD per 1 USD**, as in T-66.
+
+**Why the change.** T-66 put the rate on the CA invoice because it converted CAD → USD. The screens now read the whole week in CAD/L (T-65): the US side is the one converted, so the rate belongs to it. It also fixes two gaps: a week with a US invoice and no CA one can now be given a rate (it had nowhere to live), and a CA-only week needs none, since nothing in it is converted.
+
+**Design.**
+- **Schema.** `invoices.fx_cad_per_usd` / `fx_entered_at` stay, but the CHECK flips: only a **USD** invoice may carry them; both are null on a CAD invoice. Edited in place in `0003_actuals_schema.sql`, `synthetic` and `real` (D21 — pre-deploy). Any rate already entered on a CA invoice is dropped by the reset and re-entered on the US invoice.
+- **Lookup.** The week's rate is its **US invoice's**: `loadStoredFx` reads the US invoice of the billing week, for both directions. A CA-only week has no rate, so converting it to USD (`/transactions?convertTo=USD`) is "rate pending" with nothing to enter it on — an accepted edge, since nothing on screen asks for it.
+- **API.** `PATCH /invoices/{id}` `{ fxCadPerUsd }` is a 400 on a **CAD** invoice and accepted on a USD one (the band, the 6 dp, and "`null` clears it" are unchanged). `GET /periods` carries `fx` on the US invoice, so a week's rate is read without a second call. `import-invoice --fx-rate` is an error on a CA invoice and sets the rate on a US one.
+- **Overview.** `usConverted` and the combined panel read the US invoice's rate. A week with no US invoice shows no rate field and no "rate pending" (there is nothing to convert). The rate field sits where it converts: the combined header, as now, but keyed on the US invoice.
+- **Combined panel.** In CAD/L, the US side converted at the rate, plus the CA side as printed. A **CA-only** week is the CA invoice alone and needs no rate; a **US-only** week is the US invoice converted at its own rate.
+- **Transactions.** `?convertTo=CAD` on a USD row multiplies by the rate on that row's own invoice; `?convertTo=USD` on a CAD row divides by the week's US invoice rate.
+- **Frontend.** `ExchangeRateField` takes the US invoice; the "rate pending" line says "enter the rate for 🇺🇸 999210". T-67's prompt follows the US upload.
+
+**Files.** `migrations/{synthetic,real}/0003_actuals_schema.sql`; `backend/src/actuals/{overview,transactions,units}.ts` (`loadStoredFx`, `combine`, `convertUs`); `backend/src/api/routes/{invoices,periods}.ts`; `backend/src/invoice/importInvoice.ts` and the import CLI (`--fx-rate`); `frontend/src/components/ExchangeRateField.tsx`; the Overview page; `docs/UI-DATA-CONTRACT.md`; `PROJECT-SCOPE-v2.md` D27; `TICKETS-v2.md` T-66 and T-67.
+
+**Dependencies.** T-66. T-65 builds on the rate's current home and must be re-pointed by this ticket (or this ticket folds into T-65 if it lands before merge). T-67 waits on this.
+
+**Definition of done.**
+- [ ] `PATCH /invoices/{id}` `{ fxCadPerUsd: 1.3712 }` on a **US** invoice stores it with `fx_entered_at`; a second `PATCH` corrects it; `null` clears it; on a **CA** invoice, ≤ 0, or outside 0.5–3.0 it is a 400 and nothing changes. The migration's CHECK refuses a rate on a CAD invoice.
+- [ ] `--fx-rate` sets the rate on a US invoice at import; on a CA invoice it fails before any write.
+- [ ] The Overview shows the week's rate (or "rate pending") from the US invoice and enters and corrects it there; a week with no US invoice shows no field.
+- [ ] A **US-only** week converts: `usConverted` and the combined panel carry CAD/L figures once the rate is entered, and read "rate pending" until then. A **CA-only** week's combined panel equals the CA invoice and needs no rate.
+- [ ] Combined CAD spend = CA total + round(US total × rate), in integer cents, one rounding point (as T-65).
+- [ ] `GET /transactions?convertTo=CAD` on a USD row multiplies by its invoice's rate; `convertTo=USD` on a CAD row divides by the week's US rate; with no rate, money is `null` and `ratePending: true`.
+- [ ] No figure is converted at another week's rate — a test enters two different rates on two weeks' US invoices.
+- [ ] Nothing converted is stored; correcting the rate re-converts on the next read. The full suite runs with no network.
+
+---
+
+## T-69 · Overview redesign — design sign-off (before T-70…T-74)
+
+**Priority 69. Done.** The design came back from Claude Design as `design_handoff_overview_redesign` (a README, a reference board, a nine-state canvas and `reference-banner.png`). The HTML files are references only; nothing from them ships.
+
+**Goal.** Settle how the Overview looks with a time scope and the two reworked charts, then amend T-70 to T-74 to match.
+
+**Answers to the open questions** (all recorded in the hand-off README, which is the spec for the screen's look and copy):
+1. **Currency of the stacked columns** — both segments in CAD, the US segment converted at each week's own rate. With no rate anywhere the sides are not stacked: a `US · USD | Canada · CAD` toggle shows each in its own currency. With some rates, the US segment covers only the weeks that have one, and the subtitle says so.
+2. **Range picker** — a `from` and a `to` week dropdown; a reversed range is normalised. Choosing Range starts on the last four weeks; Billing week starts on the latest.
+3. **A week with no rate inside a range** — converted figures cover the weeks that have one; an amber notice names the missing weeks.
+4. **Invoices in view** — one summary chip (`All invoices · 28  14 US · 14 CA`) with a Show all / Hide list button for a range or all time; two chips for one week.
+5. **A single week's trend** — no chart; the week's price as a headline, `±x% vs week of …` against the week before, and a quiet "Pick a range of 4 or more weeks" line. With fewer than four weeks in the whole dataset, four progress ticks and "1 of 4 weeks imported".
+
+**Definition of done.**
+- [x] The hand-off covers the nine states (1a–1i), at 1600px and 390px.
+- [x] The open questions are answered and recorded.
+- [x] T-70 to T-74 are amended to what was built (below), and the gaps are named.
+
+---
+
+## T-70 · Overview over a range of billing weeks — data layer
+
+**Priority 70. Built — not yet merged.** Departs from the plan, which put `?from=&to=&scope=` on `GET /overview`. As built, the server serves facts and the client adds them up, so a week, a range and all time are one function and cannot disagree.
+
+**As built.**
+- **`GET /overview/weeks`** (`backend/src/actuals/overviewWeeks.ts`) returns every imported billing week, ascending: `{ weekEnd, start, end, fx, us, ca, drivers }`. Each side is as BVD printed it (US in USD and gallons, CA in CAD with HST and litres) or `null` for a week with no imported invoice. `invoice` is the printed number. `stops` is the invoice's fuel-stop count. `drivers` folds both sides into one row per driver (an unassigned stop is the `null` driver) with spend, quantity and diesel dollars per side, so an average billed price is exact. No cap at ten. `GET /overview?week=` is unchanged.
+- **One aggregation** (`frontend/src/lib/overviewAggregate.ts`, pure, unit-tested) over any list of weeks. Money and quantities are sums. Prices are Σ$ / Σqty, never a mean of weekly prices. A week with no fuel is `null`, never 0. Receipts are Σconfirmed / Σexpected, and a total of none expected is `null` ("—"), not 0%. CAD equivalents and the combined band use only weeks that have a rate, each at its own rate, litres = gallons × 3.78541, and the rate shown is the mean of the covered weeks' rates (display only). No rate is never a 1.0 rate.
+- **Scope** (`overviewScope.ts`): `?scope=all`, `?scope=week&w=`, `?scope=range&from=&to=`; the Overview opens on all time.
+
+**Not done, named.**
+- **The rate still lives on the CA invoice** (T-66; T-68 not started), so a week with a US invoice and no CA one has no rate and is left out of every converted figure. The hand-off's rule "combined uses only weeks that have a rate" also excludes a CA-only week with no rate, where T-68 says it needs none. T-68 changes `loadStoredFx` in one place; the aggregation does not change.
+- `combined.topSpendByDriver` is computed in the client, not returned by the API.
+
+**Tests.** `overviewAggregate.test.ts`, `overviewScope.test.ts`, `overviewView.test.ts` (all nine states against fixtures, today's real week with no NaN), and `backend/test/integration/overviewWeeks.test.ts`.
+
+---
+
+## T-71 · Overview scope control
+
+**Priority 71. Built — not yet merged.**
+
+**As built.** A shared `PageBanner` on the Overview carries the title, the segmented control (`All time` | `Billing week ▾` | `Range ▾`) with inline pickers, a readout (`All time · 14 weeks · Aug 4 – Nov 9`) and, right-aligned, the rate meta and an `Edit rates` link. It replaces the shell's week selector on this screen only. The scope lives in the URL. Below it: the "Invoices in view" strip, the amber FX notice, the US and Canada region cards (two big tiles, six small; Other charges folds into the Total spend sub-line and Stops takes its slot), and the combined band. An absent side keeps its card with a dashed "No Canadian invoice for …" box.
+
+`Edit rates` and "Enter exchange rates →" open a panel with one `ExchangeRateField` per week in scope, on the week's CA invoice (T-66). A saved rate re-reads the page.
+
+**Files.** `app/(app)/overview/page.tsx`, `components/{PageBanner,SegmentedControl,SubStrip,ScopeControl}.tsx`, `components/overview/*`, `hooks/{useOverviewWeeks,useOverviewScope}.ts`, `lib/overviewView.ts`, `banner.css`, `overview.css`. Retired: `CaPanel`, `SidePanel`, `BilledPriceTrend`, `TopSpendByDriver`, `AnomalyDigest`. `CombinedPanel` and `KpiCard` are no longer used by any screen and can be deleted.
+
+**Phone.** Under 640px the shell's sidebar collapses to a scrolling strip, region tiles go to two columns, and the driver chart is horizontal bars.
+
+---
+
+## T-72 · Billed price trend — US and Canada charts, scope-aware
+
+**Priority 72. Built — not yet merged.**
+
+**As built.** Two cards, one per side, in their own unit and axis. With four or more weeks in scope: a headline (the latest non-null point), the change since the first non-null point, and a 640×190 line chart — four gridlines, the y range padded by 25 % (at least 0.02), one point per week, the latest point filled. A week with no fuel breaks the line and reads `no fuel`. Every week is labelled on a desktop; a phone labels the first and last. Under four weeks: no chart, the scoped price as the headline, `±x% vs week of …` for a single week with a prior one, and a quiet line. With fewer than four weeks imported in all (today): four progress ticks and "1 of 4 weeks imported. The trend line appears once 4 weeks are in." A side with no fuel in scope says so.
+
+The 8-week cap is gone: the series is every week in scope, from the one `GET /overview/weeks` call. The `trend` arrays on `GET /overview` are untouched and no longer read.
+
+---
+
+## T-73 · Top spend by driver — stacked columns, US and Canada
+
+**Priority 73. Built — not yet merged.**
+
+**As built.** Stacked columns (a phone gets horizontal bars): the US segment navy at the bottom, converted to CAD at each covered week's own rate, Canada cyan on top. The top ten by US spend, then `All other drivers` (only when there are others), with a nice-step axis. A hovered segment gets a 2px outline in the other colour and a tooltip with spend in both currencies, quantity in gallons or litres, and the exact average billed price. A driver with no Canadian fuel has only the navy segment; one with no US fuel sorts last. With no rate anywhere and both sides present, an amber note and a `US · USD | Canada · CAD` toggle replace the stack; the Canada view leaves out drivers with no Canadian spend. With some rates, the subtitle says how many weeks the US segments cover.
+
+Sorted by raw US spend as the hand-off's logic does, so with partial rates the order can differ from the converted heights. On real data with many drivers the `All other drivers` column is the tallest, which is what "top ten, then the rest" produces.
+
+---
+
+## T-74 · Overview links carry the scope
+
+**Priority 74. Built — not yet merged.**
+
+**As built.** The Anomalies tiles link to `/transactions?scope=…&currency=USD|CAD&anomalyOnly=true`, with the Overview's own scope keys. A single week is the same link in the new shape. `GET /transactions` gains `weekFrom` and `weekTo` (inclusive billing week ends; either alone is open-ended; with `week`, or `weekFrom` after `weekTo`, a 400). Transactions reads the scope from the URL and, with none, keeps the shell's week as before. It gets the same scope control in its banner, and the "Invoices in view" strip becomes side chips (`currency=`): one week shows its invoices and a dashed chip for a missing side; a range or all time counts each side. An old `?invoice=<id>` link still means that invoice's side. The "rate pending" link goes to `/overview?scope=week&w=`.
+
+**Known gaps.** The per-row invoice tag shows only for one week with both sides. The filter dropdown options read from the scope's last week. `pageSize` is still capped at 200 rows.
+
+**Tests.** `transactionsScope.test.ts`, `transactionQuery.test.ts`, `backend/test/integration/transactionsWeekRange.test.ts`, and the Transactions and Overview page tests.
+
+---
+
+## T-75 · Banner rollout — `PageBanner` on every screen
+
+**Priority 75. Built — not yet merged.** New with this redesign.
+
+**Goal.** One page-header style across the app: a cyan hairline over a white band with the title, the page's controls, a readout and a right-hand meta line; a sub-strip under it for chips; segmented controls with square corners.
+
+**As built.**
+- `PageBanner({ title, controls, readout, meta })`, `SegmentedControl`, `SubStrip` / `StripChip` / `CodeBadge` / `GhostButton`.
+- **Overview, Transactions, Plan vs Actual**: the scope control and readout. Transactions' meta carries the standing Receipts and Flags counts, shared from the shell through a context rather than fetched twice.
+- **Import**: meta `Last import · <date>`; a strip with the quarantined count.
+- **Plans**: a segmented `All | Draft | Sent` filter on whether a plan has gone to the driver (the hand-off names Draft and Sent only; `All` is added so the full list is reachable). **New Plan**: the title and the old one-line subtitle as the readout; the hand-off's Draft | Sent switch is not shown there, since it would duplicate the existing "Sent to driver" checkbox.
+- **Every other screen** (still "later"): `TopBar` draws a default `PageBanner`, with the billing-week selector and the legacy strip where it had them. `TopBar` draws nothing over a screen that has its own banner.
+- **Plan vs Actual** is still a stub (T-46); its banner and scope control are in place.
+
+**Definition of done.**
+- [x] Every screen's header is a `PageBanner`.
+- [x] The strip and the segmented control are used by Overview, Transactions, Import and Plans.
+- [ ] A visual pass on Plan vs Actual once T-46 lands.

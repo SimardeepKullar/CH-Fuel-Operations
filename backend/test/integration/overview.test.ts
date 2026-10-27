@@ -67,21 +67,21 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
   it("matches A5's untouched figures exactly: total, diesel, DEF, scale, express, fee", async () => {
     const result = await getOverview(scopedPool, "2026-09-09");
 
-    expect(result.kpis.invoiceId).not.toBeNull();
-    expect(result.kpis.total).toEqual({ amount: 50929.71, currency: "USD" });
-    expect(result.kpis.diesel).toEqual({ qty: 8733.11, amount: 48450.68, currency: "USD" });
-    expect(result.kpis.def).toEqual({ qty: 174.43, amount: 845.4, currency: "USD" });
-    expect(result.kpis.otherCharges.scale).toBe(90.5);
-    expect(result.kpis.otherCharges.express).toBe(1543.13);
-    expect(result.kpis.otherCharges.expressFee).toBe(18);
+    expect(result.us!.kpis.invoiceId).not.toBeNull();
+    expect(result.us!.kpis.total).toEqual({ amount: 50929.71, currency: "USD" });
+    expect(result.us!.kpis.diesel).toMatchObject({ qty: 8733.11, amount: 48450.68, currency: "USD" });
+    expect(result.us!.kpis.def).toMatchObject({ qty: 174.43, amount: 845.4, currency: "USD" });
+    expect(result.us!.kpis.otherCharges.scale).toBe(90.5);
+    expect(result.us!.kpis.otherCharges.express).toBe(1543.13);
+    expect(result.us!.kpis.otherCharges.expressFee).toBe(18);
     // Other charges combines scale + express for the single KPI card (A8.1)
     // while still surfacing each separately (Step 33.1's own DoD).
-    expect(result.kpis.otherCharges.total).toBe(1633.63);
+    expect(result.us!.kpis.otherCharges.total).toBe(1633.63);
   });
 
   it("average billed price is gallons-weighted and rounds to A5's $5.55/gal", async () => {
     const result = await getOverview(scopedPool, "2026-09-09");
-    expect(Math.round(result.kpis.avgBilledPerUnit! * 100) / 100).toBe(5.55);
+    expect(Math.round(result.us!.kpis.avgBilledPerUnit! * 100) / 100).toBe(5.55);
   });
 
   it("the weighted average diverges from a naive mean of per-line prices, proving the weighting", async () => {
@@ -90,7 +90,7 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
       "SELECT AVG(billed_per_unit) AS avg FROM fuel_stop_lines WHERE product_code = 'TA'",
     );
     const unweightedMean = Number(rows[0]!.avg);
-    expect(result.kpis.avgBilledPerUnit).not.toBeCloseTo(unweightedMean, 2);
+    expect(result.us!.kpis.avgBilledPerUnit).not.toBeCloseTo(unweightedMean, 2);
   });
 
   /**
@@ -104,20 +104,20 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
    */
   it("discount matches A5's printed $5,088.61 exactly, read from invoice_totals not recomputed", async () => {
     const result = await getOverview(scopedPool, "2026-09-09");
-    expect(result.kpis.discount.total).toBe(5088.61);
-    expect(Math.round(result.kpis.discount.avgPerUnit! * 100) / 100).toBe(0.58);
+    expect(result.us!.kpis.discount.total).toBe(5088.61);
+    expect(Math.round(result.us!.kpis.discount.avgPerUnit! * 100) / 100).toBe(0.58);
   });
 
   it("receipt compliance and anomaly count reflect the database, not A5's pre-T-30/T-35 figures", async () => {
     const result = await getOverview(scopedPool, "2026-09-09");
-    expect(result.kpis.receiptCompliance).toEqual({ confirmed: 0, total: 66 });
+    expect(result.us!.kpis.receiptCompliance).toEqual({ confirmed: 0, total: 66 });
     // 12, not 84 — 0005's driver/truck pairing now comes from the real
     // invoice instead of a guess, so the false-positive unit_mismatch
     // findings the old pairing produced are gone (invoice999210.test.ts);
     // T-40A retired the def_ratio rule, dropping the count from 26 to 13;
     // and T-40F narrowed sub_gallon to diesel only, dropping this
     // invoice's one sub-gallon DEF line from 13 to 12.
-    expect(result.kpis.anomaliesFlagged).toBe(12);
+    expect(result.us!.kpis.anomaliesFlagged).toBe(12);
   });
 
   it("a period with no matching invoice returns a well-formed empty payload over HTTP, not an error", async () => {
@@ -125,9 +125,8 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
     const response = await app.handle(new Request("http://localhost/api/v1/overview?week=2020-01-01"));
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { kpis: { invoiceId: string | null; total: { amount: number } } };
-    expect(body.kpis.invoiceId).toBeNull();
-    expect(body.kpis.total.amount).toBe(0);
+    const body = (await response.json()) as { us: unknown; ca: unknown; combined: unknown; fx: unknown };
+    expect(body).toEqual({ us: null, usConverted: null, ca: null, combined: null, fx: null });
   });
 
   it("GET /overview over HTTP serves the whole screen in one call", async () => {
@@ -137,15 +136,14 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json");
     const body = (await response.json()) as {
-      kpis: { invoiceId: string };
-      trend: unknown[];
-      topSpendByDriver: unknown[];
-      anomalyDigest: unknown[];
+      us: { kpis: { invoiceId: string }; trend: unknown[]; topSpendByDriver: unknown[]; anomalyDigest: unknown[] };
+      ca: unknown;
     };
-    expect(body.kpis.invoiceId).toBeTruthy();
-    expect(Array.isArray(body.trend)).toBe(true);
-    expect(body.topSpendByDriver.length).toBeGreaterThan(0);
-    expect(body.anomalyDigest.length).toBeGreaterThan(0);
+    expect(body.us.kpis.invoiceId).toBeTruthy();
+    expect(body.ca).toBeNull();
+    expect(Array.isArray(body.us.trend)).toBe(true);
+    expect(body.us.topSpendByDriver.length).toBeGreaterThan(0);
+    expect(body.us.anomalyDigest.length).toBeGreaterThan(0);
   });
 
   it("a missing period query param is a 400 problem+json, not a crash", async () => {
@@ -288,8 +286,8 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
 
     const result = await getOverview(scopedPool, "2026-02-02", { trendPeriods: 5 });
 
-    expect(result.trend.map((t) => t.week)).toEqual(["2026-01-05", "2026-01-19", "2026-02-02"]);
-    expect(result.trend.map((t) => t.avgBilledPerUnit)).toEqual([5, 5.2, 5.4]);
+    expect(result.us!.trend.map((t) => t.week)).toEqual(["2026-01-05", "2026-01-19", "2026-02-02"]);
+    expect(result.us!.trend.map((t) => t.avgBilledPerUnit)).toEqual([5, 5.2, 5.4]);
   });
 
   it("trend respects the trailing-window limit", async () => {
@@ -298,7 +296,7 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
     await createPeriod("2026-01-19", [{ driverName: "C", cardNumber: "L3", gallons: 100, retail: 6, billed: 5.2 }]);
 
     const result = await getOverview(scopedPool, "2026-01-19", { trendPeriods: 2 });
-    expect(result.trend.map((t) => t.week)).toEqual(["2026-01-12", "2026-01-19"]);
+    expect(result.us!.trend.map((t) => t.week)).toEqual(["2026-01-12", "2026-01-19"]);
   });
 
   it("top spend by driver is ordered by spend and gallons-weighted, not a mean of prices", async () => {
@@ -311,11 +309,11 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
 
     const result = await getOverview(scopedPool, "2026-03-02");
 
-    expect(result.topSpendByDriver[0]!.driverName).toBe("Big Spender");
-    expect(result.topSpendByDriver[0]!.total).toBeGreaterThan(result.topSpendByDriver[1]!.total);
+    expect(result.us!.topSpendByDriver[0]!.driverName).toBe("Big Spender");
+    expect(result.us!.topSpendByDriver[0]!.total).toBeGreaterThan(result.us!.topSpendByDriver[1]!.total);
 
     // weighted: (100*5 + 50*6) / 150 = 5.3333..., not the naive mean (5+6)/2 = 5.5
-    const bigSpender = result.topSpendByDriver.find((d) => d.driverName === "Big Spender")!;
+    const bigSpender = result.us!.topSpendByDriver.find((d) => d.driverName === "Big Spender")!;
     expect(bigSpender.qty).toBe(150);
     expect(bigSpender.avgBilledPerUnit).toBeCloseTo(5.3333, 3);
     expect(bigSpender.avgBilledPerUnit).not.toBeCloseTo(5.5, 3);
@@ -339,10 +337,10 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
     const result = await getOverview(scopedPool, "2026-03-22");
 
     // 100 × 5.00 + 3 × 4.00 = 512.00 — the stop's printed total, not 1,024.00.
-    expect(result.topSpendByDriver).toHaveLength(1);
-    expect(result.topSpendByDriver[0]!.total).toBe(512);
-    expect(result.topSpendByDriver[0]!.qty).toBe(100);
-    expect(result.topSpendByDriver[0]!.avgBilledPerUnit).toBe(5);
+    expect(result.us!.topSpendByDriver).toHaveLength(1);
+    expect(result.us!.topSpendByDriver[0]!.total).toBe(512);
+    expect(result.us!.topSpendByDriver[0]!.qty).toBe(100);
+    expect(result.us!.topSpendByDriver[0]!.avgBilledPerUnit).toBe(5);
   });
 
   it("the anomaly digest carries the fuel stop id, enough to deep-link into Transactions", async () => {
@@ -360,15 +358,15 @@ describe.skipIf(!hasDatabase)("GET /overview synthetic periods (integration)", (
 
     const result = await getOverview(scopedPool, "2026-04-06");
 
-    expect(result.anomalyDigest).toHaveLength(1);
-    expect(result.anomalyDigest[0]!.fuelStopId).toBe(stopId);
-    expect(result.anomalyDigest[0]!.rule).toBe("sub_gallon");
-    expect(result.anomalyDigest[0]!.severity).toBe("red");
+    expect(result.us!.anomalyDigest).toHaveLength(1);
+    expect(result.us!.anomalyDigest[0]!.fuelStopId).toBe(stopId);
+    expect(result.us!.anomalyDigest[0]!.rule).toBe("sub_gallon");
+    expect(result.us!.anomalyDigest[0]!.severity).toBe("red");
 
     // Deep-linkable: the id really resolves to a fuel stop in this invoice.
     const { rows } = await scopedPool.query<{ count: string }>(
       "SELECT count(*) FROM fuel_stops WHERE id = $1",
-      [result.anomalyDigest[0]!.fuelStopId],
+      [result.us!.anomalyDigest[0]!.fuelStopId],
     );
     expect(rows[0]!.count).toBe("1");
   });

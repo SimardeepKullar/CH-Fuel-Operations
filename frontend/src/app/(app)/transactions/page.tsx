@@ -4,8 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import { listTransactions } from "../../../lib/api";
 import type { InvoiceCurrency } from "@ch/core/db/types";
-import { useInvoiceInView } from "../../../hooks/useInvoiceInView";
-import { useWeek } from "../../../hooks/useWeek";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePublishInView, useWeek } from "../../../hooks/useWeek";
+import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
+import { INVOICE_PARAM, actualRange, formatDay } from "../../../lib/weeks";
+import { writeScope, weekEndsInScope, type Scope } from "../../../lib/overviewScope";
+import { rangeLabel, scopeReadout } from "../../../lib/overviewView";
+import { anchorWeek, resolveSide, scopeQuery, transactionsScope, type SideChoice } from "../../../lib/transactionsScope";
+import PageBanner from "../../../components/PageBanner";
+import ScopeControl from "../../../components/ScopeControl";
+import TransactionsStrip from "../../../components/TransactionsStrip";
 import { choiceCurrency, choiceUnit, conversionParams, nativeChoice, type DisplayChoice } from "../../../lib/conversion";
 import ConversionToggle from "../../../components/ConversionToggle";
 import { useTransactionFilterOptions } from "../../../hooks/useTransactionFilterOptions";
@@ -37,17 +45,55 @@ function matchesSearch(row: TransactionListItem, query: string): boolean {
 }
 
 export default function TransactionsPage() {
-  const { week: period, loading: periodLoading, weekEntry } = useWeek();
-  // One invoice picked from the strip, or all of the week's; the same selection
-  // the strip highlights and the request below asks for (D28).
-  const selection = useInvoiceInView();
-  const selectionKey = selection.kind === "one" ? selection.invoice.id : selection.kind;
-  // `undefined` serves both sides; one invoice is one side, since a week holds
-  // at most one imported invoice per currency (D26).
-  const currency: InvoiceCurrency | undefined = selection.kind === "one" ? selection.invoice.currency : undefined;
+  const { weeks: periods, week: shellWeek, loading: periodLoading } = useWeek();
+  const { receipts, flags } = useStandingCountsValue();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  // The conversion belongs to the invoice it was chosen on: picking another
-  // invoice (or All) shows that one as it came in again.
+  // The scope is the Overview's, kept in the same URL keys (T-74); with none, the shell's week.
+  const weekEnds = useMemo(() => periods.map((w) => w.weekEnd).reverse(), [periods]);
+  const scope = transactionsScope(searchParams, weekEnds, shellWeek);
+  const period = anchorWeek(scope, weekEnds);
+  const inScopeEnds = new Set(weekEndsInScope(scope, weekEnds));
+  const inScope = periods.filter((w) => inScopeEnds.has(w.weekEnd));
+  const weekEntry = scope.mode === "week" ? (inScope[0] ?? null) : null;
+
+  // One side, picked on the strip (or by a link), or both. A week holds at most one imported
+  // invoice per currency (D26), so a side is an invoice there.
+  const side: SideChoice = resolveSide(scope, searchParams.get("currency"), searchParams.get(INVOICE_PARAM), periods);
+  const currency: InvoiceCurrency | undefined = side === "all" ? undefined : side;
+  const selectionKey = side;
+  usePublishInView(null);
+
+  const setScope = (next: Scope) => {
+    const params = new URLSearchParams(searchParams.toString());
+    writeScope(params, next);
+    params.delete(INVOICE_PARAM);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+  const setSide = (next: SideChoice) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("currency", next);
+    params.delete(INVOICE_PARAM);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+  const scopeWeeks = useMemo(
+    () =>
+      [...periods].reverse().map((w) => {
+        const dates = w.invoices.map(actualRange);
+        const start = dates.map((d) => d.start).sort()[0] ?? w.weekEnd;
+        const end = dates.map((d) => d.end).sort().at(-1) ?? w.weekEnd;
+        return { weekEnd: w.weekEnd, label: rangeLabel(start, end), start, end };
+      }),
+    [periods],
+  );
+  const covered = scopeWeeks.filter((w) => inScopeEnds.has(w.weekEnd));
+  const readout =
+    covered.length === 0
+      ? undefined
+      : scopeReadout(scope, covered.length, covered.length === 1 ? covered[0]!.label : `${formatDay(covered[0]!.start)} – ${formatDay(covered.at(-1)!.end)}`);
+
   const [pick, setPick] = useState<{ key: string; choice: DisplayChoice } | null>(null);
   // Forget it on leaving, too, so coming back to an invoice shows it as it came in.
   const [lastKey, setLastKey] = useState(selectionKey);
@@ -66,6 +112,7 @@ export default function TransactionsPage() {
     () => Object.fromEntries((weekEntry?.invoices ?? []).map((invoice) => [invoice.currency, invoice.invoiceNumber])),
     [weekEntry],
   ) as Partial<Record<InvoiceCurrency, string>>;
+  const request = scopeQuery(scope);
   const { filters, setFilter, clearFilters } = useTransactionFilters();
   const filterOptions = useTransactionFilterOptions(period, currency ?? null);
 
@@ -85,7 +132,7 @@ export default function TransactionsPage() {
     setLoading(true);
     setError(null);
     listTransactions({
-      week: period,
+      ...request,
       currency,
       units,
       convertTo,
@@ -116,6 +163,10 @@ export default function TransactionsPage() {
   }, [
     period,
     periodLoading,
+    scope.mode,
+    request.week,
+    request.weekFrom,
+    request.weekTo,
     currency,
     units,
     convertTo,
@@ -131,28 +182,42 @@ export default function TransactionsPage() {
   const searched = useMemo(() => rows.filter((row) => matchesSearch(row, filters.q)), [rows, filters.q]);
 
   return (
-    <div className="tx-page">
-      <div className="tx-side-bar">
-        <ConversionToggle shown={shown} onChange={(choice) => setPick({ key: selectionKey, choice })} />
+    <>
+        <PageBanner
+          title="Transactions"
+          controls={<ScopeControl scope={scope} weeks={scopeWeeks} onChange={setScope} />}
+          readout={readout}
+          meta={
+            <span className="pb-standing" data-testid="standing-counts">
+              Receipts <b>{receipts ? `${receipts.done}/${receipts.total}` : "—"}</b>
+              Flags <b className="pb-flags">{flags ?? "—"}</b>
+            </span>
+          }
+        />
+      <div className="tx-page">
+        <TransactionsStrip scope={scope} weeks={periods} inScope={inScope} side={side} onSide={setSide} />
+        <div className="tx-side-bar">
+          <ConversionToggle shown={shown} onChange={(choice) => setPick({ key: selectionKey, choice })} />
+        </div>
+        <TransactionsTable
+          rows={searched}
+          totalBeforeSearch={rows.length}
+          loading={loading}
+          error={error}
+          invoiceNumbers={invoiceNumbers}
+          showInvoice={scope.mode === "week" && side === "all"}
+          week={period}
+          currency={shown === null ? "USD" : choiceCurrency(shown)}
+          qtyUnit={shown === null ? "gal" : choiceUnit(shown)}
+          filters={filters}
+          setFilter={setFilter}
+          clearFilters={clearFilters}
+          driverOptions={filterOptions.drivers}
+          truckOptions={filterOptions.trucks}
+          cardOptions={filterOptions.cards}
+          stateOptions={filterOptions.states}
+        />
       </div>
-      <TransactionsTable
-        rows={searched}
-        totalBeforeSearch={rows.length}
-        loading={loading}
-        error={error}
-        invoiceNumbers={invoiceNumbers}
-        showInvoice={selection.kind === "all"}
-        week={period}
-        currency={shown === null ? "USD" : choiceCurrency(shown)}
-        qtyUnit={shown === null ? "gal" : choiceUnit(shown)}
-        filters={filters}
-        setFilter={setFilter}
-        clearFilters={clearFilters}
-        driverOptions={filterOptions.drivers}
-        truckOptions={filterOptions.trucks}
-        cardOptions={filterOptions.cards}
-        stateOptions={filterOptions.states}
-      />
-    </div>
+    </>
   );
 }

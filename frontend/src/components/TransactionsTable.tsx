@@ -634,7 +634,7 @@ export default function TransactionsTable({
             <span className="tx-conversion-pending" data-testid="conversion-pending">
               {" "}
               rate pending —{" "}
-              <Link href={week === null ? "/overview" : `/overview?week=${encodeURIComponent(week)}`} data-testid="enter-rate-link">
+              <Link href={week === null ? "/overview" : `/overview?scope=week&w=${encodeURIComponent(week)}`} data-testid="enter-rate-link">
                 enter the exchange rate on the Overview
               </Link>
               .

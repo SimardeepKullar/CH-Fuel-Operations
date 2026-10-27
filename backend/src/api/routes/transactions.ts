@@ -24,6 +24,9 @@ const querySchema = z.object({
   /** Optional here, unlike every other period-scoped route: a driver's or a
    * truck's transaction history (A13) spans weeks. Malformed is still a 400. */
   week: isoDateSchema.optional(),
+  /** T-74: an inclusive range of billing week ends, the Overview's range and all-time scopes. */
+  weekFrom: isoDateSchema.optional(),
+  weekTo: isoDateSchema.optional(),
   currency: currencySchema.optional(),
   units: unitsSchema.optional(),
   /** T-66: money in this currency, at the entered rate; absent, each row's own. */
@@ -36,7 +39,13 @@ const querySchema = z.object({
   state: z.string().optional(),
   product: z.string().optional(),
   receiptStatus: z.enum(RECEIPT_STATUSES).optional(),
-});
+})
+  .refine((q) => q.week === undefined || (q.weekFrom === undefined && q.weekTo === undefined), {
+    message: "week cannot be combined with weekFrom or weekTo",
+  })
+  .refine((q) => q.weekFrom === undefined || q.weekTo === undefined || q.weekFrom <= q.weekTo, {
+    message: "weekFrom must not be after weekTo",
+  });
 
 /**
  * `URLSearchParams` gives every value back as a string, so `true`/`false`
@@ -52,6 +61,8 @@ function parseQueryParams(searchParams: URLSearchParams): z.infer<typeof querySc
     "sortField",
     "sortDirection",
     "week",
+    "weekFrom",
+    "weekTo",
     "currency",
     "units",
     "convertTo",
@@ -105,6 +116,8 @@ export async function handleListTransactions(pool: Pool, url: URL): Promise<Resp
     dateFrom: query.dateFrom,
     dateTo: query.dateTo,
     week: query.week,
+    weekFrom: query.weekFrom,
+    weekTo: query.weekTo,
     currency: query.currency,
     driverId: query.driverId,
     truckId: query.truckId,

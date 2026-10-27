@@ -154,17 +154,16 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
   describe("no US screen shows a CA figure (T-61, kept by T-63)", () => {
     const app = () => createApp({ authRequired: false, pool });
 
-    it("/overview for the CA invoice's week serves the US side only: no US invoice, no spend, no trend point", async () => {
+    it("/overview for a CA-only week: no US side, the CA side's own figures, a partial combined panel", async () => {
       await importCa();
       const response = await app().handle(new Request("http://localhost/api/v1/overview?week=2026-09-09"));
       expect(response.status).toBe(200);
       const body = (await response.json()) as OverviewResult;
-      expect(body.currency).toBe("USD");
-      expect(body.kpis.invoiceId).toBeNull();
-      expect(body.kpis.total.amount).toBe(0);
-      expect(body.trend).toEqual([]);
-      expect(body.topSpendByDriver).toEqual([]);
-      expect(body.anomalyDigest).toEqual([]);
+      expect(body.us).toBeNull();
+      expect(body.ca!.currency).toBe("CAD");
+      expect(body.ca!.qtyUnit).toBe("L");
+      expect(body.ca!.trend.map((p) => p.week)).toEqual(["2026-09-09"]);
+      expect(body.combined).toMatchObject({ partial: true, missingSide: "USD" });
     });
 
     it("/transactions for the CA invoice's week: USD has no rows, CAD has the invoice's stops", async () => {
@@ -190,8 +189,8 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
       await importCa();
 
       const overview = (await (await app().handle(new Request("http://localhost/api/v1/overview?week=2026-01-07"))).json()) as OverviewResult;
-      expect(overview.kpis.total.amount).toBe(840.67);
-      expect(overview.trend.map((p) => p.week)).toEqual(["2026-01-07"]);
+      expect(overview.us!.kpis.total.amount).toBe(840.67);
+      expect(overview.us!.trend.map((p) => p.week)).toEqual(["2026-01-07"]);
 
       const transactions = (await (
         await app().handle(new Request("http://localhost/api/v1/transactions?week=2026-01-07&pageSize=200"))

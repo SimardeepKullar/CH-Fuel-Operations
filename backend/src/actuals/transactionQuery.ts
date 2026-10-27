@@ -18,6 +18,10 @@ export interface TransactionFilters {
    * Needs the `invoices i` join the queries in `transactions.ts` make.
    */
   week?: string;
+  /** An inclusive range of billing week ends (T-74): the stops of every invoice whose
+   * `billing_week_end` falls in it. Either bound alone is open-ended. Not with `week`. */
+  weekFrom?: string;
+  weekTo?: string;
   /** One side of the week (`invoices.currency`); omitted, both sides. */
   currency?: InvoiceCurrency;
   driverId?: string;
@@ -81,6 +85,12 @@ export function buildTransactionFilterClause(
   }
   if (filters.week !== undefined) {
     add("i.billing_week_end = ?::date", filters.week);
+  }
+  if (filters.weekFrom !== undefined) {
+    add("i.billing_week_end >= ?::date", filters.weekFrom);
+  }
+  if (filters.weekTo !== undefined) {
+    add("i.billing_week_end <= ?::date", filters.weekTo);
   }
   if (filters.currency !== undefined) {
     add("i.currency = ?", filters.currency);

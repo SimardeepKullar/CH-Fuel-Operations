@@ -19,10 +19,10 @@ vi.mock("../lib/api", () => ({
 const { default: TopBarInner } = await import("./TopBar");
 const { WeekProvider } = await import("../hooks/useWeek");
 
-function TopBar(props: React.ComponentProps<typeof TopBarInner>) {
+function TopBar() {
   return (
     <WeekProvider>
-      <TopBarInner {...props} />
+      <TopBarInner />
     </WeekProvider>
   );
 }
@@ -39,57 +39,35 @@ function setup() {
   listPeriods.mockResolvedValue({ weeks: [] });
 }
 
-describe("TopBar (T-39 step 39.2, A7)", () => {
-  it("hides the billing-week selector on Plan screens", () => {
+describe("TopBar — the default page banner (T-75)", () => {
+  it("draws nothing over screens that render their own banner", () => {
     setup();
-    pathname = "/";
-    render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-    expect(screen.queryByLabelText("Billing week")).toBeNull();
-
-    cleanup();
-    pathname = "/plans";
-    render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-    expect(screen.queryByLabelText("Billing week")).toBeNull();
-  });
-
-  it("shows the billing-week selector on Actuals/Analysis screens", () => {
-    setup();
-    pathname = "/transactions";
-    render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-    expect(screen.getByLabelText("Billing week")).toBeTruthy();
-  });
-
-  it("renders the standing receipts and flags counts from props, not constants", () => {
-    setup();
-    pathname = "/transactions";
-    render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-    expect(screen.getByText("48/60")).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
-  });
-
-  it("hides the standing receipts/flags counts everywhere except Transactions", () => {
-    setup();
-    for (const route of ["/", "/plans", "/overview", "/receipt-queue", "/other-charges", "/plan-actual"]) {
+    for (const route of ["/", "/plans", "/overview", "/transactions", "/import", "/plan-actual"]) {
       pathname = route;
-      const { unmount } = render(<TopBar receipts={{ done: 48, total: 60 }} flags={3} />);
-      expect(screen.queryByText("48/60")).toBeNull();
-      expect(screen.queryByText("Receipts")).toBeNull();
+      const { container, unmount } = render(<TopBar />);
+      expect(container.innerHTML).toBe("");
       unmount();
     }
   });
 
-  it("renders an em dash rather than 0 when the counts are still unknown", () => {
+  it("draws a PageBanner with the screen's title elsewhere", () => {
     setup();
-    pathname = "/transactions";
-    render(<TopBar receipts={null} flags={null} />);
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
-    expect(screen.queryByText("0")).toBeNull();
+    pathname = "/receipt-queue";
+    render(<TopBar />);
+    expect(screen.getByTestId("page-banner")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Receipt Queue" })).toBeTruthy();
   });
 
-  it("shows a screen-specific title per route", () => {
+  it("shows the billing-week selector on the week-governed screens and not on Settings", () => {
     setup();
-    pathname = "/transactions";
-    render(<TopBar receipts={null} flags={null} />);
-    expect(screen.getByText("Actuals · Transactions")).toBeTruthy();
+    pathname = "/drivers";
+    render(<TopBar />);
+    expect(screen.getByLabelText("Billing week")).toBeTruthy();
+
+    cleanup();
+    pathname = "/settings";
+    render(<TopBar />);
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
+    expect(screen.queryByLabelText("Billing week")).toBeNull();
   });
 });

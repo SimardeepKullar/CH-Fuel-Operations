@@ -22,6 +22,19 @@ describe("buildTransactionFilterClause", () => {
     expect(clause.params).toEqual([dateTo]);
   });
 
+  it("weekFrom and weekTo bound the billing week end inclusively, parameterised", () => {
+    const { whereSql, params } = buildTransactionFilterClause({ weekFrom: "2026-08-12", weekTo: "2026-09-09" });
+    expect(whereSql).toContain("i.billing_week_end >= $1::date");
+    expect(whereSql).toContain("i.billing_week_end <= $2::date");
+    expect(params).toEqual(["2026-08-12", "2026-09-09"]);
+  });
+
+  it("weekFrom alone is open-ended", () => {
+    const { whereSql, params } = buildTransactionFilterClause({ weekFrom: "2026-08-12" });
+    expect(whereSql).not.toContain("<=");
+    expect(params).toEqual(["2026-08-12"]);
+  });
+
   it("week alone filters on the invoice's billing week, parameterised", () => {
     const clause = buildTransactionFilterClause({ week: "2026-09-09" });
     expect(clause.whereSql).toBe("WHERE i.billing_week_end = $1::date");

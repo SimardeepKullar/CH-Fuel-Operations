@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import PageBanner from "../../components/PageBanner";
 import PlanTab from "../../components/PlanTab";
 import DevToolsTab from "../../components/DevToolsTab";
 import { usePlan } from "../../hooks/usePlan";
@@ -52,42 +53,45 @@ export default function NewPlanPage() {
   }
 
   return (
-    <div className="new-plan-page">
-      <PlanTab
-        plan={plan}
-        loading={loading}
-        error={error}
-        originAddress={form.originAddress}
-        destinationAddress={form.destinationAddress}
-        onOriginChange={(originAddress) => patchForm({ originAddress })}
-        onDestinationChange={(destinationAddress) => patchForm({ destinationAddress })}
-        truckId={form.truckId}
-        onTruckIdChange={(truckId) => patchForm({ truckId })}
-        priceEffectiveOn={form.priceEffectiveOn}
-        onPriceEffectiveOnChange={(priceEffectiveOn) => patchForm({ priceEffectiveOn })}
-        onPlanRoute={planRoute}
-        planDisabled={request === null}
-      />
-
-      <button
-        type="button"
-        className="dev-tools-toggle"
-        aria-expanded={devToolsOpen}
-        onClick={() => setDevToolsOpen((v) => !v)}
-      >
-        {devToolsOpen ? "Hide Dev Tools" : "Dev Tools"}
-      </button>
-
-      {devToolsOpen && (
-        <DevToolsTab
-          form={form}
-          onChange={patchForm}
+    <>
+      <PageBanner title="New Plan" readout="Cheapest compliant Love’s stops · 350–500 mi legs · starts at 100% fuel" />
+      <div className="new-plan-page">
+        <PlanTab
           plan={plan}
           loading={loading}
-          onApply={planRoute}
-          applyDisabled={request === null}
+          error={error}
+          originAddress={form.originAddress}
+          destinationAddress={form.destinationAddress}
+          onOriginChange={(originAddress) => patchForm({ originAddress })}
+          onDestinationChange={(destinationAddress) => patchForm({ destinationAddress })}
+          truckId={form.truckId}
+          onTruckIdChange={(truckId) => patchForm({ truckId })}
+          priceEffectiveOn={form.priceEffectiveOn}
+          onPriceEffectiveOnChange={(priceEffectiveOn) => patchForm({ priceEffectiveOn })}
+          onPlanRoute={planRoute}
+          planDisabled={request === null}
         />
-      )}
-    </div>
+
+        <button
+          type="button"
+          className="dev-tools-toggle"
+          aria-expanded={devToolsOpen}
+          onClick={() => setDevToolsOpen((v) => !v)}
+        >
+          {devToolsOpen ? "Hide Dev Tools" : "Dev Tools"}
+        </button>
+
+        {devToolsOpen && (
+          <DevToolsTab
+            form={form}
+            onChange={patchForm}
+            plan={plan}
+            loading={loading}
+            onApply={planRoute}
+            applyDisabled={request === null}
+          />
+        )}
+      </div>
+    </>
   );
 }
