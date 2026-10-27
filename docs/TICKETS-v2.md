@@ -121,6 +121,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-74** | **Overview links carry the scope** | T-70, T-71 | **12** | **done — merged (`8df1373`, PR #21)** |
 | **T-75** | **Banner rollout — `PageBanner` on every screen** | T-71 | **12** | **done — merged (`8df1373`, PR #21)** |
 | **T-76** | **Frontend UI design — all pages** | T-75 | **12** | **new** · to be specified |
+| **T-77** | **Import screen restyle — upload panel and one-line history** | T-42, T-64, T-75 | **12** | **new** · branch `ticket/T-77-import-ui`, not started |
 
 **Phase 11 (Canada invoices)** lands before T-49: T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place, which D21 allows only until the first deploy. Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. Decisions D24–D30 (PROJECT-SCOPE-v2 §A15) govern all seven.
 
@@ -1670,3 +1671,50 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 
 **Definition of done.**
 - [ ] _To be filled in._
+
+---
+
+## T-77 · Import screen restyle — upload panel and one-line history
+
+**Priority 77. New — from the owner's mock-up, 2026-10-27.** UI only: the Import slice of T-76, done ahead of it.
+
+**Goal.** The Import screen matches the owner's screenshot: the quarantine strip, then two white panels — **Upload invoice** and **Import history** — each under a cyan hairline with an uppercase title and a one-line subtitle, and every history row on one line with its week control inline.
+
+**Why.** T-42 and T-64 built the behaviour; the look predates the T-75 banner style. The history's "Belongs to week ending" control sits on a second line under each row, so the table reads as two interleaved lists, and the dropzone is a bare box with a ghost button.
+
+**Design (from the screenshot).**
+- **Banner and strip unchanged:** `PageBanner` "Import" with `Last import · <date>`; the `Quarantine` strip with its count chip ("Nothing quarantined" when zero).
+- **Upload invoice panel.** White card, cyan top hairline, title `UPLOAD INVOICE`, subtitle `One invoice per file · US or Canada`. Inside, a full-width dashed drop area on a pale fill holding, centred: an upload icon (arrow into a tray) in the accent blue; `DROP A BVD INVOICE HERE` in the uppercase condensed heading face; the existing two-sentence note, the CSV sentence on its own line; a **filled primary** `Browse file…` button (today a ghost button). The parsing, preview, quarantine, duplicate and error states render inside this panel in place of the drop area; their own contents do not change.
+- **Import history panel.** Same card treatment, title `IMPORT HISTORY`, subtitle `Move an invoice if it landed in the wrong billing week`. The blueprint `Corners` go.
+- **Table header** on a light-grey band, small uppercase letter-spaced: `Invoice #`, `Period`, `Total` (right-aligned), `Status`, `Imported`, `Belongs to week ending`.
+- **One line per invoice:**
+  - *Invoice #* — the square `CodeBadge` (`US` navy, `CA` blue) then the number in mono; replaces the flag emoji.
+  - *Period* — the printed range in bold (`2026-08-01 – 2026-09-09`); when `datesDiffer`, the amber note sits directly under it as a pill (`⚠ Printed Aug 1 – Sep 9; transactions Sep 3 – Sep 10`).
+  - *Total* — bold, right-aligned, with thousands separators: `CA$46,837.33`, `US$50,929.71`. Uses the existing `formatMoneyGrouped` (T-65); no formatter changes.
+  - *Status* — an uppercase pill: green `IMPORTED`, red `QUARANTINED`.
+  - *Imported* — muted, `Oct 19, 2026 · 11:35:32 AM` (today `toLocaleString()`'s `10/19/2026, 11:35:32 AM`).
+  - *Belongs to week ending* — the date input and a square uppercase `MOVE` ghost button side by side. A refusal's message shows under the control, still inside the row. A quarantined row leaves this cell empty.
+- **Search (added 2026-10-27).** A search box on the right of the history panel's header. Every whitespace-separated term must match the invoice number, the printed period or billing-week dates, the country (`us`/`ca`), the status, or the total (with or without commas); clearing it restores every row. No match shows "No invoice matches". It filters the rows the page already holds, client-side, and the page now asks for 200 (the API's maximum) rather than 50 so that it covers a long history; a server-side search is a separate ticket if the history ever outgrows that.
+- **Table header colours (revised 2026-10-27).** The header row is white with a hairline above and below and navy text, not a grey band — it read as a disabled strip against the white panel.
+- **Behaviour unchanged:** drag-and-drop and the picker, the client-side extension check, upload, reopening a quarantined row by click or Enter/Space, Move's enable rules and its 409 message, and every `data-testid` the existing tests use.
+
+**Files.** Modified: `frontend/src/components/Dropzone.tsx` (icon, heading, primary button), `frontend/src/components/ImportHistory.tsx` (panel header, one-line grid, badge, pills, timestamp format), `frontend/src/app/(app)/import/page.tsx` (the Upload invoice panel wrapping the intake states), `frontend/src/lib/weeks.ts` (`formatImportedAt`), `frontend/src/App.css` (`.import-*` rules), and the co-located tests (`Dropzone.test.tsx`, `ImportHistory.test.tsx`, `import/page.test.tsx`). No backend change.
+
+**Not in scope.** Any API or data change; the contents of `ParsingState`, `ReconciliationPreview` and `QuarantineScreen`; the banner; other pages (T-76).
+
+**Dependencies.** T-42, T-64, T-75.
+
+**Definition of done.**
+- [ ] The screen renders, top to bottom: banner, quarantine strip, Upload invoice panel, Import history panel — each panel with its cyan hairline, uppercase title and the subtitle above, verbatim.
+- [ ] The drop area shows the upload icon, `Drop a BVD invoice here`, the two-line note, and a primary (filled) `Browse file…` button; dropping or picking a file behaves exactly as before, and a non-CSV/PDF file is still refused before any request.
+- [ ] Parsing, preview, quarantine, duplicate and error states render inside the Upload invoice panel.
+- [ ] The history table has the six headers above, and each invoice is a **single row** — the week input and `Move` are in the last column of the same row, not a sub-row — asserted in `ImportHistory.test.tsx`.
+- [ ] Searching the history by invoice number, date, country, status or total narrows the rows; every term must match; clearing restores all; no match says so — asserted in `ImportHistory.test.tsx`.
+- [ ] The invoice cell shows a `US`/`CA` `CodeBadge`, not a flag emoji.
+- [ ] Total renders with thousands separators (`CA$46,837.33`, `US$50,929.71`), asserted.
+- [ ] Status renders as a pill, green for Imported and red for Quarantined; a quarantined row is still reopenable by click and Enter/Space, and has no week control.
+- [ ] The amber dates-differ note appears under the period only when `datesDiffer`.
+- [ ] Imported-at renders as `MMM D, YYYY · h:mm:ss AM/PM`, asserted against a fixed timestamp.
+- [ ] Move: disabled until the date changes; a 409 shows its message within the row; a success clears the draft — the existing assertions pass unchanged.
+- [ ] A visual check against the owner's screenshot, with a screenshot of the built page attached to the PR.
+- [ ] `npm run verify` green.

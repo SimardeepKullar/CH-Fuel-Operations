@@ -388,3 +388,14 @@ describe("ImportPage — the page banner (T-75)", () => {
     expect(screen.queryByTestId("last-import")).toBeNull();
   });
 });
+
+describe("ImportPage — the upload panel (T-77)", () => {
+  it("wraps the intake in an Upload invoice panel with its subtitle", async () => {
+    listInvoices.mockResolvedValue(historyResult());
+    render(<ImportPage />);
+    const panel = await screen.findByTestId("upload-panel");
+    expect(panel.querySelector(".import-panel-title")!.textContent).toBe("Upload invoice");
+    expect(panel.textContent).toContain("One invoice per file · US or Canada");
+    expect(panel.querySelector("[data-testid=dropzone]")).toBeTruthy();
+  });
+});

@@ -3,10 +3,10 @@
 import { useState } from "react";
 import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
 import { ApiError } from "../lib/api";
-import { formatMoney } from "../lib/formatMoney";
-import { SIDE_FLAGS, formatDatesDifferNote } from "../lib/weeks";
-import Corners from "./Corners";
+import { formatMoneyGrouped } from "../lib/formatMoney";
+import { formatDatesDifferNote, formatImportedAt } from "../lib/weeks";
 import EmptyState from "./EmptyState";
+import { CodeBadge } from "./SubStrip";
 
 interface ImportHistoryProps {
   rows: InvoiceListItem[];
@@ -21,6 +21,26 @@ const STATUS_LABELS: Record<InvoiceListItem["status"], string> = {
   imported: "Imported",
   quarantined: "Quarantined",
 };
+
+/** Every whitespace-separated term must appear in the row's invoice number, either date range,
+ * country, status, or total — so "999217 aug" or "ca quarantined" narrow, never widen. */
+function matchesQuery(row: InvoiceListItem, query: string): boolean {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const haystack = [
+    row.invoiceNumber,
+    row.periodStart,
+    row.periodEnd,
+    row.billingWeekEnd,
+    row.currency === "CAD" ? "ca canada cad" : "us usa usd",
+    row.status,
+    formatMoneyGrouped(row.grandTotal, row.currency),
+    row.grandTotal.toFixed(2),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return terms.every((term) => haystack.includes(term));
+}
 
 function messageOf(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? err.title;
@@ -51,6 +71,8 @@ export default function ImportHistory({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [movingId, setMovingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const visible = rows.filter((row) => matchesQuery(row, query));
 
   const move = (row: InvoiceListItem) => {
     const target = drafts[row.id];
@@ -72,16 +94,29 @@ export default function ImportHistory({
   };
 
   return (
-    <div className="panel-card blueprint import-history" data-testid="import-history">
-      <Corners />
-      <div className="panel-card-header">
-        <span className="panel-card-title">Import history</span>
+    <div className="panel-card import-panel import-history" data-testid="import-history">
+      <div className="import-panel-head import-history-head-bar">
+        <div>
+          <h2 className="import-panel-title">Import history</h2>
+          <p className="import-panel-sub">Move an invoice if it landed in the wrong billing week</p>
+        </div>
+        <input
+          type="search"
+          className="input import-history-search"
+          placeholder="Search invoice #, date, US/CA, status…"
+          aria-label="Search import history"
+          data-testid="history-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
 
       {loading ? (
         <EmptyState title="Loading history…" />
       ) : rows.length === 0 ? (
         <EmptyState title="No invoices imported yet" />
+      ) : visible.length === 0 ? (
+        <EmptyState title="No invoice matches" detail={`Nothing in the import history matches "${query.trim()}".`} />
       ) : (
         <div className="import-history-table">
           <div className="import-history-row import-history-head">
@@ -90,9 +125,11 @@ export default function ImportHistory({
             <span className="num">Total</span>
             <span>Status</span>
             <span>Imported</span>
+            <span>Belongs to week ending</span>
           </div>
-          {rows.map((row) => {
+          {visible.map((row) => {
             const reopenable = row.status === "quarantined";
+            const imported = row.status === "imported";
             const draft = drafts[row.id] ?? row.billingWeekEnd;
             const error = errors[row.id];
             return (
@@ -111,55 +148,55 @@ export default function ImportHistory({
                       : undefined
                   }
                 >
-                  <span className="mono">
-                    {SIDE_FLAGS[row.currency]} {row.invoiceNumber}
+                  <span className="import-history-invoice">
+                    <CodeBadge code={row.currency === "CAD" ? "CA" : "US"} small />
+                    <span className="mono">{row.invoiceNumber}</span>
                   </span>
-                  <span>
-                    {row.periodStart} – {row.periodEnd}
-                  </span>
-                  <span className="num">{formatMoney(row.grandTotal, row.currency)}</span>
-                  <span className={`import-history-status import-history-status-${row.status}`}>
-                    {STATUS_LABELS[row.status]}
-                  </span>
-                  <span className="muted">{new Date(row.importedAt).toLocaleString()}</span>
-                </div>
-
-                {row.status === "imported" && (
-                  <div className="import-history-sub">
-                    {row.datesDiffer && (
+                  <span className="import-history-period">
+                    <strong>
+                      {row.periodStart} – {row.periodEnd}
+                    </strong>
+                    {imported && row.datesDiffer && (
                       <span className="import-history-note" data-testid={`dates-differ-note-${row.id}`}>
                         ⚠ {formatDatesDifferNote({ printedStart: row.periodStart, printedEnd: row.periodEnd, actualStart: row.actualStart, actualEnd: row.actualEnd })}
                       </span>
                     )}
-                    <span className="import-history-week">
-                      <label>
-                        Belongs to week ending{" "}
+                  </span>
+                  <span className="num import-history-total">{formatMoneyGrouped(row.grandTotal, row.currency)}</span>
+                  <span className={`import-history-status import-history-status-${row.status}`}>
+                    {STATUS_LABELS[row.status]}
+                  </span>
+                  <span className="muted">{formatImportedAt(row.importedAt)}</span>
+                  <span className="import-history-week">
+                    {imported && (
+                      <>
                         <input
                           type="date"
+                          aria-label="Belongs to week ending"
                           className="input import-history-week-input"
                           value={draft}
                           disabled={!onMoveWeek || movingId === row.id}
                           onChange={(e) => setDrafts((current) => ({ ...current, [row.id]: e.target.value }))}
                         />
-                      </label>
-                      {onMoveWeek && (
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          disabled={movingId === row.id || draft === "" || draft === row.billingWeekEnd}
-                          onClick={() => move(row)}
-                        >
-                          Move
-                        </button>
-                      )}
-                    </span>
-                    {error && (
-                      <span className="import-history-error" role="alert" data-testid={`week-error-${row.id}`}>
-                        {error}
-                      </span>
+                        {onMoveWeek && (
+                          <button
+                            type="button"
+                            className="import-history-move"
+                            disabled={movingId === row.id || draft === "" || draft === row.billingWeekEnd}
+                            onClick={() => move(row)}
+                          >
+                            Move
+                          </button>
+                        )}
+                        {error && (
+                          <span className="import-history-error" role="alert" data-testid={`week-error-${row.id}`}>
+                            {error}
+                          </span>
+                        )}
+                      </>
                     )}
-                  </div>
-                )}
+                  </span>
+                </div>
               </div>
             );
           })}

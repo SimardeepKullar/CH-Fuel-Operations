@@ -5,6 +5,7 @@ import {
   formatDatesDifferNote,
   formatDay,
   formatDayYear,
+  formatImportedAt,
   formatWeekEnding,
   invoiceOnSide,
   invoiceViewHref,
@@ -76,5 +77,12 @@ describe("side lookups", () => {
     const params = new URLSearchParams({ q: "dallas", invoice: "x" });
     expect(invoiceViewHref("/transactions", params, "2026-09-09", "all")).toBe("/transactions?q=dallas&invoice=all&week=2026-09-09");
     expect(invoiceViewHref("/overview", params, "2026-09-09", "CAD")).toBe("/transactions?week=2026-09-09&invoice=CAD");
+  });
+});
+
+describe("formatImportedAt (T-77)", () => {
+  it("prints 'Mon D, YYYY · h:mm:ss AM/PM' in the viewer's zone", () => {
+    expect(formatImportedAt(new Date(2026, 9, 19, 11, 35, 32).toISOString())).toBe("Oct 19, 2026 · 11:35:32 AM");
+    expect(formatImportedAt(new Date(2026, 0, 5, 15, 4, 9).toISOString())).toBe("Jan 5, 2026 · 3:04:09 PM");
   });
 });
