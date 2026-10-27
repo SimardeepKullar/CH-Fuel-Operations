@@ -69,13 +69,13 @@ function perUnitHeader(prefix: string, currency: InvoiceCurrency | null, unit: I
  * from and its country: `🇨🇦 999217`. A row carries the currency it was billed
  * in (`invoiceCurrency`, which a conversion leaves alone — T-66), and a week
  * holds one imported invoice per currency (D26), so that currency names it. */
-function InvoiceTag({ currency, invoiceNumber }: { currency: InvoiceCurrency; invoiceNumber: string | null }) {
+function InvoiceTag({ currency, invoiceNumber }: { currency: InvoiceCurrency; invoiceNumber: string }) {
   return (
     <span className="tx-invoice-tag" data-currency={currency} data-testid="tx-invoice-tag">
       <span role="img" aria-label={SIDE_LABELS[currency]}>
         {SIDE_FLAGS[currency]}
       </span>{" "}
-      {invoiceNumber ?? SIDE_LABELS[currency]}
+      {invoiceNumber}
     </span>
   );
 }
@@ -83,11 +83,11 @@ function InvoiceTag({ currency, invoiceNumber }: { currency: InvoiceCurrency; in
 /** The columns for the rows' currency and unit — `null` where the rows hold more
  * than one. The money and per-unit headers carry both when they can (A6.1 as
  * amended): a CA invoice reads `Litres`, `Billed CAD/L`, `Total CAD`. With
- * `invoiceNumbers`, each row is tagged with its invoice (All invoices). */
+ * `showInvoice`, each row is tagged with its invoice (All invoices). */
 function buildColumns(
   currency: InvoiceCurrency | null,
   unit: InvoiceQtyUnit | null,
-  invoiceNumbers: Partial<Record<InvoiceCurrency, string>> | null,
+  showInvoice: boolean,
 ): ColumnDef<TransactionListItem, any>[] {
   return [
     // Rendered specially in the row loop below (it needs the live `expandedId`
@@ -102,10 +102,10 @@ function buildColumns(
           <span className="tx-datetime">
             <span className="tx-date">{date}</span>
             <span className="tx-time">{time}</span>
-            {invoiceNumbers !== null && (
+            {showInvoice && (
               <InvoiceTag
                 currency={row.original.invoiceCurrency}
-                invoiceNumber={invoiceNumbers[row.original.invoiceCurrency] ?? null}
+                invoiceNumber={row.original.invoiceNumber}
               />
             )}
           </span>
@@ -255,10 +255,6 @@ interface TransactionsTableProps {
   totalBeforeSearch: number;
   loading: boolean;
   error: Error | null;
-  /** The week's invoice number per currency (one imported invoice per side, D26) — a row's
-   * own invoice for `StopExpansion`'s "Source" row, keyed on the row's `invoiceCurrency`
-   * (what BVD billed), which a conversion leaves alone (T-66). */
-  invoiceNumbers: Partial<Record<InvoiceCurrency, string>>;
   /** Tag each row with the invoice it came from (flag + number) — on under All invoices. */
   showInvoice?: boolean;
   /** The selected week — where "rate pending" links to enter the rate (the Overview, T-66). */
@@ -288,7 +284,6 @@ export default function TransactionsTable({
   totalBeforeSearch,
   loading,
   error,
-  invoiceNumbers,
   showInvoice = false,
   week = null,
   currency: requestedCurrency,
@@ -309,6 +304,11 @@ export default function TransactionsTable({
   useEffect(() => {
     if (activeIndex >= rows.length) setActiveIndex(Math.max(0, rows.length - 1));
   }, [rows.length, activeIndex]);
+
+  // A new order puts a different row first (T-40J).
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [filters.sort]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -363,8 +363,8 @@ export default function TransactionsTable({
   const ratePending = rows.some((row) => row.ratePending === true);
   const fx = rows.find((row) => row.fx !== undefined)?.fx ?? null;
   const columns = useMemo(
-    () => buildColumns(currency, unit, showInvoice ? invoiceNumbers : null),
-    [currency, unit, showInvoice, invoiceNumbers],
+    () => buildColumns(currency, unit, showInvoice),
+    [currency, unit, showInvoice],
   );
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
 
@@ -540,8 +540,25 @@ export default function TransactionsTable({
                 <span
                   key={header.id}
                   className={`tx-head-cell${["gallons", "billed", "retail", "total"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
+                  {...(header.id === "occurredAt"
+                    ? { role: "columnheader", "aria-sort": filters.sort === "asc" ? ("ascending" as const) : ("descending" as const) }
+                    : {})}
                 >
-                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  {header.id === "occurredAt" ? (
+                    <button
+                      type="button"
+                      className="tx-sort"
+                      onClick={() => setFilter("sort", filters.sort === "asc" ? "" : "asc")}
+                      title={filters.sort === "asc" ? "Oldest first — click for newest first" : "Newest first — click for oldest first"}
+                    >
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      <span className="tx-sort-mark" aria-hidden="true">
+                        {filters.sort === "asc" ? "↑" : "↓"}
+                      </span>
+                    </button>
+                  ) : (
+                    flexRender(header.column.columnDef.header, header.getContext())
+                  )}
                 </span>
               ))}
             </div>
@@ -590,7 +607,7 @@ export default function TransactionsTable({
                         ),
                       )}
                     </div>
-                    {open && <StopExpansion stop={stop} invoiceNumber={invoiceNumbers[stop.invoiceCurrency] ?? null} />}
+                    {open && <StopExpansion stop={stop} invoiceNumber={stop.invoiceNumber} />}
                   </div>
                 );
               })}

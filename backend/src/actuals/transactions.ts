@@ -93,6 +93,8 @@ export interface TransactionListItem {
   currency: InvoiceCurrency;
   /** The currency BVD billed the row in — what names its invoice (T-66). */
   invoiceCurrency: InvoiceCurrency;
+  /** The number of the invoice the row came from — what tells two weeks' (or two sides') rows apart in a range. */
+  invoiceNumber: string;
   /** The entered rate the row's money was converted at; only on a converted row. */
   fx?: InvoiceFx;
   /** `?convertTo=` asked for a conversion and no rate is entered: money is `null`. */
@@ -138,6 +140,7 @@ interface TransactionRow {
   ta_billed: string | null;
   currency: InvoiceCurrency;
   qty_unit: InvoiceQtyUnit;
+  invoice_number: string;
 }
 
 /** `BASE_SELECT`'s row: a `TransactionRow` plus the rate of its billing week's CA invoice. */
@@ -160,7 +163,7 @@ const BASE_SELECT = `
          s.id AS station_id, s.name_raw AS station_name_raw,
          s.city_raw AS station_city_raw, s.state_usps AS station_state_usps,
          ta.qty AS ta_qty, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed,
-         i.currency, i.qty_unit,
+         i.currency, i.qty_unit, i.invoice_number,
          fx.fx_cad_per_usd, fx.fx_entered_at
   FROM fuel_stops fs
   JOIN invoices i ON i.id = fs.invoice_id
@@ -259,6 +262,7 @@ function toListItem(
     total: money.money(row.total),
     currency: money.currency,
     invoiceCurrency: row.currency,
+    invoiceNumber: row.invoice_number,
     receiptStatus: row.receipt_status,
     flags: flagsByStop.get(row.id) ?? [],
   };
@@ -512,7 +516,7 @@ export async function getTransactionById(
             s.city_raw AS station_city_raw, s.state_usps AS station_state_usps,
             s.resolution AS station_resolution, s.resolution_source AS station_resolution_source,
             ta.qty AS ta_qty, ta.retail_per_unit AS ta_retail, ta.billed_per_unit AS ta_billed,
-            i.currency, i.qty_unit
+            i.currency, i.qty_unit, i.invoice_number
      FROM fuel_stops fs
      JOIN invoices i ON i.id = fs.invoice_id
      JOIN fuel_cards fc ON fc.id = fs.card_id

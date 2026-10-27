@@ -57,7 +57,6 @@ export default function TransactionsPage() {
   const period = anchorWeek(scope, weekEnds);
   const inScopeEnds = new Set(weekEndsInScope(scope, weekEnds));
   const inScope = periods.filter((w) => inScopeEnds.has(w.weekEnd));
-  const weekEntry = scope.mode === "week" ? (inScope[0] ?? null) : null;
 
   // One side, picked on the strip (or by a link), or both. A week holds at most one imported
   // invoice per currency (D26), so a side is an invoice there.
@@ -108,10 +107,6 @@ export default function TransactionsPage() {
   const shown = conversion ?? native;
   const { units, convertTo } = conversionParams(conversion);
 
-  const invoiceNumbers = useMemo(
-    () => Object.fromEntries((weekEntry?.invoices ?? []).map((invoice) => [invoice.currency, invoice.invoiceNumber])),
-    [weekEntry],
-  ) as Partial<Record<InvoiceCurrency, string>>;
   const request = scopeQuery(scope);
   const { filters, setFilter, clearFilters } = useTransactionFilters();
   const filterOptions = useTransactionFilterOptions(period, currency ?? null);
@@ -147,6 +142,8 @@ export default function TransactionsPage() {
         ? (filters.receiptStatus as "pending" | "confirmed" | "missing")
         : undefined,
       anomalyOnly: filters.anomalyOnly || undefined,
+      // Newest first is the API's default, so only oldest first is asked for (T-40J).
+      ...(filters.sort === "asc" ? { sortField: "occurred_at" as const, sortDirection: "asc" as const } : {}),
     })
       .then((result) => {
         if (!cancelled) setRows(result.rows);
@@ -177,6 +174,7 @@ export default function TransactionsPage() {
     filters.product,
     filters.receiptStatus,
     filters.anomalyOnly,
+    filters.sort,
   ]);
 
   const searched = useMemo(() => rows.filter((row) => matchesSearch(row, filters.q)), [rows, filters.q]);
@@ -204,8 +202,7 @@ export default function TransactionsPage() {
           totalBeforeSearch={rows.length}
           loading={loading}
           error={error}
-          invoiceNumbers={invoiceNumbers}
-          showInvoice={scope.mode === "week" && side === "all"}
+          showInvoice={side === "all"}
           week={period}
           currency={shown === null ? "USD" : choiceCurrency(shown)}
           qtyUnit={shown === null ? "gal" : choiceUnit(shown)}
