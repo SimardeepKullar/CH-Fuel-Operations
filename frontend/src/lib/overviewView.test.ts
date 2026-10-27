@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { overviewFixture, SCENARIO_START, weekEndsOf, type OverviewScenario } from "./overviewFixtures";
 import { buildDriverView, buildTrends, chartGeometry, niceStep, paddedRange } from "./overviewCharts";
 import type { Scope } from "./overviewScope";
-import { buildOverviewView, rangeLabel } from "./overviewView";
+import { buildOverviewView, rangeLabel, weekOverWeek } from "./overviewView";
 
 const href = (side: string) => `/transactions?side=${side}`;
 
@@ -67,7 +67,7 @@ describe("1b single week", () => {
     expect(v.invoices.weekChips.map((c) => c.absent)).toEqual([false, false]);
     expect(v.readout).toMatch(/^Billing week · /);
     expect(v.rateMeta).toBe("Exchange rate 1.42 CAD per USD");
-    expect(v.us.big[1]!.sub).toMatch(/^Discount \$\d\.\d{4} \/ gal off retail$/);
+    expect(v.us.big[1]!.sub).toMatch(/^[+−]\d\.\d% vs wk of Oct 27 · Discount \$\d\.\d{4} \/ gal off retail$/);
     expect(v.us.small[2]!.sub).toBe("Scale, express and fees");
     expect(v.combined.rateLabel).toBe("CAD per USD");
   });
@@ -161,7 +161,7 @@ describe("1g US invoice only (week of Oct 13)", () => {
   });
   it("shows no Canadian fuel in the CA trend", () => {
     const [, ca] = buildTrends(overviewFixture("usonly"), scopeFor("usonly"), v.span);
-    expect(ca.none).toBe("No Canadian fuel this week.");
+    expect(ca.none).toBe("No Canadian fuel in this scope.");
   });
 });
 
@@ -188,14 +188,28 @@ describe("trend charts", () => {
     const ends = weekEndsOf(weeks);
     const [us] = buildTrends(weeks, { mode: "range", from: ends[11]!, to: ends[13]! }, "x");
     expect(us.chart).toBeNull();
-    expect(us.note).toBe("Pick a range of 4 or more weeks to see the trend.");
-    expect(us.progress).toBeNull();
+    expect(us.note).toBe("3 of 4 weeks in this range. The trend line appears once 4 weeks are in.");
+    expect(us.progress).toEqual({ filled: 3, total: 4 });
   });
 
-  it("a single week compares with the week before", () => {
+  it("a single week compares with the week before, in the tiles", () => {
     const weeks = overviewFixture("all");
-    const [us] = buildTrends(weeks, { mode: "week", week: weekEndsOf(weeks)[13]! }, "x");
-    expect(us.delta).toMatch(/^[+−]\d\.\d% vs week of Oct 27$/);
+    expect(weekOverWeek(weeks, weeks[13]!, "us")).toMatch(/^[+−]\d\.\d% vs wk of Oct 27$/);
+    expect(weekOverWeek(weeks, weeks[13]!, "ca")).toMatch(/^[+−]\d\.\d% vs wk of Oct 27$/);
+    expect(weekOverWeek(weeks, weeks[0]!, "us")).toBe("");
+  });
+
+  it("no change when that side has no invoice in either week", () => {
+    const weeks = overviewFixture("usonly");
+    expect(weekOverWeek(weeks, weeks[10]!, "ca")).toBe("");
+  });
+
+  it("the trend shows only when the scope covers more than one week", () => {
+    const weeks = overviewFixture("all");
+    const v = (scope: Scope) => buildOverviewView(weeks, scope, () => "/t").showTrend;
+    expect(v({ mode: "week", week: weekEndsOf(weeks)[5]! })).toBe(false);
+    expect(v({ mode: "all" })).toBe(true);
+    expect(v({ mode: "range", from: weekEndsOf(weeks)[4]!, to: weekEndsOf(weeks)[5]! })).toBe(true);
   });
 
   it("a week with no fuel breaks the line", () => {

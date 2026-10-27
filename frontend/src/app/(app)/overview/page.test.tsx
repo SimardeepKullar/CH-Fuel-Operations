@@ -141,12 +141,11 @@ describe("OverviewPage (T-71)", () => {
     expect(screen.getByText("−2.8% since Aug 4")).toBeTruthy();
   });
 
-  it("today's one week: no chart, four ticks, no NaN anywhere", async () => {
+  it("today's one week: no trend card at all, and no NaN anywhere", async () => {
     const { container } = mount("today");
-    await screen.findByTestId("trend-us");
+    await screen.findByTestId("us-panel");
+    expect(screen.queryByTestId("trend-us")).toBeNull();
     expect(screen.queryByTestId("trend-chart")).toBeNull();
-    expect(within(screen.getByTestId("trend-us")).getByTestId("trend-ticks").children).toHaveLength(4);
-    expect(screen.getAllByText("1 of 4 weeks imported. The trend line appears once 4 weeks are in.")).toHaveLength(2);
     expect(tile("us-panel", "Average billed price").textContent).toContain("$5.5479");
     expect(container.textContent).not.toMatch(/NaN|Infinity|undefined/);
   });
@@ -207,7 +206,7 @@ describe("OverviewPage (T-71)", () => {
 describe("OverviewPage — entering the exchange rate", () => {
   it("Edit rates opens a field per week and a saved rate re-reads the page", async () => {
     mount("today");
-    await screen.findByTestId("trend-us");
+    await screen.findByTestId("us-panel");
     patchInvoiceFx.mockResolvedValue({ fx: { rate: 1.3712, enteredAt: "2026-10-26T12:00:00.000Z" } });
     fireEvent.click(screen.getByRole("link", { name: "Edit rates" }));
     const input = (await screen.findByPlaceholderText("e.g. 1.3712")) as HTMLInputElement;

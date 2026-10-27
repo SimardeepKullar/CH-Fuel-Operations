@@ -5,7 +5,7 @@
  * from `aggregateWeeks`; this file chooses and formats them, following the
  * design hand-off's copy exactly. The charts' models are in `overviewCharts`.
  */
-import { aggregateWeeks, receiptPercent, type CaAggregate, type ScopeAggregate, type UsAggregate, type WeekFigures } from "./overviewAggregate";
+import { aggregateWeeks, receiptPercent, trendSeries, type CaAggregate, type ScopeAggregate, type UsAggregate, type WeekFigures } from "./overviewAggregate";
 import { weekEndsInScope, type Scope } from "./overviewScope";
 import { formatDay } from "./weeks";
 
@@ -140,6 +140,8 @@ export interface OverviewView {
   us: RegionView;
   ca: RegionView;
   combined: CombinedView;
+  /** More than one week in scope: the billed-price trend is worth drawing. */
+  showTrend: boolean;
 }
 
 /** The weeks a scope covers, from every imported week (ascending). */
@@ -147,6 +149,19 @@ export function weeksInScope(all: readonly WeekFigures[], scope: Scope): WeekFig
   const ends = new Set(weekEndsInScope(scope, all.map((w) => w.weekEnd)));
   return all.filter((w) => ends.has(w.weekEnd));
 }
+
+/** `+1.2% vs wk of Oct 6` for a single week against the week before it, or `` when either lacks that side. */
+export function weekOverWeek(all: readonly WeekFigures[], week: WeekFigures, side: Side): string {
+  const prior = all[all.findIndex((w) => w.weekEnd === week.weekEnd) - 1];
+  if (prior === undefined) return "";
+  const now = trendSeries([week], side)[0] ?? null;
+  const before = trendSeries([prior], side)[0] ?? null;
+  if (now === null || before === null || before === 0) return "";
+  const pct = ((now - before) / before) * 100;
+  return `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}% vs wk of ${formatDay(prior.start)}`;
+}
+
+const lead = (change: string, rest: string): string => (change === "" ? rest : rest === "" ? change : `${change} · ${rest}`);
 
 const weekRange = (w: WeekFigures): string => rangeLabel(w.start, w.end);
 
@@ -157,7 +172,7 @@ function head(side: Side, inScope: readonly WeekFigures[], currency: string): st
   return `${inScope.length} invoices · ${formatDay(first.start)} – ${formatDay(last.end)} · ${currency}`;
 }
 
-function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, scopeShort: string): RegionView {
+function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, scopeShort: string, wow: string): RegionView {
   const base = { side: "us" as const, code: "US" as const, name: "United States", accent: NAVY, absentMessage: `No US invoice for ${span}` };
   if (agg === null) return { ...base, present: false, sub: "USD · gallons", big: [], small: [] };
   const inScope = weeks.filter((w) => w.us !== null);
@@ -200,7 +215,7 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
       tile("Average billed price", "US", agg.avgPrice === null ? "—" : price4(agg.avgPrice), "/ gal",
         several
           ? agg.weeklyLow === null ? "" : `Weekly low $${agg.weeklyLow.toFixed(2)} · high $${agg.weeklyHigh!.toFixed(2)}`
-          : agg.discPerGal === null ? "" : `Discount ${price4(agg.discPerGal)} / gal off retail`),
+          : lead(wow, agg.discPerGal === null ? "" : `Discount ${price4(agg.discPerGal)} / gal off retail`)),
     ],
     small: [
       tile("Diesel", "US", usd(agg.diesel), "", `${qty(agg.gal)} gal`),
@@ -212,7 +227,7 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
   };
 }
 
-function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, scopeShort: string): RegionView {
+function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: string, anomaliesHref: string, scopeShort: string, wow: string): RegionView {
   const base = { side: "ca" as const, code: "CA" as const, name: "Canada", accent: CYAN, absentMessage: `No Canadian invoice for ${span}` };
   if (agg === null) return { ...base, present: false, sub: "CAD · litres", big: [], small: [] };
   const inScope = weeks.filter((w) => w.ca !== null);
@@ -227,7 +242,7 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
     big: [
       tile("Total spend, with HST", "CA", usd(agg.total), "", agg.other > 0 ? `Includes CA${usd(agg.other)} other charges` : `${qty(agg.litres)} L diesel`, { note: hst(agg.hst) }),
       tile("Billed price, with HST", "CA", agg.avgPrice === null ? "—" : price4(agg.avgPrice), "/ L",
-        agg.avgPricePreTax === null ? "" : `CA${price4(agg.avgPricePreTax)} / L before HST`,
+        lead(wow, agg.avgPricePreTax === null ? "" : `CA${price4(agg.avgPricePreTax)} / L before HST`),
         { note: several && agg.weeklyLow !== null ? `Weekly $${agg.weeklyLow.toFixed(2)} – $${agg.weeklyHigh!.toFixed(2)}` : "" }),
     ],
     small: [
@@ -362,8 +377,9 @@ export function buildOverviewView(all: readonly WeekFigures[], scope: Scope, tra
       allChips: weeks.flatMap(chips),
     },
     fxNotice,
-    us: usRegion(agg.us, weeks, span, transactionsHref("us"), scopeShort),
-    ca: caRegion(agg.ca, weeks, span, transactionsHref("ca"), scopeShort),
+    showTrend: weeks.length > 1,
+    us: usRegion(agg.us, weeks, span, transactionsHref("us"), scopeShort, single && first ? weekOverWeek(all, first, "us") : ""),
+    ca: caRegion(agg.ca, weeks, span, transactionsHref("ca"), scopeShort, single && first ? weekOverWeek(all, first, "ca") : ""),
     combined: combinedView(agg, single, usCount > 0, caCount > 0, transactionsHref("all")),
   };
 }

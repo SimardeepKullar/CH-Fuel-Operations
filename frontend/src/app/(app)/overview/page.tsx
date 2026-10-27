@@ -105,10 +105,12 @@ export default function OverviewPage() {
           <RegionCard region={view.us} />
           <RegionCard region={view.ca} />
         </div>
-        <div className="ov-trends">
-          <TrendCard trend={trends[0]} />
-          <TrendCard trend={trends[1]} />
-        </div>
+        {view.showTrend && (
+          <div className="ov-trends">
+            <TrendCard trend={trends[0]} />
+            <TrendCard trend={trends[1]} />
+          </div>
+        )}
         <DriverSpend build={buildDrivers} splitPossible={splitPossible} />
       </div>
     </div>

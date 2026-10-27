@@ -40,7 +40,7 @@ export interface TrendView {
 
 const signed = (pct: number): string => `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}%`;
 
-function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[], side: Side, single: boolean, spanLabel: string, scopeMode: Scope["mode"]): TrendView {
+function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[], side: Side, spanLabel: string): TrendView {
   const us = side === "us";
   const base = {
     side,
@@ -57,7 +57,7 @@ function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[
   const series = trendSeries(scopeWeeks, side);
   const change = trendChange(series);
   if (change === null) {
-    return { ...base, label: "Billed price", none: `No ${us ? "US" : "Canadian"} fuel ${scopeMode === "week" ? "this week" : "in this scope"}.`, hasValue: false, value: "" };
+    return { ...base, label: "Billed price", none: `No ${us ? "US" : "Canadian"} fuel in this scope.`, hasValue: false, value: "" };
   }
   const labels = scopeWeeks.map((w) => formatDay(w.start));
   if (scopeWeeks.length >= MIN_TREND_WEEKS) {
@@ -74,30 +74,24 @@ function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[
 
   const agg = aggregateWeeks(scopeWeeks);
   const scoped = us ? agg.us?.avgPrice : agg.ca?.avgPrice;
-  let delta = "";
-  if (single) {
-    const prior = all[all.findIndex((w) => w.weekEnd === scopeWeeks[0]!.weekEnd) - 1];
-    const priorPrice = prior === undefined ? null : trendSeries([prior], side)[0]!;
-    if (priorPrice !== null && scoped != null) delta = `${signed(((scoped - priorPrice) / priorPrice) * 100)} vs week of ${formatDay(prior!.start)}`;
-  }
   const short = all.length < MIN_TREND_WEEKS;
   return {
     ...base,
-    label: single ? `Billed price · week of ${formatDay(scopeWeeks[0]!.start)}` : `Billed price · ${spanLabel}`,
+    label: `Billed price · ${spanLabel}`,
     none: null,
     hasValue: true,
     value: "$" + (scoped ?? change.latest).toFixed(2),
-    delta,
-    note: short ? `${all.length} of ${MIN_TREND_WEEKS} weeks imported. The trend line appears once ${MIN_TREND_WEEKS} weeks are in.` : "Pick a range of 4 or more weeks to see the trend.",
-    progress: short ? { filled: all.length, total: MIN_TREND_WEEKS } : null,
+    note: short
+      ? `${all.length} of ${MIN_TREND_WEEKS} weeks imported. The trend line appears once ${MIN_TREND_WEEKS} weeks are in.`
+      : `${scopeWeeks.length} of ${MIN_TREND_WEEKS} weeks in this range. The trend line appears once ${MIN_TREND_WEEKS} weeks are in.`,
+    progress: { filled: short ? all.length : scopeWeeks.length, total: MIN_TREND_WEEKS },
   };
 }
 
 /** Both trend cards for a scope. `spanLabel` is the view's span (`Aug 4 – Nov 9`). */
 export function buildTrends(all: readonly WeekFigures[], scope: Scope, spanLabel: string): [TrendView, TrendView] {
   const weeks = weeksInScope(all, scope);
-  const single = weeks.length === 1;
-  return [trendFor(all, weeks, "us", single, spanLabel, scope.mode), trendFor(all, weeks, "ca", single, spanLabel, scope.mode)];
+  return [trendFor(all, weeks, "us", spanLabel), trendFor(all, weeks, "ca", spanLabel)];
 }
 
 export interface ChartGeometry {
