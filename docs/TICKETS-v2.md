@@ -109,17 +109,17 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-62** | **CA fleet roster additions — 21 cards and drivers, 20 trucks** | T-58 | **11** | **done — merged (`043eee2`, PR #15)** |
 | **T-63** | **Billing weeks — pair US and CA invoices on period end** | T-61 | **11** | **done — merged (`7c008b0`, PR #17)** |
 | **T-64** | **Week selector, "Invoices in view", and Transactions in native units** | T-63, T-40, T-42 | **11** | **done — merged (`cfff981`, PR #18)** |
-| **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **new** |
+| **T-65** | **Overview — US, CA and combined panels** | T-63, T-64, T-66, T-41 | **11** | **done — merged (`8df1373`, PR #21; restyle `8adafc8`, PR #22)** |
 | **T-66** | **Exchange rate on the CA invoice, entered by the dispatcher** | T-61, T-64 | **11** | **done — merged (`13475b8`, PR #20)** |
 | **T-67** | **Prompt for the exchange rate when a US invoice is imported** | T-42, T-68 | **11** | **new** · waits on T-68 |
 | **T-68** | **Move the exchange rate from the CA invoice to the US invoice** | T-66 | **11** | **decided 2026-10-26 — not started** |
 | **T-69** | **Overview redesign — design sign-off** | T-65 | **12** | **done — signed off from the Claude Design hand-off (nine states, 1a–1i)** |
-| **T-70** | **Overview over a range of billing weeks — data layer** | T-69 | **12** | **built — not yet merged** (as `GET /overview/weeks` plus one client aggregation) |
-| **T-71** | **Overview scope control (all time / week / range)** | T-69, T-70 | **12** | **built — not yet merged** |
-| **T-72** | **Billed price trend — US and Canada charts, scope-aware** | T-69, T-70 | **12** | **built — not yet merged** |
-| **T-73** | **Top spend by driver — stacked columns, US and Canada** | T-69, T-70 | **12** | **built — not yet merged** |
-| **T-74** | **Overview links carry the scope** | T-70, T-71 | **12** | **built — not yet merged** |
-| **T-75** | **Banner rollout — `PageBanner` on every screen** | T-71 | **12** | **built — not yet merged** |
+| **T-70** | **Overview over a range of billing weeks — data layer** | T-69 | **12** | **done — merged (`8df1373`, PR #21)** (as `GET /overview/weeks` plus one client aggregation) |
+| **T-71** | **Overview scope control (all time / week / range)** | T-69, T-70 | **12** | **done — merged (`8df1373`, PR #21)** |
+| **T-72** | **Billed price trend — US and Canada charts, scope-aware** | T-69, T-70 | **12** | **done — merged (`8df1373`, PR #21)** |
+| **T-73** | **Top spend by driver — stacked columns, US and Canada** | T-69, T-70 | **12** | **done — merged (`8df1373`, PR #21)** |
+| **T-74** | **Overview links carry the scope** | T-70, T-71 | **12** | **done — merged (`8df1373`, PR #21)** |
+| **T-75** | **Banner rollout — `PageBanner` on every screen** | T-71 | **12** | **done — merged (`8df1373`, PR #21)** |
 | **T-76** | **Frontend UI design — all pages** | T-75 | **12** | **new** · to be specified |
 
 **Phase 11 (Canada invoices)** lands before T-49: T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place, which D21 allows only until the first deploy. Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. Decisions D24–D30 (PROJECT-SCOPE-v2 §A15) govern all seven.
@@ -1417,7 +1417,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 ## T-65 · Overview — US, CA and combined panels
 
-**Priority 65. D27, D28.**
+**Priority 65. D27, D28. Done — merged (`8df1373`, PR #21; combined band and country breakdown restyled in `8adafc8`, PR #22). Shipped together with the Phase 12 redesign (T-69–T-75).**
 
 **Goal.** For the selected week: US KPIs top left, CA KPIs top right, combined totals and rates below.
 
@@ -1562,7 +1562,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 ## T-70 · Overview over a range of billing weeks — data layer
 
-**Priority 70. Built — not yet merged.** Departs from the plan, which put `?from=&to=&scope=` on `GET /overview`. As built, the server serves facts and the client adds them up, so a week, a range and all time are one function and cannot disagree.
+**Priority 70. Done — merged (`8df1373`, PR #21).** Departs from the plan, which put `?from=&to=&scope=` on `GET /overview`. As built, the server serves facts and the client adds them up, so a week, a range and all time are one function and cannot disagree.
 
 **As built.**
 - **`GET /overview/weeks`** (`backend/src/actuals/overviewWeeks.ts`) returns every imported billing week, ascending: `{ weekEnd, start, end, fx, us, ca, drivers }`. Each side is as BVD printed it (US in USD and gallons, CA in CAD with HST and litres) or `null` for a week with no imported invoice. `invoice` is the printed number. `stops` is the invoice's fuel-stop count. `drivers` folds both sides into one row per driver (an unassigned stop is the `null` driver) with spend, quantity and diesel dollars per side, so an average billed price is exact. No cap at ten. `GET /overview?week=` is unchanged.
@@ -1579,7 +1579,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 ## T-71 · Overview scope control
 
-**Priority 71. Built — not yet merged.**
+**Priority 71. Done — merged (`8df1373`, PR #21).**
 
 **As built.** A shared `PageBanner` on the Overview carries the title, the segmented control (`All time` | `Billing week ▾` | `Range ▾`) with inline pickers, a readout (`All time · 14 weeks · Aug 4 – Nov 9`) and, right-aligned, the rate meta and an `Edit rates` link. It replaces the shell's week selector on this screen only. The scope lives in the URL. Below it: the "Invoices in view" strip, the amber FX notice, the US and Canada region cards (two big tiles, six small; Other charges folds into the Total spend sub-line and Stops takes its slot), and the combined band. An absent side keeps its card with a dashed "No Canadian invoice for …" box.
 
@@ -1593,7 +1593,7 @@ BVD bills Canadian fuel on a second weekly invoice — CAD, litres, sales tax in
 
 ## T-72 · Billed price trend — US and Canada charts, scope-aware
 
-**Priority 72. Built — not yet merged.**
+**Priority 72. Done — merged (`8df1373`, PR #21).**
 
 **As built.** Two cards, one per side, in their own unit and axis. With four or more weeks in scope: a headline (the latest non-null point), the change since the first non-null point, and a 640×190 line chart — four gridlines, the y range padded by 25 % (at least 0.02), one point per week, the latest point filled. A week with no fuel breaks the line and reads `no fuel`. Every week is labelled on a desktop; a phone labels the first and last. Under four weeks: no chart, the scoped price as the headline, `±x% vs week of …` for a single week with a prior one, and a quiet line. With fewer than four weeks imported in all (today): four progress ticks and "1 of 4 weeks imported. The trend line appears once 4 weeks are in." A side with no fuel in scope says so.
 
@@ -1603,7 +1603,7 @@ The 8-week cap is gone: the series is every week in scope, from the one `GET /ov
 
 ## T-73 · Top spend by driver — stacked columns, US and Canada
 
-**Priority 73. Built — not yet merged.**
+**Priority 73. Done — merged (`8df1373`, PR #21).**
 
 **As built.** Stacked columns (a phone gets horizontal bars): the US segment navy at the bottom, converted to CAD at each covered week's own rate, Canada cyan on top. The top ten by US spend, then `All other drivers` (only when there are others), with a nice-step axis. A hovered segment gets a 2px outline in the other colour and a tooltip with spend in both currencies, quantity in gallons or litres, and the exact average billed price. A driver with no Canadian fuel has only the navy segment; one with no US fuel sorts last. With no rate anywhere and both sides present, an amber note and a `US · USD | Canada · CAD` toggle replace the stack; the Canada view leaves out drivers with no Canadian spend. With some rates, the subtitle says how many weeks the US segments cover.
 
@@ -1613,7 +1613,7 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 
 ## T-74 · Overview links carry the scope
 
-**Priority 74. Built — not yet merged.**
+**Priority 74. Done — merged (`8df1373`, PR #21).**
 
 **As built.** The Anomalies tiles link to `/transactions?scope=…&currency=USD|CAD&anomalyOnly=true`, with the Overview's own scope keys. A single week is the same link in the new shape. `GET /transactions` gains `weekFrom` and `weekTo` (inclusive billing week ends; either alone is open-ended; with `week`, or `weekFrom` after `weekTo`, a 400). Transactions reads the scope from the URL and, with none, keeps the shell's week as before. It gets the same scope control in its banner, and the "Invoices in view" strip becomes side chips (`currency=`): one week shows its invoices and a dashed chip for a missing side; a range or all time counts each side. An old `?invoice=<id>` link still means that invoice's side. The "rate pending" link goes to `/overview?scope=week&w=`.
 
@@ -1625,7 +1625,7 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 
 ## T-75 · Banner rollout — `PageBanner` on every screen
 
-**Priority 75. Built — not yet merged.** New with this redesign.
+**Priority 75. Done — merged (`8df1373`, PR #21).** New with this redesign.
 
 **Goal.** One page-header style across the app: a cyan hairline over a white band with the title, the page's controls, a readout and a right-hand meta line; a sub-strip under it for chips; segmented controls with square corners.
 
