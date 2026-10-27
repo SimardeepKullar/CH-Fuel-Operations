@@ -21,7 +21,10 @@ function TileBox({ tile, big }: { tile: Tile; big?: boolean }) {
     <div className={big ? "ov-tile ov-tile-big" : "ov-tile"} data-testid="ov-tile" data-label={tile.label}>
       <div className="ov-tile-top">
         <span className="ov-tile-label">{tile.label}</span>
-        <span className="ov-tile-eq">{tile.eq}</span>
+        <span className="ov-tile-eq">
+          {tile.eq}
+          {tile.eqQty !== "" && <span className="ov-tile-eq-qty">{tile.eqQty}</span>}
+        </span>
       </div>
       <Money tile={tile} big={big} />
       <div className="ov-tile-bottom">

@@ -14,8 +14,9 @@ const CYAN = "#00a6e2";
 /** Weeks needed before a trend line is drawn. */
 export const MIN_TREND_WEEKS = 4;
 
-const usd = (n: number): string => "$" + Math.round(n).toLocaleString("en-US");
-const qty = (n: number): string => Math.round(n).toLocaleString("en-US");
+const TWO = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
+const usd = (n: number): string => "$" + n.toLocaleString("en-US", TWO);
+const qty = (n: number): string => n.toLocaleString("en-US", TWO);
 
 export interface TrendView {
   side: Side;

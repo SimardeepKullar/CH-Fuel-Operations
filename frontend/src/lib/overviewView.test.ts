@@ -35,7 +35,7 @@ describe("1a all time", () => {
   it("has the US tiles with a CAD equivalent and weekly low/high", () => {
     expect(v.us.big[0]!.label).toBe("Average billed price");
     expect(v.us.big[0]!.sub).toBe("Weekly low $5.52 · high $5.74");
-    expect(v.us.big[0]!.eq).toMatch(/^≈ CA\$\d\.\d{4} \/ L$/);
+    expect(v.us.big[0]!.eq).toMatch(/^CA\$\d\.\d{4} \/ L$/);
     expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Discount captured", "Stops", "Receipt compliance", "Anomalies flagged"]);
     expect(v.us.small[5]!.link).toEqual({ text: "Open in Transactions, all time →", href: "/transactions?side=us" });
   });
@@ -238,7 +238,7 @@ describe("driver columns", () => {
   it("tooltips carry both currencies and both units", () => {
     const col = d.columns[2]!;
     expect(col.usTooltip.title).toBe("Driver 3 · United States");
-    expect(col.usTooltip.rows[0]!.value).toMatch(/^US\$[\d,]+ · CA\$[\d,]+$/);
+    expect(col.usTooltip.rows[0]!.value).toMatch(/^US\$[\d,]+\.\d{2} · CA\$[\d,]+\.\d{2}$/);
     expect(col.usTooltip.rows[1]!.value).toMatch(/ gal$/);
     expect(col.usTooltip.rows[2]!.value).toMatch(/^US\$\d\.\d{4} \/ gal$/);
     expect(col.caTooltip.rows[1]!.value).toMatch(/ L$/);

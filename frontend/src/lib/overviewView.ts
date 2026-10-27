@@ -21,8 +21,10 @@ export function rangeLabel(start: string, end: string): string {
   return start.slice(0, 7) === end.slice(0, 7) ? `${formatDay(start)} – ${Number(end.slice(8))}` : `${formatDay(start)} – ${formatDay(end)}`;
 }
 
-const usd = (n: number): string => "$" + Math.round(n).toLocaleString("en-US");
-const qty = (n: number): string => Math.round(n).toLocaleString("en-US");
+const TWO = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
+const usd = (n: number): string => "$" + n.toLocaleString("en-US", TWO);
+const qty = (n: number): string => n.toLocaleString("en-US", TWO);
+const count = (n: number): string => Math.round(n).toLocaleString("en-US");
 const price4 = (n: number): string => "$" + n.toFixed(4);
 
 export interface Tile {
@@ -34,6 +36,8 @@ export interface Tile {
   sub: string;
   /** Top right: the CAD equivalent. */
   eq: string;
+  /** Under it: the same quantity in litres. */
+  eqQty: string;
   /** Bottom right note. */
   note: string;
   color: string;
@@ -41,8 +45,8 @@ export interface Tile {
   link: { text: string; href: string } | null;
 }
 
-function tile(label: string, cc: string, value: string, unit: string, sub: string, o: Partial<Pick<Tile, "eq" | "note" | "color" | "link">> = {}): Tile {
-  return { label, cc, value, unit, sub, eq: o.eq ?? "", note: o.note ?? "", color: o.color ?? NAVY, link: o.link ?? null };
+function tile(label: string, cc: string, value: string, unit: string, sub: string, o: Partial<Pick<Tile, "eq" | "eqQty" | "note" | "color" | "link">> = {}): Tile {
+  return { label, cc, value, unit, sub, eq: o.eq ?? "", eqQty: o.eqQty ?? "", note: o.note ?? "", color: o.color ?? NAVY, link: o.link ?? null };
 }
 
 const receiptColor = (pct: number | null): string => (pct === null ? NAVY : pct < 50 ? RED : pct < 85 ? AMBER : NAVY);
@@ -162,7 +166,8 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
   const conv = agg.converted;
   const partial = conv !== null && conv.coveredWeeks < agg.weeks;
   const suffix = partial ? ` · ${conv.coveredWeeks} of ${agg.weeks} wks` : "";
-  const eq = (cad: number | null, withSuffix = false): string => (cad === null || conv === null ? "" : `≈ CA${usd(cad)}${withSuffix ? suffix : ""}`);
+  const eq = (cad: number | null, withSuffix = false): string => (cad === null || conv === null ? "" : `CA${usd(cad)}${withSuffix ? suffix : ""}`);
+  const litres = (l: number | null): string => (l === null || conv === null ? "" : `${qty(l)} L`);
   const pct = receiptPercent(agg.receiptsConfirmed, agg.receiptsExpected);
   const several = agg.weeks > 1;
 
@@ -175,14 +180,14 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
         several
           ? agg.weeklyLow === null ? "" : `Weekly low $${agg.weeklyLow.toFixed(2)} · high $${agg.weeklyHigh!.toFixed(2)}`
           : agg.discPerGal === null ? "" : `Discount ${price4(agg.discPerGal)} / gal off retail`,
-        { eq: conv?.pricePerLitre == null ? "" : `≈ CA${price4(conv.pricePerLitre)} / L${suffix}` }),
+        { eq: conv?.pricePerLitre == null ? "" : `CA${price4(conv.pricePerLitre)} / L${suffix}` }),
       tile("Total spend", "US", usd(agg.total), "", `Includes US${usd(agg.other)} other charges`, { eq: eq(conv?.total ?? null, true) }),
     ],
     small: [
-      tile("Diesel", "US", usd(agg.diesel), "", `${qty(agg.gal)} gal`, { eq: eq(conv?.diesel ?? null) }),
-      tile("DEF", "US", usd(agg.def), "", `${qty(agg.defGal)} gal`, { eq: eq(conv?.def ?? null) }),
+      tile("Diesel", "US", usd(agg.diesel), "", `${qty(agg.gal)} gal`, { eq: eq(conv?.diesel ?? null), eqQty: litres(conv?.litres ?? null) }),
+      tile("DEF", "US", usd(agg.def), "", `${qty(agg.defGal)} gal`, { eq: eq(conv?.def ?? null), eqQty: litres(conv?.defLitres ?? null) }),
       tile("Discount captured", "US", usd(agg.disc), "", agg.discPerGal === null ? "" : `$${agg.discPerGal.toFixed(3)} / gal average`, { eq: eq(conv?.disc ?? null) }),
-      tile("Stops", "", qty(agg.stops), "", several ? `About ${Math.round(agg.stops / agg.weeks)} per week` : "Fuel stops on this invoice"),
+      tile("Stops", "", count(agg.stops), "", several ? `About ${Math.round(agg.stops / agg.weeks)} per week` : "Fuel stops on this invoice"),
       tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
       tile("Anomalies flagged", "", String(agg.anomalies), "", "", { color: AMBER, link: { text: `Open in Transactions, ${scopeShort} →`, href: anomaliesHref } }),
     ],
@@ -211,7 +216,7 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
       tile("Diesel", "CA", usd(agg.dieselWithTax), "", `${qty(agg.litres)} L`, { note: hst(agg.dieselHst) }),
       tile("DEF", "CA", usd(agg.defWithTax), "", `${qty(agg.defLitres)} L`, { note: hst(agg.defHst) }),
       tile("Discount captured", "CA", usd(agg.disc), "", agg.discPerLitre === null ? "Before tax" : `Before tax · $${agg.discPerLitre.toFixed(3)} / L`),
-      tile("Stops", "", qty(agg.stops), "", several ? `About ${Math.round(agg.stops / agg.weeks)} per week` : "Fuel stops on this invoice"),
+      tile("Stops", "", count(agg.stops), "", several ? `About ${Math.round(agg.stops / agg.weeks)} per week` : "Fuel stops on this invoice"),
       tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct) }),
       tile("Anomalies flagged", "", String(agg.anomalies), "", "", { color: AMBER, link: { text: `Open in Transactions, ${scopeShort} →`, href: anomaliesHref } }),
     ],

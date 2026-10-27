@@ -173,7 +173,7 @@ describe("OverviewPage (T-71)", () => {
     fireEvent.mouseEnter(screen.getAllByTestId("driver-seg-us")[2]!);
     const tip = screen.getByTestId("driver-tooltip");
     expect(tip.textContent).toContain("Driver 3 · United States");
-    expect(tip.textContent).toMatch(/US\$[\d,]+ · CA\$[\d,]+/);
+    expect(tip.textContent).toMatch(/US\$[\d,]+\.\d{2} · CA\$[\d,]+\.\d{2}/);
     fireEvent.mouseLeave(screen.getAllByTestId("driver-column")[2]!);
     expect(screen.queryByTestId("driver-tooltip")).toBeNull();
   });
