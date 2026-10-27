@@ -1,0 +1,110 @@
+/* Receipt Queue (T-43). One card at a time; on a phone the decision buttons sit at the bottom of the
+   screen, inside thumb reach, and every control is at least 44px tall. */
+
+.rq-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 18px;
+  max-width: 760px;
+  width: 100%;
+  min-width: 0;
+}
+
+.rq-failure {
+  border: 1px solid var(--color-error-border);
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  padding: 10px 12px;
+  font: 500 14px var(--font-body);
+  overflow-wrap: anywhere;
+}
+
+.rq-progress {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.rq-progress-count { font: 700 26px var(--font-heading); color: var(--color-text); font-variant-numeric: tabular-nums; }
+.rq-progress-label { font: 500 13px var(--font-body); color: var(--color-label); }
+.rq-progress-bar { flex: 1 1 100%; height: 6px; background: var(--color-divider); }
+.rq-progress-fill { display: block; height: 100%; background: var(--color-accent); }
+
+.rq-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rq-when { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.rq-when-text { font: 600 18px var(--font-heading); color: var(--color-text); }
+.rq-badge {
+  font: 600 11px var(--font-heading);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border: 1px solid var(--color-control-border);
+  color: var(--color-control-fg);
+  background: var(--color-control-bg);
+}
+.rq-badge-flag { border-color: var(--color-amber); color: #946012; background: #fdf6e6; }
+
+.rq-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+.rq-fact { min-width: 0; }
+.rq-fact-wide { grid-column: 1 / -1; }
+.rq-fact dt { font: 600 11px var(--font-heading); letter-spacing: 0.09em; text-transform: uppercase; color: var(--color-label); }
+.rq-fact dd { margin: 2px 0 0; font: 500 16px var(--font-body); color: var(--color-text); overflow-wrap: anywhere; }
+
+.rq-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rq-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 600 15px var(--font-heading);
+  cursor: pointer;
+}
+.rq-action:disabled { opacity: 0.5; cursor: default; }
+.rq-action-yes { background: var(--color-candidate); border-color: var(--color-candidate); color: #fff; }
+.rq-action-no { background: var(--color-error-bg); border-color: var(--color-error-border); color: var(--color-error); }
+.rq-action-skip { grid-column: 1 / -1; min-height: 44px; }
+.rq-key {
+  min-width: 24px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font: 700 13px var(--font-mono);
+  text-align: center;
+}
+
+.rq-batch { display: flex; flex-direction: column; gap: 8px; }
+.rq-batch-title { margin: 0; font: 600 13px var(--font-heading); letter-spacing: 0.09em; text-transform: uppercase; color: var(--color-accent-800); }
+.rq-batch-sub { margin: 0; font: 400 13px var(--font-body); color: var(--color-label); }
+.rq-batch-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.rq-batch-select { flex: 1 1 200px; min-width: 0; min-height: 44px; padding: 0 10px; font: 500 15px var(--font-body); }
+.rq-batch-button { min-height: 44px; height: auto; }
+.rq-batch-confirm { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--color-divider); padding-top: 8px; }
+.rq-batch-count { margin: 0; font: 500 15px var(--font-body); color: var(--color-text); }
+
+@media (max-width: 700px) {
+  .rq-page { padding: 10px 12px 96px; }
+  .rq-facts { grid-template-columns: 1fr 1fr; }
+  /* One-thumb reach: Y and N stay pinned to the bottom edge while the card scrolls. */
+  .rq-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+  }
+  .rq-action { min-height: 56px; }
+}
