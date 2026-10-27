@@ -42,7 +42,7 @@ function setup() {
 describe("TopBar — the default page banner (T-75)", () => {
   it("draws nothing over screens that render their own banner", () => {
     setup();
-    for (const route of ["/", "/plans", "/overview", "/transactions", "/import", "/plan-actual"]) {
+    for (const route of ["/", "/plans", "/overview", "/transactions", "/import", "/plan-actual", "/receipt-queue"]) {
       pathname = route;
       const { container, unmount } = render(<TopBar />);
       expect(container.innerHTML).toBe("");
@@ -52,10 +52,10 @@ describe("TopBar — the default page banner (T-75)", () => {
 
   it("draws a PageBanner with the screen's title elsewhere", () => {
     setup();
-    pathname = "/receipt-queue";
+    pathname = "/other-charges";
     render(<TopBar />);
     expect(screen.getByTestId("page-banner")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Receipt Queue" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Other Charges" })).toBeTruthy();
   });
 
   it("shows the billing-week selector on the week-governed screens and not on Settings", () => {
