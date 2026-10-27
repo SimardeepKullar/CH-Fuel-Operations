@@ -68,8 +68,11 @@
 /* Combined band */
 .ov-cb-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.7fr) minmax(190px, 0.7fr); border-top: 4px solid #16205c; }
 .ov-cb-main { padding: 16px 20px 18px; min-width: 0; }
-.ov-cb-col { display: flex; flex-direction: column; gap: 14px; padding: 16px 20px 18px; border-left: 1px solid #e3e8f1; min-width: 0; }
-.ov-cb-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 16px 20px; }
+.ov-cb-col { display: flex; flex-direction: column; gap: 14px; padding: 12px; border-left: 1px solid #e3e8f1; min-width: 0; }
+.ov-cb-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 1px; padding: 0; background: #e3e8f1; }
+.ov-cb-kpis .ov-cb-block:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.ov-cb-kpis .ov-cb-block, .ov-cb-attn .ov-cb-block { padding: 12px 16px 14px; background: #fff; }
+.ov-cb-attn { gap: 1px; padding: 0; background: #e3e8f1; }
 .ov-cb-head { display: flex; align-items: center; gap: 10px; }
 .ov-combined-chip { display: grid; place-items: center; height: 22px; padding: 0 7px; flex: none; font: 700 11px var(--font-heading); letter-spacing: 0.06em; color: #fff; background: #16205c; }
 .ov-cb-label { font: 600 10px var(--font-heading); letter-spacing: 0.13em; text-transform: uppercase; color: #5b6a8c; }

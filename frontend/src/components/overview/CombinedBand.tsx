@@ -92,8 +92,10 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
           </div>
           {attention.receipts !== null && (
             <div className="ov-cb-block">
-              <div className="ov-cb-label">Receipts missing</div>
-              <div className="ov-cb-count ov-cb-amber">{attention.receipts.missing}</div>
+              <div className="ov-cb-label">Receipt compliance</div>
+              <div className="ov-cb-count" style={{ color: attention.receipts.color }}>
+                {attention.receipts.value}
+              </div>
               <div className="ov-cb-note">{attention.receipts.sub}</div>
               <Link className="ov-link" href={attention.receipts.link.href}>
                 {attention.receipts.link.text}

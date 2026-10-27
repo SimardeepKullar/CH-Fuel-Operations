@@ -108,7 +108,7 @@ export interface CombinedShare {
 export interface CombinedAttention {
   anomalies: { count: number; link: { text: string; href: string } };
   /** `null` when no stop expected a receipt. */
-  receipts: { missing: number; sub: string; link: { text: string; href: string } } | null;
+  receipts: { value: string; color: string; sub: string; link: { text: string; href: string } } | null;
 }
 
 export interface CombinedView {
@@ -319,7 +319,8 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
         expected === 0
           ? null
           : {
-              missing: expected - confirmed,
+              value: `${receiptPercent(confirmed, expected) ?? 0}%`,
+              color: receiptColor(receiptPercent(confirmed, expected)),
               sub: `${confirmed} of ${expected} confirmed`,
               link: { text: "See which stops →", href: "/receipt-queue" },
             },
