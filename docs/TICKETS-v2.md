@@ -1690,15 +1690,15 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 - **One line per invoice:**
   - *Invoice #* — the square `CodeBadge` (`US` navy, `CA` blue) then the number in mono; replaces the flag emoji.
   - *Period* — the printed range in bold (`2026-08-01 – 2026-09-09`); when `datesDiffer`, the amber note sits directly under it as a pill (`⚠ Printed Aug 1 – Sep 9; transactions Sep 3 – Sep 10`).
-  - *Total* — bold, right-aligned, with thousands separators: `CA$46,837.33`, `US$50,929.71`. Grouping applies to this column only; `formatMoney`'s other callers are not changed by this ticket.
+  - *Total* — bold, right-aligned, with thousands separators: `CA$46,837.33`, `US$50,929.71`. Uses the existing `formatMoneyGrouped` (T-65); no formatter changes.
   - *Status* — an uppercase pill: green `IMPORTED`, red `QUARANTINED`.
   - *Imported* — muted, `Oct 19, 2026 · 11:35:32 AM` (today `toLocaleString()`'s `10/19/2026, 11:35:32 AM`).
   - *Belongs to week ending* — the date input and a square uppercase `MOVE` ghost button side by side. A refusal's message shows under the control, still inside the row. A quarantined row leaves this cell empty.
 - **Behaviour unchanged:** drag-and-drop and the picker, the client-side extension check, upload, reopening a quarantined row by click or Enter/Space, Move's enable rules and its 409 message, and every `data-testid` the existing tests use.
 
-**Files.** Modified: `frontend/src/components/Dropzone.tsx` (icon, heading, primary button), `frontend/src/components/ImportHistory.tsx` (panel header, one-line grid, badge, pills, timestamp format), `frontend/src/app/(app)/import/page.tsx` (the Upload invoice panel wrapping the intake states), `frontend/src/App.css` (`.import-*` rules), and the co-located tests (`Dropzone.test.tsx`, `ImportHistory.test.tsx`, `import/page.test.tsx`). No backend change.
+**Files.** Modified: `frontend/src/components/Dropzone.tsx` (icon, heading, primary button), `frontend/src/components/ImportHistory.tsx` (panel header, one-line grid, badge, pills, timestamp format), `frontend/src/app/(app)/import/page.tsx` (the Upload invoice panel wrapping the intake states), `frontend/src/lib/weeks.ts` (`formatImportedAt`), `frontend/src/App.css` (`.import-*` rules), and the co-located tests (`Dropzone.test.tsx`, `ImportHistory.test.tsx`, `import/page.test.tsx`). No backend change.
 
-**Not in scope.** Any API or data change; the contents of `ParsingState`, `ReconciliationPreview` and `QuarantineScreen`; the banner; other pages (T-76); thousands separators anywhere but this table's Total.
+**Not in scope.** Any API or data change; the contents of `ParsingState`, `ReconciliationPreview` and `QuarantineScreen`; the banner; other pages (T-76).
 
 **Dependencies.** T-42, T-64, T-75.
 
@@ -1708,7 +1708,7 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 - [ ] Parsing, preview, quarantine, duplicate and error states render inside the Upload invoice panel.
 - [ ] The history table has the six headers above, and each invoice is a **single row** — the week input and `Move` are in the last column of the same row, not a sub-row — asserted in `ImportHistory.test.tsx`.
 - [ ] The invoice cell shows a `US`/`CA` `CodeBadge`, not a flag emoji.
-- [ ] Total renders with thousands separators (`CA$46,837.33`, `US$50,929.71`), asserted; no other screen's money formatting changes.
+- [ ] Total renders with thousands separators (`CA$46,837.33`, `US$50,929.71`), asserted.
 - [ ] Status renders as a pill, green for Imported and red for Quarantined; a quarantined row is still reopenable by click and Enter/Space, and has no week control.
 - [ ] The amber dates-differ note appears under the period only when `datesDiffer`.
 - [ ] Imported-at renders as `MMM D, YYYY · h:mm:ss AM/PM`, asserted against a fixed timestamp.

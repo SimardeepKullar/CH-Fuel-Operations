@@ -72,12 +72,27 @@ export default function Dropzone({ onFile, disabled = false }: DropzoneProps) {
           if (file) handleFile(file);
         }}
       />
+      <svg
+        className="import-dropzone-icon"
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
+      </svg>
       <div className="import-dropzone-title">Drop a BVD invoice here</div>
       <p className="import-dropzone-detail">
-        The emailed PDF is preferred — it&rsquo;s the only export carrying express tractor and driver. The portal
-        CSV is accepted too.
+        The emailed PDF is preferred — it&rsquo;s the only export carrying express tractor and driver.
+        <br />
+        The portal CSV is accepted too.
       </p>
-      <span className="btn btn-ghost import-dropzone-browse">Browse file…</span>
+      <span className="btn btn-primary import-dropzone-browse">Browse file…</span>
       {rejection && (
         <p className="import-dropzone-rejection" data-testid="dropzone-rejection">
           {rejection}

@@ -154,7 +154,12 @@ export default function ImportPage() {
         <SubStrip label="Quarantine" testId="quarantine-strip">
           <StripChip absent={quarantined === 0}>{quarantined === 0 ? "Nothing quarantined" : `${quarantined} quarantined`}</StripChip>
         </SubStrip>
-        <div className="import-main">
+        <div className="panel-card import-panel" data-testid="upload-panel">
+          <div className="import-panel-head">
+            <h2 className="import-panel-title">Upload invoice</h2>
+            <p className="import-panel-sub">One invoice per file · US or Canada</p>
+          </div>
+          <div className="import-main">
           {view.phase === "idle" && <Dropzone onFile={handleFile} />}
           {view.phase === "parsing" && <ParsingState fileName={view.fileName} rowCount={view.rowCount} />}
           {view.phase === "loading" && <EmptyState title="Loading…" />}
@@ -181,6 +186,7 @@ export default function ImportPage() {
               </button>
             </div>
           )}
+          </div>
         </div>
 
         <ImportHistory

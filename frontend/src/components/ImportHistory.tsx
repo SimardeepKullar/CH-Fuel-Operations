@@ -3,10 +3,10 @@
 import { useState } from "react";
 import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
 import { ApiError } from "../lib/api";
-import { formatMoney } from "../lib/formatMoney";
-import { SIDE_FLAGS, formatDatesDifferNote } from "../lib/weeks";
-import Corners from "./Corners";
+import { formatMoneyGrouped } from "../lib/formatMoney";
+import { formatDatesDifferNote, formatImportedAt } from "../lib/weeks";
 import EmptyState from "./EmptyState";
+import { CodeBadge } from "./SubStrip";
 
 interface ImportHistoryProps {
   rows: InvoiceListItem[];
@@ -72,10 +72,10 @@ export default function ImportHistory({
   };
 
   return (
-    <div className="panel-card blueprint import-history" data-testid="import-history">
-      <Corners />
-      <div className="panel-card-header">
-        <span className="panel-card-title">Import history</span>
+    <div className="panel-card import-panel import-history" data-testid="import-history">
+      <div className="import-panel-head">
+        <h2 className="import-panel-title">Import history</h2>
+        <p className="import-panel-sub">Move an invoice if it landed in the wrong billing week</p>
       </div>
 
       {loading ? (
@@ -90,9 +90,11 @@ export default function ImportHistory({
             <span className="num">Total</span>
             <span>Status</span>
             <span>Imported</span>
+            <span>Belongs to week ending</span>
           </div>
           {rows.map((row) => {
             const reopenable = row.status === "quarantined";
+            const imported = row.status === "imported";
             const draft = drafts[row.id] ?? row.billingWeekEnd;
             const error = errors[row.id];
             return (
@@ -111,55 +113,55 @@ export default function ImportHistory({
                       : undefined
                   }
                 >
-                  <span className="mono">
-                    {SIDE_FLAGS[row.currency]} {row.invoiceNumber}
+                  <span className="import-history-invoice">
+                    <CodeBadge code={row.currency === "CAD" ? "CA" : "US"} small />
+                    <span className="mono">{row.invoiceNumber}</span>
                   </span>
-                  <span>
-                    {row.periodStart} – {row.periodEnd}
-                  </span>
-                  <span className="num">{formatMoney(row.grandTotal, row.currency)}</span>
-                  <span className={`import-history-status import-history-status-${row.status}`}>
-                    {STATUS_LABELS[row.status]}
-                  </span>
-                  <span className="muted">{new Date(row.importedAt).toLocaleString()}</span>
-                </div>
-
-                {row.status === "imported" && (
-                  <div className="import-history-sub">
-                    {row.datesDiffer && (
+                  <span className="import-history-period">
+                    <strong>
+                      {row.periodStart} – {row.periodEnd}
+                    </strong>
+                    {imported && row.datesDiffer && (
                       <span className="import-history-note" data-testid={`dates-differ-note-${row.id}`}>
                         ⚠ {formatDatesDifferNote({ printedStart: row.periodStart, printedEnd: row.periodEnd, actualStart: row.actualStart, actualEnd: row.actualEnd })}
                       </span>
                     )}
-                    <span className="import-history-week">
-                      <label>
-                        Belongs to week ending{" "}
+                  </span>
+                  <span className="num import-history-total">{formatMoneyGrouped(row.grandTotal, row.currency)}</span>
+                  <span className={`import-history-status import-history-status-${row.status}`}>
+                    {STATUS_LABELS[row.status]}
+                  </span>
+                  <span className="muted">{formatImportedAt(row.importedAt)}</span>
+                  <span className="import-history-week">
+                    {imported && (
+                      <>
                         <input
                           type="date"
+                          aria-label="Belongs to week ending"
                           className="input import-history-week-input"
                           value={draft}
                           disabled={!onMoveWeek || movingId === row.id}
                           onChange={(e) => setDrafts((current) => ({ ...current, [row.id]: e.target.value }))}
                         />
-                      </label>
-                      {onMoveWeek && (
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
-                          disabled={movingId === row.id || draft === "" || draft === row.billingWeekEnd}
-                          onClick={() => move(row)}
-                        >
-                          Move
-                        </button>
-                      )}
-                    </span>
-                    {error && (
-                      <span className="import-history-error" role="alert" data-testid={`week-error-${row.id}`}>
-                        {error}
-                      </span>
+                        {onMoveWeek && (
+                          <button
+                            type="button"
+                            className="import-history-move"
+                            disabled={movingId === row.id || draft === "" || draft === row.billingWeekEnd}
+                            onClick={() => move(row)}
+                          >
+                            Move
+                          </button>
+                        )}
+                        {error && (
+                          <span className="import-history-error" role="alert" data-testid={`week-error-${row.id}`}>
+                            {error}
+                          </span>
+                        )}
+                      </>
                     )}
-                  </div>
-                )}
+                  </span>
+                </div>
               </div>
             );
           })}

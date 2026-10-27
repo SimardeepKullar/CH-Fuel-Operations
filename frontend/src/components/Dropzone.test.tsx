@@ -55,4 +55,13 @@ describe("Dropzone (T-42 step 42.1)", () => {
     expect(screen.queryByTestId("dropzone-rejection")).toBeNull();
     expect(onFile).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the upload icon, the heading, the two-line note and a primary Browse button (T-77)", () => {
+    render(<Dropzone onFile={vi.fn()} />);
+    const zone = screen.getByTestId("dropzone");
+    expect(zone.querySelector("svg.import-dropzone-icon")).toBeTruthy();
+    expect(zone.textContent).toContain("Drop a BVD invoice here");
+    expect(zone.querySelector(".import-dropzone-detail br")).toBeTruthy();
+    expect(zone.querySelector(".btn-primary")!.textContent).toBe("Browse file…");
+  });
 });

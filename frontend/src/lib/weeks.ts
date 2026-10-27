@@ -109,3 +109,11 @@ export function invoiceViewHref(pathname: string, searchParams: { toString(): st
   next.set(INVOICE_PARAM, value);
   return `/transactions?${next.toString()}`;
 }
+
+/** `2026-10-19T15:35:32Z` -> `"Oct 19, 2026 · 11:35:32 AM"` in the viewer's time zone (the Import history's Imported column). */
+export function formatImportedAt(iso: string): string {
+  const at = new Date(iso);
+  const day = at.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const time = at.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  return `${day} · ${time}`.replace(/\s/g, " ");
+}
