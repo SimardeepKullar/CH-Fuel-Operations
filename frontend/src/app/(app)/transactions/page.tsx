@@ -108,10 +108,6 @@ export default function TransactionsPage() {
   const shown = conversion ?? native;
   const { units, convertTo } = conversionParams(conversion);
 
-  const invoiceNumbers = useMemo(
-    () => Object.fromEntries((weekEntry?.invoices ?? []).map((invoice) => [invoice.currency, invoice.invoiceNumber])),
-    [weekEntry],
-  ) as Partial<Record<InvoiceCurrency, string>>;
   const request = scopeQuery(scope);
   const { filters, setFilter, clearFilters } = useTransactionFilters();
   const filterOptions = useTransactionFilterOptions(period, currency ?? null);
@@ -207,7 +203,6 @@ export default function TransactionsPage() {
           totalBeforeSearch={rows.length}
           loading={loading}
           error={error}
-          invoiceNumbers={invoiceNumbers}
           showInvoice={side === "all"}
           week={period}
           currency={shown === null ? "USD" : choiceCurrency(shown)}

@@ -36,6 +36,7 @@ function stop(overrides: Partial<TransactionListItem> = {}): TransactionListItem
     currency: "USD",
     // What BVD billed; the same as `currency` unless a conversion says otherwise.
     invoiceCurrency: overrides.invoiceCurrency ?? overrides.currency ?? "USD",
+    invoiceNumber: (overrides.invoiceCurrency ?? overrides.currency ?? "USD") === "CAD" ? "999217" : "999210",
     receiptStatus: "confirmed",
     flags: [],
     lines: [
@@ -52,7 +53,6 @@ function baseProps(rows: TransactionListItem[]) {
     totalBeforeSearch: rows.length,
     loading: false,
     error: null,
-    invoiceNumbers: { USD: "999210", CAD: "999217" },
     currency: "USD" as const,
     qtyUnit: "gal" as const,
     filters: EMPTY_FILTERS,

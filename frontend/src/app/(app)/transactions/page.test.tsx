@@ -55,6 +55,7 @@ function stop(overrides: Partial<TransactionListItem> = {}): TransactionListItem
     currency: "USD",
     // What BVD billed; the same as `currency` unless a conversion says otherwise.
     invoiceCurrency: overrides.invoiceCurrency ?? overrides.currency ?? "USD",
+    invoiceNumber: (overrides.invoiceCurrency ?? overrides.currency ?? "USD") === "CAD" ? "999217" : "999210",
     receiptStatus: "confirmed",
     flags: [],
     lines: [],
@@ -395,13 +396,13 @@ describe("TransactionsPage — the Overview's scope in the URL (T-74)", () => {
     expect(screen.getByText(/^All time · 2 weeks · /)).toBeTruthy();
   });
 
-  it("all time tags each row with its country, since rows from both invoices are mixed", async () => {
+  it("all time tags each row with its country and invoice number, since rows from both invoices are mixed", async () => {
     searchParams = new URLSearchParams("scope=all");
     twoWeeks();
     render(<TransactionsPage />);
     await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
     const tags = screen.getAllByTestId("tx-invoice-tag");
-    expect(tags.map((t) => (t as HTMLElement).dataset.currency).sort()).toEqual(["CAD", "USD"]);
+    expect(tags.map((t) => t.textContent).sort()).toEqual(["🇨🇦 999217", "🇺🇸 999210"]);
   });
 
   it("the strip counts each side's invoices in a range and picks a side through the URL", async () => {

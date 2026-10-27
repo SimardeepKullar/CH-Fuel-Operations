@@ -106,6 +106,9 @@ describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)"
       expect(row).not.toHaveProperty("ratePending");
       expectConverted(row, expected.get(row.id)!);
     }
+    // Every row names the invoice BVD billed it on, conversion or not.
+    const caNumber = (await pool.query<{ n: string }>("SELECT invoice_number AS n FROM invoices WHERE id = $1", [caId])).rows[0]!.n;
+    expect(new Set(result.rows.map((r) => r.invoiceNumber))).toEqual(new Set([caNumber]));
     // At least one line carries real tax, so the tax columns were converted, not just zeros.
     expect(result.rows.some((r) => r.lines!.some((l) => (l.hst ?? 0) !== 0))).toBe(true);
   });
