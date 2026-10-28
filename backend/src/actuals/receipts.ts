@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { InvoiceCurrency, ReceiptOutcome, ReceiptStatus } from "../db/types.js";
+import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptOutcome, ReceiptStatus } from "../db/types.js";
 import {
   driverRawResolved,
   stationSummary,
@@ -58,15 +58,28 @@ export interface ReceiptQueueItem {
   id: string;
   occurredAt: string;
   driver: RawResolvedString;
+  /** The resolved driver, which is what a batch confirm posts; `null` when the card's driver never resolved. */
+  driverId: string | null;
   truck: RawResolvedString;
   station: TransactionStationSummary | null;
+  /** The diesel (TA) line's quantity in `qtyUnit`, as BVD printed it; `null` when the stop has no TA line. */
+  qty: number | null;
+  qtyUnit: InvoiceQtyUnit;
+  /** The product codes the stop bought (`TA`, `DF`, `SC`…), sorted — what the row is for. A
+   * stop's lines are unique on `(fuel_stop_id, product_code)`, so each code appears once. */
+  products: string[];
   /** In `currency`, as billed. */
   total: number;
   currency: InvoiceCurrency;
+  /** The BVD invoice the stop was billed on (`999217`); with `currency`, it names the US or CA side of the week. */
+  invoiceNumber: string;
   receiptStatus: ReceiptStatus;
   /** Whether this stop carries an undismissed anomaly — the field
    * `EXCEPTIONS_FIRST_QUEUE_ORDER` sorts on (D17). */
   hasException: boolean;
+  /** The open anomalies behind `hasException`, for a hover. `charges_no_fuel` is left out, as
+   * Transactions never shows it as a flag. */
+  flags: { rule: string; severity: "amber" | "red" }[];
 }
 
 export interface ReceiptQueueProgress {
@@ -84,7 +97,12 @@ interface QueueRow {
   occurred_at: Date;
   total: string;
   currency: InvoiceCurrency;
+  qty_unit: InvoiceQtyUnit;
+  invoice_number: string;
+  ta_qty: string | null;
+  products: string[];
   receipt_status: ReceiptStatus;
+  driver_id: string | null;
   unit_raw: string;
   driver_name_raw: string;
   truck_unit_number: string | null;
@@ -94,6 +112,7 @@ interface QueueRow {
   station_city_raw: string | null;
   station_state_usps: string | null;
   has_exception: boolean;
+  flags: { rule: string; severity: "amber" | "red" }[];
 }
 
 function toQueueItem(row: QueueRow): ReceiptQueueItem {
@@ -101,12 +120,18 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
     id: row.id,
     occurredAt: row.occurred_at.toISOString(),
     driver: driverRawResolved(row),
+    driverId: row.driver_id,
     truck: truckRawResolved(row),
     station: stationSummary(row),
+    qty: row.ta_qty === null ? null : Number(row.ta_qty),
+    qtyUnit: row.qty_unit,
+    products: row.products,
     total: Number(row.total),
     currency: row.currency,
+    invoiceNumber: row.invoice_number,
     receiptStatus: row.receipt_status,
     hasException: row.has_exception,
+    flags: row.flags,
   };
 }
 
@@ -117,6 +142,9 @@ export interface ReceiptQueueScope {
   /** A billing week's end, `YYYY-MM-DD`. */
   week?: string;
   currency?: InvoiceCurrency;
+  /** Also return stops already confirmed — the Receipt Queue screen's Confirmed and All views.
+   * Off by default, so the sidebar badge and every older caller still get the work queue only. */
+  includeConfirmed?: boolean;
 }
 
 /** Parameterised `AND` conditions over `invoices i`, shared by the queue and its progress. */
@@ -166,8 +194,11 @@ export async function listReceiptQueue(
 
   const [{ rows }, progress] = await Promise.all([
     pool.query<QueueRow>(
-      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, fs.receipt_status,
-              fs.unit_raw, fs.driver_name_raw,
+      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, i.qty_unit, i.invoice_number, ta.qty AS ta_qty,
+              COALESCE((SELECT array_agg(fsl.product_code ORDER BY fsl.product_code)
+                        FROM fuel_stop_lines fsl WHERE fsl.fuel_stop_id = fs.id), '{}') AS products,
+              fs.receipt_status,
+              fs.driver_id, fs.unit_raw, fs.driver_name_raw,
               t.unit_number AS truck_unit_number,
               d.display_name AS driver_display_name,
               s.id AS station_id, s.name_raw AS station_name_raw,
@@ -175,13 +206,23 @@ export async function listReceiptQueue(
               EXISTS (
                 SELECT 1 FROM anomalies a
                 WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL
-              ) AS has_exception
+                  AND a.rule <> 'charges_no_fuel'
+              ) AS has_exception,
+              COALESCE((
+                SELECT jsonb_agg(jsonb_build_object('rule', a.rule, 'severity', a.severity) ORDER BY a.rule)
+                FROM anomalies a
+                WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL
+                  AND a.rule <> 'charges_no_fuel'
+              ), '[]'::jsonb) AS flags
        FROM fuel_stops fs
        JOIN invoices i ON i.id = fs.invoice_id
        LEFT JOIN trucks t ON t.id = fs.truck_id
        LEFT JOIN drivers d ON d.id = fs.driver_id
        LEFT JOIN stations s ON s.id = fs.station_id
-       WHERE fs.receipt_status <> 'confirmed'${scopeSql}
+       LEFT JOIN LATERAL (
+         SELECT qty FROM fuel_stop_lines WHERE fuel_stop_id = fs.id AND product_code = 'TA' LIMIT 1
+       ) ta ON true
+       WHERE ${scope.includeConfirmed === true ? "true" : "fs.receipt_status <> 'confirmed'"}${scopeSql}
        ${orderClause}`,
       scopeParams,
     ),
@@ -291,6 +332,41 @@ export async function confirmReceiptsForDriver(
 
     await client.query("COMMIT");
     return { driverId: params.driverId, confirmedCount: stopRows.length };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * `POST /receipt-checks`, batch confirm for an explicit list of stops — what the Receipt Queue's
+ * "Confirm all N shown" posts, because the dispatcher confirms the rows a driver and/or day
+ * filter shows, not the driver's whole queue. Already-confirmed ids are skipped, so a retry
+ * writes nothing twice; `confirmedCount` is the number actually written. One transaction.
+ */
+export async function confirmReceiptStops(
+  pool: Pool,
+  params: { fuelStopIds: readonly string[]; checkedBy: string },
+): Promise<{ confirmedCount: number }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{ id: string }>(
+      "SELECT id FROM fuel_stops WHERE id = ANY($1::uuid[]) AND receipt_status <> 'confirmed'",
+      [params.fuelStopIds],
+    );
+    const ids = rows.map((r) => r.id);
+    if (ids.length > 0) {
+      await client.query(
+        "INSERT INTO receipt_checks (fuel_stop_id, checked_by, outcome) SELECT unnest($1::uuid[]), $2, 'confirmed'",
+        [ids, params.checkedBy],
+      );
+      await client.query("UPDATE fuel_stops SET receipt_status = 'confirmed' WHERE id = ANY($1::uuid[])", [ids]);
+    }
+    await client.query("COMMIT");
+    return { confirmedCount: ids.length };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

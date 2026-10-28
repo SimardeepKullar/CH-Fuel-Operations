@@ -11,6 +11,25 @@ const RULE_LABELS: Record<string, string> = {
   price_above_published: "Price high",
 };
 
+/** One line per rule for a hover — what the rule found, in the dispatcher's terms. */
+const RULE_DESCRIPTIONS: Record<string, string> = {
+  sub_gallon: "Fuel line is under the minimum quantity",
+  unit_mismatch: "Unit typed at the pump does not match the truck assigned to the card",
+  too_close: "Another fill on the same card at the same station came shortly before",
+  price_above_published: "Billed price is above BVD's published price",
+};
+
+/** `Unit mismatch: Unit typed at the pump…` — the text a flag's hover shows. */
+export function describeFlag(rule: string): string {
+  const what = RULE_DESCRIPTIONS[rule];
+  return what === undefined ? labelFor(rule) : `${labelFor(rule)}: ${what}`;
+}
+
+/** The one-line meaning of a rule, or `null` for a rule added without one. */
+export function flagDescription(rule: string): string | null {
+  return RULE_DESCRIPTIONS[rule] ?? null;
+}
+
 function labelFor(rule: string): string {
   return RULE_LABELS[rule] ?? rule.replace(/_/g, " ");
 }

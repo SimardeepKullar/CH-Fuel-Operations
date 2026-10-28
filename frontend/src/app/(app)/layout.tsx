@@ -10,6 +10,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "../../App.css";
 import "../../banner.css";
 import "../../overview.css";
+import "../../receiptQueue.css";
 
 /**
  * T-39: the shell every Phase 9 screen mounts into (D15, A7). Fetches the
@@ -18,12 +19,12 @@ import "../../overview.css";
  * `(app)`, so it is one pair of requests per session, not one per route.
  */
 export default function AppShellLayout({ children }: { children: ReactNode }) {
-  const { receipts, flags } = useStandingCounts();
+  const { receipts, flags, refresh } = useStandingCounts();
   const pendingReceipts = receipts ? receipts.total - receipts.done : null;
 
   return (
     <WeekProvider>
-      <StandingCountsProvider value={{ receipts, flags }}>
+      <StandingCountsProvider value={{ receipts, flags, refresh }}>
         <div className="app-shell">
           <Sidebar pendingReceipts={pendingReceipts} />
           <div className="app-shell-main">

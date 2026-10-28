@@ -40,6 +40,9 @@ export interface TransactionStationSummary {
    * column itself is never populated at ingest (`resolveStation.ts`), so it
    * is derived here rather than trusted from a column that doesn't exist. */
   loveNumber: number | null;
+  /** What to print for the station: `Love's #294` when the name carries a store number, otherwise the
+   * site's own name as BVD prints it (a CA site, `BVD MISSISSAUGA - SHAWSON`, has no `#`). */
+  name: string;
   city: string;
   state: string;
 }
@@ -214,16 +217,30 @@ export function truckRawResolved(row: Pick<TransactionRow, "truck_unit_number" |
   };
 }
 
+/** BVD prints some site names and cities in capitals (`BVD MISSISSAUGA - SHAWSON`). A string with no
+ * lowercase letter is title-cased for display, keeping the `BVD` brand; mixed-case text is left as sent. */
+export function displayCase(text: string): string {
+  if (!/[A-Z]/.test(text) || /[a-z]/.test(text)) {
+    return text;
+  }
+  return text
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (c) => c.toUpperCase())
+    .replace(/\bBvd\b/g, "BVD");
+}
+
 export function stationSummary(
   row: Pick<TransactionRow, "station_id" | "station_name_raw" | "station_city_raw" | "station_state_usps">,
 ): TransactionStationSummary | null {
   if (row.station_id === null || row.station_name_raw === null) {
     return null;
   }
+  const { storeNumber } = parseStoreName(row.station_name_raw);
   return {
     id: row.station_id,
-    loveNumber: parseStoreName(row.station_name_raw).storeNumber,
-    city: row.station_city_raw ?? "",
+    loveNumber: storeNumber,
+    name: storeNumber === null ? displayCase(row.station_name_raw.trim()) : `Love's #${storeNumber}`,
+    city: displayCase(row.station_city_raw ?? ""),
     state: row.station_state_usps ?? "",
   };
 }

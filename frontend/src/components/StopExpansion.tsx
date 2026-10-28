@@ -148,7 +148,7 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
           <dt>Station</dt>
           <dd>
             {stop.station
-              ? `Love's #${stop.station.loveNumber ?? "?"} — ${stop.station.city}, ${stop.station.state}`
+              ? `${stop.station.name} — ${stop.station.city}, ${stop.station.state}`
               : "Unresolved"}
           </dd>
           <dt>Card</dt>

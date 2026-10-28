@@ -25,10 +25,10 @@ const SCREEN_TITLES: Record<string, string> = {
  * Screens that render their own `PageBanner` — they have controls of their own
  * (a scope, a Draft/Sent switch, counts) — so the shell draws no header over them.
  */
-export const OWN_BANNER = new Set(["/", "/plans", "/overview", "/transactions", "/import", "/plan-actual"]);
+export const OWN_BANNER = new Set(["/", "/plans", "/overview", "/transactions", "/import", "/plan-actual", "/receipt-queue"]);
 
-/** Screens governed by the shell's single billing-week selector. */
-const WEEK_ROUTES = new Set(["/receipt-queue", "/other-charges", "/drivers", "/trucks", "/stations"]);
+/** Screens governed by the shell's single billing-week selector. The Receipt Queue is not one: it is a standing worklist across every week (D17). */
+const WEEK_ROUTES = new Set(["/other-charges", "/drivers", "/trucks", "/stations"]);
 
 /**
  * The default page header (T-75): a `PageBanner` for every screen that does not draw its
