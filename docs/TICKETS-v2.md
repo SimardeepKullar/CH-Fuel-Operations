@@ -122,6 +122,7 @@ If the spec and the repository disagree, say so and propose the edit.
 | **T-75** | **Banner rollout — `PageBanner` on every screen** | T-71 | **12** | **done — merged (`8df1373`, PR #21)** |
 | **T-76** | **Frontend UI design — all pages** | T-75 | **12** | **new** · to be specified |
 | **T-77** | **Import screen restyle — upload panel and one-line history** | T-42, T-64, T-75 | **12** | **done — merged (`b2f8a03`, PR #24)** |
+| **T-78** | **One assigned truck per driver — drop effective dates** | T-26, T-28, T-30 | **12** | **new** |
 
 **Phase 11 (Canada invoices)** lands before T-49: T-61, T-63 and T-66 edit `0003_actuals_schema.sql` in place, which D21 allows only until the first deploy. Order: T-60 and T-62 in parallel → T-61 → T-63 and T-66 in parallel → T-64 → T-65. Decisions D24–D30 (PROJECT-SCOPE-v2 §A15) govern all seven.
 
@@ -765,18 +766,24 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 
 **Goal.** A8.5, optimised for speed and built to survive automation.
 
-**Files.** New: `frontend/src/app/(app)/receipt-queue/page.tsx`, `QueueCard.tsx`, `BatchConfirm.tsx`.
+**Redesigned 2026-10-28, from the owner's design (`ReceiptQueue.dc.html`).** The first build (one card at a time, `Y`/`N`/`S` shortcuts, batch by driver) was replaced by a table: every fuel purchase of the selected billing week is a row with its own Yes / No. Keyboard shortcuts and Skip are gone by design. The items below are the current definition of done.
+
+**Files.** `frontend/src/app/(app)/receipt-queue/page.tsx`, `frontend/src/lib/receiptQueueView.ts` (filters, search, view rules), `frontend/src/receiptQueue.css`; `QueueCard.tsx` and `BatchConfirm.tsx` removed. Backend: `GET /receipt-queue?include=all`, `POST /receipt-checks` with `fuelStopIds`, per-item `flags`, and a station display `name` shared with Transactions. No migration — status lives in `fuel_stops.receipt_status` and `receipt_checks`.
 
 **Dependencies.** T-35, T-39.
 
 **Definition of done.**
-- [ ] One transaction at a time with enough context to search Samsara (driver, date/time, truck, station, gallons, total).
-- [ ] `Y` / `N` / `S` keyboard shortcuts, visible on screen, working without focus gymnastics.
-- [ ] Progress reads `12 of 60`.
-- [ ] Batch confirm for a driver who uploaded everything, with an explicit count before it writes.
-- [ ] **Works on a phone**: hit targets ≥ 44px, one-thumb reach for Y/N, no horizontal scroll at 390px.
-- [ ] The layout does not assume every item needs a decision — an exceptions-only queue renders correctly with no code change (D17).
-- [ ] An optimistic decision that fails on the server rolls back visibly.
+- [x] A row per fuel purchase of the selected week, newest first: receipt status (icon + word), date · time, driver, truck, station, quantity with its unit (gal / L), total with a currency prefix, reason, and Yes / No (`aria-pressed`; a decided row can be changed).
+- [x] `To check | Confirmed | All` with counts (To check = pending + missing), progress `12 of 60 confirmed · 48 to check`, and the sidebar badge following decisions.
+- [x] Search matches driver, truck, station or a date typed `Oct 21` / `10/21`; Driver, Day and Flagged-only filters; Clear.
+- [x] Batch confirm appears only under a driver and/or day filter with undecided rows, states the count and how many were marked missing, confirms before writing, and writes exactly the shown rows in one transaction.
+- [x] Optimistic decisions: counts and progress move at once; a failed save reverts the row, highlights it and shows an alert naming the row and reason with Retry and Dismiss; a row decided this session stays listed in To check until the view or a filter changes.
+- [x] Loading skeleton, load-error panel with Try again, "Nothing left to check" with View all, and a no-match state with Clear filters.
+- [x] The station column prints the site's own name (`BVD Mississauga - Shawson`; `Love's #368` for a US store), title-cased when BVD sends capitals — on Transactions too.
+- [x] The truck cell is Transactions' `RawResolved`; the Flagged badge hovers (and takes focus) to name each open anomaly. `charges_no_fuel` never flags, here or in the Flagged-only filter.
+- [x] Phone: filters wrap and the table scrolls horizontally inside its card.
+- [ ] **"No upload found" reason badge** — nothing records an automated check result yet. Needs a source on `receipt_checks` (e.g. `manual` | `samsara`) and a flag on `fuel_stops`; blocked on A18 Q3 (does Samsara expose receipt uploads?).
+- [ ] Rows whose truck never resolved (the card's driver has no truck assignment) — resolved by T-78, not here.
 
 ---
 
@@ -1718,3 +1725,55 @@ Sorted by raw US spend as the hand-off's logic does, so with partial rates the o
 - [x] Move: disabled until the date changes; a 409 shows its message within the row; a success clears the draft — the existing assertions pass unchanged.
 - [x] A visual check against the owner's screenshot — done by the owner locally; no screenshot attached to the PR.
 - [x] `npm run verify` green.
+
+---
+
+## T-78 · One assigned truck per driver — drop effective dates
+
+**Priority 78. New — from the owner, 2026-10-28.** Data model, resolution and anomaly change. No new screen.
+
+**Goal.** Every driver has exactly one assigned truck, set by dispatch, with no date range. A fuel stop resolves its truck from the card's driver's assigned truck. Whenever the invoice's entered unit differs from that truck, the stop gets a `unit_mismatch` flag.
+
+**Why.** On the Week ending 2026-09-09 CA invoice, stops for five drivers show only the raw unit (amber, dotted) and no resolved truck. Units 031 and 062 are in the roster. Those drivers simply have no `truck_assignments` row (see the T-62 note in `0005_fleet_roster_seed.sql`), so the stop resolves a driver and no truck, and `unit_mismatch` skips it: a `null` truck is "nothing to compare". The owner wants to set each driver's truck once and have every stop compared against it.
+
+**Are the effective dates used? Checked, not assumed.**
+- **Read by resolution.** `resolveAssignment` (`backend/src/catalog/assignments.ts`) picks the assignment in force on the stop's UTC date. `resolveTruckForStop`, the importer and the `reresolve` CLI all go through it.
+- **Carried by real data, twice.** The roster seed (synthetic and real, identical here) uses them for two mid-week handovers: Taylor → Finn Gray on 1019 from 2026-09-07, and Kit Barnes 1012 → 101 from 2026-09-04. Every other row is a placeholder start date (`2026-01-01`, or `2026-09-03` for the CA additions) with no end date.
+- **In the spec.** Scope v2 §A11's `truck_assignments` row and **D19** say a reassignment must not change how past stops resolve. A8.8, T-45's definition of done and `GET /trucks/{id}`'s `assignments` show assignment history. A13's `/settings/assignments` is described as "effective-dated writes".
+- **Not maintained by anyone.** There is no UI to write an assignment: Settings (T-47) is unbuilt, and every row is hand-seeded in `0005`.
+- **Not what protects history.** `fuel_stops.truck_id` is stored at import, so a later change to an assignment does not move past stops on its own. Only the manual `reresolve` CLI re-reads assignments for past stops.
+
+**Conclusion.** The dates are live code but low value. They are kept by hand, they matter for only two handovers, and stored `truck_id` already protects history for normal use. Dropping them is reasonable before the first deploy, provided the D19 trade-off is accepted on purpose, not by accident:
+- Kit Barnes's stops in 1012 before 2026-09-04 will flag as `unit_mismatch` against 101.
+- A truck swap entered later and followed by `reresolve` re-points past stops to the new truck.
+
+The owner accepts both. Under this model the assigned truck is the expectation, and a flag is how a different truck shows up.
+
+**Design.**
+- **Schema (squashable, D21; no deploy yet).** Replace `truck_assignments` with a nullable `drivers.truck_id uuid REFERENCES trucks(id)`. A column states "one truck per driver" directly. Two drivers sharing a truck (Jordan and Harper Lane on 072) is still allowed. **Open:** keep the table with `UNIQUE (driver_id)` and no dates instead, if anything is expected to hang off an assignment row. The recommendation is the column.
+- **Resolution.** `resolveAssignment(cardId)` becomes card → driver → `drivers.truck_id`, with no date. The rule that the truck **never** comes from the entered unit text (T-28) stays.
+- **Anomaly.** `unit_mismatch` compares `unit_raw` to the assigned truck's unit, as today. A driver with **no** assigned truck stays unflagged, because a `null` truck is not a mismatch. The import report already lists "cards resolved to a driver with no assignment", and that list should be what prompts dispatch to set one.
+- **Roster.** `0005_fleet_roster_seed.sql`, real and synthetic, sets one truck per driver from the owner's list. The five CA drivers with no truck get one. Taylor, Finn Gray and Kit Barnes each get a single truck. The synthetic file keeps the same scenarios with invented names.
+- **Re-running after a change.** Anomalies run only at import (`importInvoice.ts`); `reresolve` updates `truck_id` but does not re-run anomalies. After the roster changes, `reresolve` must also re-run `runAnomalies` for each invoice it touched. Otherwise stored stops keep their old truck and old flags.
+- **Truck detail.** `GET /trucks/{id}`'s `assignments` history becomes "drivers currently assigned this truck", and `assignedCard` no longer needs `asOf`.
+
+**Files.**
+- Migrations: `migrations/synthetic/0003_actuals_schema.sql` and `0005_fleet_roster_seed.sql`, plus the gitignored `migrations/real/` mirrors.
+- Backend: `backend/src/db/schema.ts` and `types.ts`, `backend/src/catalog/assignments.ts`, `backend/src/resolve/resolveTruck.ts` and `reresolve.ts`, `backend/src/cli/reresolve.ts`, `backend/src/actuals/trucks.ts`.
+- Tests: `assignments.test.ts`, and the integration tests `actualsSchema`, `actualsSeed`, `referenceLayer`, `reresolve`, `runAnomalies`, `trucks`, `importInvoice` and `invoice999210`.
+- Docs: `docs/PROJECT-SCOPE-v2.md` (amend D19, A8.8, and the A11 and A13 assignment rows), plus T-26's and T-45's definitions of done in this file, edited to match.
+
+**Not in scope.**
+- Editing the assignment in the app: that is T-47's Settings screen, which then writes one column instead of date ranges.
+- The leading-zero case (`"50"` vs `"050"`), which `unitMismatch.ts` notes is not yet normalised. Every stop is now compared against an assigned truck, so this will produce more false flags. It should be its own ticket, before or right after this one.
+
+**Dependencies.** T-26, T-28, T-30.
+
+**Definition of done.**
+- [ ] No `effective_from`/`effective_to` remains in the schema or code; each driver has at most one assigned truck, enforced by the schema.
+- [ ] A stop resolves the card's driver's assigned truck regardless of its date, and never from `unit_raw`. Asserted with stops before and after the old Kit Barnes handover date resolving to the same truck.
+- [ ] A stop whose `unit_raw` differs from the assigned truck is flagged `unit_mismatch`. A driver with no assigned truck is not flagged. Both are asserted.
+- [ ] Every driver in both roster seeds has an assigned truck, the five CA drivers included, and the real `0005` matches the owner's list.
+- [ ] After changing a driver's truck, `reresolve` updates past stops' `truck_id` **and** their `unit_mismatch` flags. Asserted in `reresolve.test.ts`.
+- [ ] D19 and the A8.8/A11/A13 rows in scope v2 are amended to say the trade-off was chosen on purpose, and T-26's and T-45's definitions of done are edited to match.
+- [ ] `npm run verify` is green from a clean checkout.

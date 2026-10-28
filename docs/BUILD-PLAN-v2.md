@@ -716,27 +716,20 @@ Common steps, applied per ticket rather than repeated below: a pure query-builde
 
 ## T-43 · Receipt Queue screen
 
-### Step 43.1 — The queue card and shortcuts
+> **Redesigned 2026-10-28.** The card, `Y`/`N`/`S` shortcuts and batch-by-driver (formerly steps 43.1–43.2) were built and then replaced by the table design. See T-43's definition of done in `TICKETS-v2.md`.
 
-**Files.** New: `receipt-queue/page.tsx`, `QueueCard.tsx`.
+### Step 43.3 — The table, filters and batch confirm
 
-**Tests.**
-- One item at a time with the A8.5 context fields.
-- `Y`/`N`/`S` work, are visible on screen, and do not require clicking first.
-- Progress reads `12 of 60`.
-- Skip advances without writing.
-- An optimistic decision that fails on the server rolls back visibly.
-- **Pass:** all five.
-
-### Step 43.2 — Phone layout and batch confirm
-
-**Files.** New: `BatchConfirm.tsx`. Modified: `QueueCard.tsx`.
+**Files.** `receipt-queue/page.tsx`, `lib/receiptQueueView.ts`, `receiptQueue.css`; backend `include=all` and `fuelStopIds`.
 
 **Tests.**
-- At 390px: no horizontal scroll, hit targets ≥ 44px, Y/N within one-thumb reach.
-- Batch confirm states the count before writing and writes in one transaction.
-- With an exceptions-only queue (2 items of 60), the layout renders correctly and does not imply 58 pending decisions.
-- **Pass:** all three.
+- A row shows its unit (gal / L) and a currency-prefixed total; a CA site prints its own name, not "Love's".
+- Yes / No update the row, counts and progress at once; a failed save reverts the row and shows the alert with the reason; the row stays listed in To check.
+- Search matches a date typed `10/21`.
+- Batch confirm is offered only under a driver/day filter, confirms before writing, and posts exactly the shown ids; the server skips ids already confirmed.
+- `GET /receipt-queue?include=all` returns confirmed stops; a `fuelStopIds` body is validated (non-empty, uuids).
+- The Flagged badge's hover names each open anomaly.
+- **Pass:** all six.
 
 ## T-44 · Other Charges screen
 
