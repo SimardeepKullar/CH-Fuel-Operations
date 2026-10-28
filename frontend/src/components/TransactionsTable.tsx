@@ -21,7 +21,7 @@ import {
   sumMoney,
 } from "../lib/formatMoney";
 import { formatFxEnteredAt } from "../lib/conversion";
-import { SIDE_FLAGS, SIDE_LABELS } from "../lib/weeks";
+import InvoiceTag from "./InvoiceTag";
 import {
   PRODUCT_OPTIONS,
   RECEIPT_STATUS_OPTIONS,
@@ -63,21 +63,6 @@ const columnHelper = createColumnHelper<TransactionListItem>();
 function perUnitHeader(prefix: string, currency: InvoiceCurrency | null, unit: InvoiceQtyUnit | null): string {
   if (currency !== null) return `${prefix} ${currency}${unit === null ? " per unit" : `/${unit}`}`;
   return `${prefix} per ${unit ?? "unit"}`;
-}
-
-/** Under All invoices, the tag under a row's date naming the invoice it came
- * from and its country: `🇨🇦 999217`. A row carries the currency it was billed
- * in (`invoiceCurrency`, which a conversion leaves alone — T-66), and a week
- * holds one imported invoice per currency (D26), so that currency names it. */
-function InvoiceTag({ currency, invoiceNumber }: { currency: InvoiceCurrency; invoiceNumber: string }) {
-  return (
-    <span className="tx-invoice-tag" data-currency={currency} data-testid="tx-invoice-tag">
-      <span role="img" aria-label={SIDE_LABELS[currency]}>
-        {SIDE_FLAGS[currency]}
-      </span>{" "}
-      {invoiceNumber}
-    </span>
-  );
 }
 
 /** The columns for the rows' currency and unit — `null` where the rows hold more
@@ -139,7 +124,7 @@ function buildColumns(
         const station = row.original.station;
         return (
           <span className="tx-station">
-            <span className="tx-station-name">{station ? `Love's #${station.loveNumber ?? "?"}` : "Unresolved"}</span>
+            <span className="tx-station-name">{station ? station.name : "Unresolved"}</span>
             <span className="tx-station-place">{station ? `${station.city}, ${station.state}` : "—"}</span>
           </span>
         );

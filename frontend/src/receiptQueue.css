@@ -1,0 +1,103 @@
+/* Receipt Queue (T-43). The toolbar, legend, panel and row typography are Transactions' own classes
+   (.tx-*, .rr-*, .anomaly-flag); this file only adds what Transactions has no equivalent for.
+   Square corners and the same small type scale throughout. */
+
+.rq-num { font-variant-numeric: tabular-nums; }
+.rq-r { text-align: right; }
+.rq-red { color: var(--color-error); }
+.rq-unit { color: var(--color-muted); font-size: 11px; }
+
+.rq-readout { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 9px; font: 400 12.5px var(--font-body); font-variant-numeric: tabular-nums; }
+.rq-readout strong { font-weight: 600; }
+.rq-bar { width: 120px; height: 5px; background: var(--color-divider); overflow: hidden; display: block; }
+.rq-bar-fill { display: block; height: 100%; background: var(--color-candidate); }
+
+.rq-btn {
+  height: 30px; padding: 0 14px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-label);
+  font: 600 10.5px var(--font-heading); letter-spacing: 0.11em; text-transform: uppercase; cursor: pointer;
+}
+.rq-btn:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-control-fg); }
+.rq-btn:disabled { opacity: 0.5; cursor: default; }
+.rq-btn-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-800); font-weight: 700; }
+.rq-btn-primary:hover:not(:disabled) { background: #0090c4; border-color: #0090c4; color: var(--color-accent-800); }
+.rq-btn-danger { background: var(--color-error); border-color: var(--color-error); color: #fff; font-weight: 700; }
+.rq-btn-danger:hover:not(:disabled) { background: #8f1d17; border-color: #8f1d17; color: #fff; }
+.rq-btn-danger-ghost { border-color: var(--color-error-border); background: #fff; color: var(--color-error); }
+
+.rq-batch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 13px; background: var(--color-accent-100); border: 1px solid var(--color-accent-300); }
+.rq-batch-text { display: flex; flex-direction: column; gap: 1px; }
+.rq-batch-title { font: 600 12.5px var(--font-body); color: var(--color-accent-800); }
+.rq-batch-hint { font: 400 11px var(--font-body); color: var(--color-label); }
+.rq-batch-go { margin-left: auto; }
+.rq-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 13px; background: #fff; border: 1px solid var(--color-border); border-top: 2px solid var(--color-accent); }
+.rq-confirm-text { display: flex; flex-direction: column; gap: 3px; flex: 1 1 320px; font: 400 12.5px var(--font-body); }
+.rq-confirm-title { font: 700 15px var(--font-heading); letter-spacing: 0.03em; text-transform: uppercase; color: var(--color-accent-800); }
+.rq-confirm-actions { display: flex; gap: 8px; }
+
+.rq-flash { display: flex; align-items: center; gap: 9px; padding: 9px 13px; background: #eaf6ee; border: 1px solid #7db98f; color: var(--color-candidate); font: 600 12.5px var(--font-body); }
+.rq-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 13px; background: var(--color-error-bg); border: 1px solid var(--color-error-border); color: var(--color-error); }
+.rq-alert-text { flex: 1 1 360px; display: flex; flex-direction: column; gap: 2px; font: 400 12.5px var(--font-body); overflow-wrap: anywhere; }
+.rq-alert-text strong { font: 600 12.5px var(--font-body); }
+
+.rq-scroll { overflow: auto; max-height: 616px; }
+.rq-table { width: 100%; border-collapse: collapse; min-width: 1080px; font-variant-numeric: tabular-nums; }
+.rq-table th {
+  position: sticky; top: 0; z-index: 1; background: #fafbfc; text-align: left; padding: 9px 12px; white-space: nowrap;
+  border-bottom: 1px solid var(--color-border); font: 600 9.5px var(--font-heading); letter-spacing: 0.11em; text-transform: uppercase; color: var(--color-muted);
+}
+.rq-table th.rq-r { text-align: right; }
+.rq-table td { padding: 6px 12px; height: 44px; box-sizing: border-box; border-bottom: 1px solid var(--color-divider); white-space: nowrap; }
+.rq-table td.rq-r { text-align: right; }
+.rq-row-failed td { background: var(--color-error-bg); }
+.rq-row-failed td:first-child { box-shadow: inset 3px 0 0 var(--color-error); }
+/* The Flagged badge's hover: the same chips Transactions shows, with what each one means. It opens to the
+   left of the badge so the table's own scroll box does not clip it. */
+.rq-flag { position: relative; display: inline-flex; cursor: help; }
+.rq-flag:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.rq-flag-tip {
+  display: none; position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); z-index: 3;
+  flex-direction: column; gap: 6px; width: max-content; max-width: 300px; padding: 9px 11px;
+  background: #fff; border: 1px solid var(--color-border); border-top: 2px solid var(--color-accent);
+  white-space: normal; text-align: left; font: 400 11.5px var(--font-body); color: var(--color-label);
+}
+.rq-flag:hover .rq-flag-tip, .rq-flag:focus .rq-flag-tip, .rq-flag:focus-within .rq-flag-tip { display: flex; }
+.rq-flag-line { display: flex; align-items: flex-start; gap: 8px; }
+.rq-flag-line .anomaly-flag { flex: none; }
+
+.rq-status { display: inline-flex; align-items: center; gap: 8px; font: 600 12px var(--font-body); }
+.rq-status-confirmed { color: var(--color-candidate); }
+.rq-status-missing { color: var(--color-error); }
+.rq-status-pending { color: var(--color-label); }
+
+.rq-yn { display: inline-flex; gap: 5px; }
+.rq-yes, .rq-no {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 28px; min-width: 60px; padding: 0 10px;
+  font: 700 10.5px var(--font-heading); letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+}
+.rq-yes { background: #eaf5ee; color: var(--color-candidate); border: 1px solid #b9d9c5; }
+.rq-no { background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error-border); }
+.rq-yes[aria-pressed="true"] { background: var(--color-candidate); color: #fff; border-color: var(--color-candidate); }
+.rq-no[aria-pressed="true"] { background: var(--color-error); color: #fff; border-color: var(--color-error); }
+.rq-yes:disabled, .rq-no:disabled { opacity: 0.5; cursor: default; }
+
+.rq-done, .rq-empty, .rq-error { display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center; font: 400 12.5px var(--font-body); }
+.rq-done { padding: 52px 24px; }
+.rq-done h2 { margin: 4px 0 0; font: 700 19px var(--font-heading); letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-accent-800); }
+.rq-done p { margin: 0; color: var(--color-label); }
+.rq-empty { padding: 36px 24px; color: var(--color-label); }
+.rq-empty strong { font-weight: 600; color: var(--color-accent-800); }
+.rq-error { margin: 20px; padding: 26px 24px; background: var(--color-error-bg); border: 1px solid var(--color-error-border); color: var(--color-error); }
+.rq-error strong { font: 600 14px var(--font-body); }
+
+.rq-loading { padding: 10px 14px; font: 400 12px var(--font-body); color: var(--color-label); border-bottom: 1px solid var(--color-divider); background: #fafbfc; }
+.rq-skel { display: grid; grid-template-columns: 96px 150px 110px 50px minmax(0, 1fr) 80px 90px 240px; gap: 18px; align-items: center; height: 44px; padding: 0 12px; border-bottom: 1px solid var(--color-divider); }
+.rq-skel span { height: 9px; background: var(--color-divider); }
+.rq-skel span:last-child { height: 20px; background: #eef1f6; }
+
+.rq-foot { padding: 9px 14px; border-top: 1px solid var(--color-divider); }
+
+@media (max-width: 700px) {
+  .rq-yes, .rq-no { height: 34px; min-width: 64px; }
+  .rq-batch-go { margin-left: 0; width: 100%; }
+  .tx-search { max-width: none; }
+}

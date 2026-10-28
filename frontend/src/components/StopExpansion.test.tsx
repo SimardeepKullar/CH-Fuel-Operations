@@ -16,7 +16,7 @@ const A900000001: TransactionListItem = {
   card: { id: "card-1", number: "9000005" },
   driver: { resolved: "JORDAN", raw: "JORDAN", agrees: true },
   truck: { resolved: "072", raw: "072", agrees: true },
-  station: { id: "st-1", loveNumber: 294, city: "Dallas", state: "TX" },
+  station: { id: "st-1", loveNumber: 294, name: "Love's #294", city: "Dallas", state: "TX" },
   qty: 40.0,
   qtyUnit: "gal",
   retailPerUnit: 5.799,

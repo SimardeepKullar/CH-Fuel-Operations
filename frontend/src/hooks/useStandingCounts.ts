@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getHealth, getReceiptQueue } from "../lib/api";
 
 export interface StandingCounts {
@@ -7,6 +7,8 @@ export interface StandingCounts {
   /** `health.openAnomalyCount` — undismissed anomalies system-wide (A7's "Flags"). */
   flags: number | null;
   loading: boolean;
+  /** Re-reads both counts — the Receipt Queue calls it after a decision so the badge follows (T-43). */
+  refresh: () => void;
 }
 
 /**
@@ -20,6 +22,8 @@ export function useStandingCounts(): StandingCounts {
   const [receipts, setReceipts] = useState<{ done: number; total: number } | null>(null);
   const [flags, setFlags] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [version, setVersion] = useState(0);
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +48,7 @@ export function useStandingCounts(): StandingCounts {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [version]);
 
-  return { receipts, flags, loading };
+  return { receipts, flags, loading, refresh };
 }

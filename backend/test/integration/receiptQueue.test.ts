@@ -88,6 +88,13 @@ async function seed(pool: Pool): Promise<SeedIds> {
     [stopA1],
   );
 
+  // Only stopA1 carries a diesel line, so a queue item with no TA line (qty null) is covered too (T-43).
+  await pool.query(
+    `INSERT INTO fuel_stop_lines (fuel_stop_id, product_code, qty, retail_per_unit, billed_per_unit, amount)
+     VALUES ($1, 'TA', 120.50, 4.0000, 3.9000, 100.00)`,
+    [stopA1],
+  );
+
   await pool.query(
     `INSERT INTO users (email, password_hash, display_name) VALUES ('checker@example.com', 'x', 'Checker')`,
   );
@@ -142,7 +149,11 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
         occurredAt: string;
         driver: { resolved: string | null; raw: string; agrees: boolean | null };
         truck: { resolved: string | null; raw: string; agrees: boolean | null };
+        driverId: string | null;
         station: unknown;
+        qty: number | null;
+        qtyUnit: string;
+        products: string[];
         total: number;
         receiptStatus: string;
       }>;
@@ -159,6 +170,15 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     expect(item.truck.resolved).toBe("201");
     expect(item.total).toBe(100);
     expect(item.receiptStatus).toBe("pending");
+    // T-43: what the card shows (gallons) and what batch confirm posts (the driver).
+    expect(item.driverId).toBe(ids.driverA);
+    expect(item.qty).toBe(120.5);
+    expect(item.qtyUnit).toBe("gal");
+    const noFuelLine = body.items.find((i) => i.id === ids.stopB1)!;
+    expect(noFuelLine.qty).toBeNull();
+    // Each row says what it bought: the diesel stop carries TA, the no-diesel stop does not.
+    expect(item.products).toContain("TA");
+    expect(noFuelLine.products).not.toContain("TA");
 
     expect(body.progress).toEqual({ done: 1, total: 5 }); // stopBConfirmed is the one "done" stop
   });
@@ -261,6 +281,27 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
       [[ids.stopA1, ids.stopA2, ids.stopA3]],
     );
     expect(checkCountsAfter[0]!.count).toBe("3"); // unchanged
+  });
+
+  it("include=all returns confirmed stops too; batch-confirm by ids writes only the unconfirmed ones", async () => {
+    const all = await app.handle(new Request("http://localhost/api/v1/receipt-queue?week=2026-02-07&include=all"), {
+      userId: ids.checker,
+    });
+    const allBody = (await all.json()) as { items: { id: string; invoiceNumber: string }[] };
+    expect(allBody.items.map((i) => i.id)).toContain(ids.stopBConfirmed);
+    expect(new Set(allBody.items.map((i) => i.invoiceNumber))).toEqual(new Set(["T35-TEST"]));
+
+    const res = await app.handle(
+      postReceiptCheck({ fuelStopIds: [ids.stopA1, ids.stopA2, ids.stopBConfirmed], outcome: "confirmed" }),
+      { userId: ids.checker },
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { confirmedCount: number }).confirmedCount).toBe(2);
+    const { rows } = await scopedPool.query<{ receipt_status: string }>(
+      "SELECT receipt_status FROM fuel_stops WHERE id = $1",
+      [ids.stopA3],
+    );
+    expect(rows[0]!.receipt_status).toBe("pending"); // not in the list, untouched
   });
 
   it("a confirmed stop never reappears in the queue", async () => {
