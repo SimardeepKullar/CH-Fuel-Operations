@@ -84,7 +84,7 @@ describe.skipIf(!hasDatabase)("budgetGuard (integration)", () => {
     const call = (endpoint: keyof typeof DAILY_LIMITS) =>
       withBudgetGuard(scopedPool, "ors", endpoint, DAILY_LIMITS[endpoint], fetchSpy, NOON);
 
-    // A plan (TICKETS-v2 T-54): 3 directions, 2 matrix, 2 geocoding.
+    // A plan (T-54): 3 directions, 2 matrix, 2 geocoding.
     for (let plan = 1; plan <= 25; plan += 1) {
       for (let i = 0; i < 3; i += 1) await call("directions");
       for (let i = 0; i < 2; i += 1) await call("matrix");

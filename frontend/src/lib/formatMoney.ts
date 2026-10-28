@@ -9,7 +9,7 @@
 import type { InvoiceCurrency, InvoiceQtyUnit } from "@ch/core/db/types";
 
 /**
- * `255.13` -> `"$255.13"` — 2dp. TICKETS-v2.md T-40's DoD reads "a USD
+ * `255.13` -> `"$255.13"` — 2dp. T-40's DoD reads "a USD
  * marker is present on the money column" (singular, column-level), and the
  * design file (the visual authority for this screen) puts that marker on
  * the column header ("Total USD") and the footer caption ("All amounts

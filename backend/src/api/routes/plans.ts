@@ -89,7 +89,7 @@ export async function handleCreatePlan(pool: Pool, request: Request, url: URL, d
     const response = await createPlan(planRequest, { ...deps, pool }, createdBy);
     // A completed plan is a new resource (201); an infeasible one is still
     // persisted but is a legitimate answer, not a created resource in the
-    // same sense — §12.2, BUILD-PLAN 16.3: 200, never a 4xx.
+    // same sense — §12.2, T-16 step 16.3: 200, never a 4xx.
     const status = response.status === "completed" ? 201 : 200;
     return jsonResponse(convertPlanResponseUnits(response, units), status);
   } catch (err) {

@@ -94,14 +94,13 @@ Specs and process live in `docs/`, in the authority order defined in [CLAUDE.md]
 
 1. `migrations/*.sql` — authoritative schema
 2. `docs/PROJECT-SCOPE.md` (v1, the planner) and `docs/PROJECT-SCOPE-v2.md` (v2, actuals/reconciliation — wins on conflict)
-3. `docs/TICKETS.md` / `docs/TICKETS-v2.md` — the ticket register and current build status
-4. `docs/BUILD-PLAN.md` / `docs/BUILD-PLAN-v2.md` — per-ticket implementation steps and test plans
-5. `docs/UI-DATA-CONTRACT.md` — frontend data requirements not yet covered by the API spec
-6. `docs/HANDOFF-PROMPT.md` — bootstrap prompt for picking the project back up cold
+3. GitHub issues `T-NN · <title>` — one per ticket, with its definition of done and build steps; the "CH Fuel Planner" project board tracks their status
+4. `docs/UI-DATA-CONTRACT.md` — frontend data requirements not yet covered by the API spec
+5. `docs/HANDOFF-PROMPT.md` — bootstrap prompt for picking the project back up cold
 
 ## Status
 
-Built ticket-by-ticket (one branch, one squashed PR, one entry in `docs/TICKETS-v2.md` per ticket). Both the v1 route planner and the v2 actuals/reconciliation build are functionally complete through T-58; see `docs/TICKETS-v2.md` for the current ticket index and any open items.
+Built ticket-by-ticket (one issue, one branch, one squashed PR per ticket). Both the v1 route planner and the v2 actuals/reconciliation build are functionally complete through T-58; see the project board for open tickets.
 
 ## License
 

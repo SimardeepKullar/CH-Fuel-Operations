@@ -18,7 +18,7 @@ const hasRealFixture = existsSync(realFixturePath);
  * T-31: `npm run import-invoice -- ./data/bvd-invoices/invoice_999210.csv` end to
  * end, then every figure checked against the database directly in SQL —
  * never against application code, so these prove the data, not the code
- * path that wrote it (BUILD-PLAN-v2.md Step 31.2).
+ * path that wrote it (T-31 step 31.2).
  *
  * Migrations 0001-0006 (via `runMigrations`) seed the real 27-card/driver/
  * truck roster (0004, §A19), so every card and every present unit number on

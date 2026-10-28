@@ -59,14 +59,14 @@ Internal tool for a handful of named people, not multi-tenant SaaS. Do not desig
 
 ## A3. Where the build stands
 
-Verified 15 September 2026. This table is the last hand-maintained status snapshot in this doc — for anything past T-25, treat `TICKETS-v2.md`'s ticket index as the source of truth rather than re-syncing this table on every merge.
+Verified 15 September 2026. This table is the last hand-maintained status snapshot in this doc — for anything past T-25, treat the ticket issues on GitHub (the "CH Fuel Planner" project board) as the source of truth rather than re-syncing this table on every merge.
 
 | Ticket | State |
 |---|---|
 | T-01 … T-10 | **Complete, merged to `main` in `CH-Fuel-Planner`.** Toolchain + CI + hooks; rewritten schema + drift test; seed data (3 truck profiles, gazetteer, 1 user, 1 product code); Next.js/TS migration; `@ch/core` build boundary; auth + login; BVD price-sheet ingest + backfill (30 January dates + August sheet); station resolution 604/605 (#306 is temporarily closed and stays `unresolved`); ORS adapter + budget guard + both meters. |
-| T-11 … T-24 | Specified in `TICKETS.md`; see `TICKETS-v2.md`'s index for what has merged (T-11 corridor and T-12 optimiser have). Corridor query, optimiser, validation loop, detour costing, geocoding, plan endpoints, disclaimers, read endpoints, `sentToDriver`, frontend client, MapLibre, UI states, deploy. T-20 deferred (§17). |
+| T-11 … T-24 | Specified in their ticket issues; see the board for what has merged (T-11 corridor and T-12 optimiser have). Corridor query, optimiser, validation loop, detour costing, geocoding, plan endpoints, disclaimers, read endpoints, `sentToDriver`, frontend client, MapLibre, UI states, deploy. T-20 deferred (§17). |
 | T-25 | **Complete, merged to `main` (`324e939`, PR #12).** Actuals schema + seed data only — `drivers`, `driver_aliases`, `trucks`, `fuel_cards`, `truck_assignments`, invoice/fuel-stop/anomaly tables, 27-unit reference seed. No service, API, or UI touches these tables yet. |
-| T-26 … T-49 | **New in v2, not built.** `TICKETS-v2.md`. |
+| T-26 … T-49 | **New in v2, not built.** Specified in their ticket issues. |
 
 The frontend today is the v1 three-tab shell (Plan / Recent / Dev Tools) plus a Metrics tab in the design package. v2 replaces that shell with the sidebar IA in A7 — see A16.
 
@@ -433,6 +433,20 @@ These are edits to already-specified v1 tickets, not new tickets. Apply them whe
 - No claims of truck-legal routing. The `GOOGLE_LINK_NOT_TRUCK_LEGAL` disclaimer (T-17) stays.
 - The public marketing website is a separate product.
 - No multi-tenancy, no roles matrix, no virtualised million-row grids.
+
+
+### Deferred, deliberately
+
+Moved here from the retired v2 ticket register on 28 October 2026.
+
+| Item | Why not now | Ref |
+|---|---|---|
+| Samsara receipt automation | Needs A18 Q3 answered. The queue is already shaped for it (D17). | A8.5 |
+| Cost per mile as a headline | Needs odometer data (A18 Q1). Changes the Trucks screen's shape. | A8.8 |
+| Currency toggle | Needs A18 Q2. Until then everything is USD and says so. | A6.1 |
+| Published-price audit | Needs the BVD price file as a file (A18 Q5). The field exists and returns null. | A10 |
+| Gmail poller for invoices | Same seam as v1's price-sheet poller; `importInvoice` does not change. | §20 |
+| HERE routing, Canada, multi-stop | Unchanged from v1's deferred list. | §20 |
 
 ---
 

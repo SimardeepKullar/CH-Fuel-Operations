@@ -39,7 +39,7 @@ function printResult(result: BackfillResult): void {
 /**
  * argv and stdout, nothing else — same split as `cli/ingest.ts`. A per-file
  * failure is reported, not a reason to exit non-zero: that is the entire
- * point of batching (BUILD-PLAN 7.1), so only a failure to even start the
+ * point of batching (T-07 step 7.1), so only a failure to even start the
  * run (bad directory, etc.) fails the process.
  */
 export async function runBackfillCli(argv: string[], pool: Pool): Promise<number> {

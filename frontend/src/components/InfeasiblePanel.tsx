@@ -28,7 +28,7 @@ function gapLine(reason: InfeasibleReason): string | null {
 }
 
 /**
- * UI-DATA-CONTRACT §8 / BUILD-PLAN 23.1: an infeasible plan returns a
+ * UI-DATA-CONTRACT §8 / T-23 step 23.1: an infeasible plan returns a
  * structured reason with gap miles, suggestions, and the candidates the
  * corridor still found — a rich payload that previously had nowhere to go
  * beyond `reason.message`.
