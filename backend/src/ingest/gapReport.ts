@@ -36,7 +36,7 @@ export function isoDateRange(start: string, end: string): string[] {
 
 /**
  * Any date in `range` absent from `presentDates`. This is why `valid_on` is
- * a plain date rather than "valid until superseded" (BUILD-PLAN 7.2) — a
+ * a plain date rather than "valid until superseded" (T-07 step 7.2) — a
  * carried-forward stale price would hide exactly the gap this reports.
  */
 export function findGaps(presentDates: Iterable<string>, range: DateRange): string[] {

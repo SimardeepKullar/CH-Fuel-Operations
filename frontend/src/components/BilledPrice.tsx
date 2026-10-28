@@ -14,7 +14,7 @@ interface BilledPriceProps {
   ratePending?: boolean;
 }
 
-// Inline, not a CSS class: BUILD-PLAN-v2 Step 40.1 asserts the size
+// Inline, not a CSS class: T-40 step 40.1 asserts the size
 // relationship via `getComputedStyle`, and the test environment renders
 // components without the app's stylesheet cascade — see App.css's own
 // header comment on this pattern being the design file's convention too

@@ -28,8 +28,8 @@ const hasRealFixture = existsSync(realFixturePath);
  * `importInvoice()` never writes `receipt_checks` (T-35's job), so every
  * stop here is `pending`, and the anomaly count is T-30's real engine
  * output against the current seed roster, not the pre-T-30 "3". Every other
- * figure in this describe block matches A5 exactly, per BUILD-PLAN-v2.md
- * Step 33.1 and TICKETS-v2.md's T-33 DoD — including discount, which reads
+ * figure in this describe block matches A5 exactly, per T-33
+ * step 33.1 and T-33's DoD — including discount, which reads
  * BVD's own printed "Disc AMT" off `invoice_totals` rather than recomputing
  * it (see the discount test below for why that distinction matters here).
  */

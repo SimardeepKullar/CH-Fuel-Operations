@@ -50,7 +50,7 @@ function makeMinimalInvoiceCsv(dateIso: string): Buffer {
 
 /** A structurally wrong fuel-section header — stands in for an older year's
  * sheet shape (A18 Q6). Named with a leading "2016" invoice number so a
- * per-file failure names the year, the way BUILD-PLAN Step 48.2 asks for. */
+ * per-file failure names the year, the way T-48 step 48.2 asks for. */
 function shapeShiftedInvoiceCsv(): Buffer {
   return Buffer.from(
     [

@@ -7,7 +7,7 @@
  * files, fetched from www2.census.gov and checked by hand against every
  * row below.
  *
- * This is the "shared fixture" BUILD-PLAN step 9.1 asks for: proof that
+ * This is the "shared fixture" T-09 step 9.1 asks for: proof that
  * `normalizeCity()` converges on the same string
  * `scripts/load_gazetteer.py` would have already stored, for every dirty
  * string that exists in the real data — not just a plausible-looking

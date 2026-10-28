@@ -153,7 +153,7 @@ describe.skipIf(!hasDatabase)("OrsRoutingProvider metering (integration)", () =>
       const matrices = new OrsRoutingProvider({ apiKey: "test-key", fetchImpl: matrixFetch, pool: scopedPool });
       const matrixRequest = { origins: [origin], destinations: [destination], truckSpec };
 
-      // A plan's ORS calls (TICKETS-v2 T-54): 3 directions and 2 matrix. Geocoding
+      // A plan's ORS calls (T-54): 3 directions and 2 matrix. Geocoding
       // has no adapter yet, so its allowance is exercised in budgetGuard.test.ts.
       for (let plan = 1; plan <= 25; plan += 1) {
         for (let i = 0; i < 3; i += 1) await routes.route({ origin, destination, truckSpec });

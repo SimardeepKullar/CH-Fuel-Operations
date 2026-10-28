@@ -1,6 +1,6 @@
 # Overview page redesign — design brief
 
-*Paste this into Claude Design. Bring the mock-up and any changes back to the repo session, and we will update tickets T-69 to T-74 in `docs/TICKETS-v2.md` to match.*
+*Paste this into Claude Design. Bring the mock-up and any changes back to the repo session, and we will update tickets T-69 to T-74 (now GitHub issues) to match.*
 
 ## What this is
 

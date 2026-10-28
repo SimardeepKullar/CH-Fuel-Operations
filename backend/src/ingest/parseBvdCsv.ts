@@ -3,7 +3,7 @@ import { parse } from "csv-parse/sync";
 /**
  * The 15-column BVD header, in order, after normalisation (trim, uppercase,
  * collapse internal whitespace). All 31 January files and the August sheet
- * share this exact shape, so the gate can be strict (§4.1 / BUILD-PLAN 6.1).
+ * share this exact shape, so the gate can be strict (§4.1 / T-06 step 6.1).
  */
 const EXPECTED_HEADER = [
   "SITE",

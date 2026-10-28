@@ -27,8 +27,7 @@ Census names already arrive in the exact convention BVD's ALL-CAPS
 "McCalla", "Mount Vernon", "St. Augustine" (PROJECT-SCOPE.md §4.6).
 T-09's cityNormalize.ts has to reproduce that convention exactly, in
 TypeScript, from the supplier's raw strings; that the two independent
-implementations agree is asserted by the shared test in BUILD-PLAN step
-9.1, not by anything in this file.
+implementations agree is asserted by the shared test in T-09 step 9.1, not by anything in this file.
 
 Where a Place and a County Subdivision would claim the same (state,
 normalized name), the Place wins — it is the more direct match for a

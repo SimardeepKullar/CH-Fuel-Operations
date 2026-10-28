@@ -177,6 +177,6 @@ ends up.
 
 ## Suggested next step
 
-Register this as a numbered ticket (`docs/TICKETS-v2.md`) before branching,
+Register this as a numbered ticket (a `T-NN` GitHub issue — it became T-56) before branching,
 per the project's own one-ticket-one-branch workflow (CLAUDE.md) — this is
 real schema/app work, not a hotfix.
