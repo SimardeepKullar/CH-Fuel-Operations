@@ -1,0 +1,38 @@
+# Keeps the "CH Fuel Planner" project board in step with the ticket issues:
+# phase epics, sub-issues, the Phase field, and "Phase status" (Active /
+# Complete), so the board can hide finished phases by itself.
+#
+# Runs scripts/github-board.mjs on every issue event that can change a
+# phase's state. Its own edits re-trigger it once; that run finds nothing to
+# change and stops. Needs the PROJECT_TOKEN secret — a classic token with the
+# `repo` and `project` scopes; the workflow's own GITHUB_TOKEN cannot write to
+# a user-owned project.
+
+name: board-sync
+
+on:
+  issues:
+    types: [opened, closed, reopened, labeled, unlabeled, edited]
+  workflow_dispatch:
+
+concurrency:
+  group: board-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Sync the board
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/github-board.mjs --apply --project 4

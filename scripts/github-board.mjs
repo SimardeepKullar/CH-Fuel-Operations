@@ -1,28 +1,28 @@
 #!/usr/bin/env node
 // Keeps the ticket issues organised: every `T-NN · …` issue with a `phase-N`
-// label gets its release milestone, a type label if it has none, and is
-// attached as a sub-issue of its `Phase N · Name` epic. The issues are the
+// label gets a type label if it has none, and is attached as a sub-issue of
+// its `Phase N · Name` epic. Phases are the only grouping — no milestones
+// until there is a real ship date to track. The issues are the
 // ticket register (CLAUDE.md, Tickets); this script only files them.
 //
 // Dry run by default. Idempotent: re-running finds what exists and skips it.
 //
-//   node scripts/github-board.mjs            # print what would change
-//   node scripts/github-board.mjs --apply    # make the changes
+//   node scripts/github-board.mjs                        # print what would change
+//   node scripts/github-board.mjs --apply                # make the changes
+//   node scripts/github-board.mjs --apply --project 4    # also sync the board
 //
-// Needs `gh` authenticated against this repo. New issues reach the project
-// board through the project's own auto-add workflow, not this script.
+// With --project, every ticket and epic is on the board with its Phase field
+// set, and a "Phase status" field reads Complete once every ticket in its
+// phase is closed, Active otherwise — so a view filtered on
+// `-phase-status:Complete` drops finished phases by itself. The board-sync
+// workflow runs this on every issue event; --project needs a token with the
+// `project` scope (the workflow's PROJECT_TOKEN secret).
 
 import { execFileSync } from 'node:child_process';
 
 const APPLY = process.argv.includes('--apply');
-
-const RELEASES = [
-  { title: 'v1 Planner', phases: [0, 1, 2, 3, 4, 5, 6], description: 'Fuel planner — PROJECT-SCOPE.md, phases 0–6.' },
-  { title: 'v2 Actuals', phases: [7, 8, 9, 10], description: 'Actuals and reconciliation — PROJECT-SCOPE-v2.md, phases 7–10.' },
-  { title: 'v2 Canada', phases: [11], description: 'Canadian invoices, currency and billing weeks — phase 11 (D24–D30).' },
-  { title: 'v2 UI refresh', phases: [12], description: 'Overview redesign and screen restyles — phase 12.' },
-];
-const releaseOf = (phase) => RELEASES.find((r) => r.phases.includes(phase))?.title;
+const projectIdx = process.argv.indexOf('--project');
+const PROJECT = projectIdx >= 0 ? Number(process.argv[projectIdx + 1]) : null;
 
 const TYPE_LABELS = {
   feature: { color: '1f6feb', description: 'New capability or change in behaviour' },
@@ -40,7 +40,7 @@ const act = (desc, fn) => {
   return APPLY ? fn() : undefined;
 };
 
-// ── Labels and milestones ───────────────────────────────────────────────────
+// ── Labels ──────────────────────────────────────────────────────────────────
 
 const labels = new Set(ghJsonLines('label', 'list', '--limit', '500', '--json', 'name', '--jq', '.[] | {name}').map((l) => l.name));
 console.log('Labels');
@@ -48,22 +48,12 @@ for (const [name, l] of [...Object.entries(TYPE_LABELS).map(([t, l]) => [`type:$
   if (!labels.has(name)) act(`label ${name}`, () => gh('label', 'create', name, '--color', l.color, '--description', l.description));
 }
 
-console.log('Milestones');
-const milestones = new Set(
-  ghJsonLines('api', '--paginate', 'repos/{owner}/{repo}/milestones?state=all&per_page=100', '--jq', '.[] | {title}').map((m) => m.title),
-);
-for (const r of RELEASES) {
-  if (!milestones.has(r.title)) {
-    act(`milestone "${r.title}"`, () => gh('api', 'repos/{owner}/{repo}/milestones', '-f', `title=${r.title}`, '-f', `description=${r.description}`));
-  }
-}
-
 // ── Ticket issues ───────────────────────────────────────────────────────────
 
 // The issues endpoint returns PRs too, and PR titles also start with `T-NN ·`.
 const issues = ghJsonLines(
   'api', '--paginate', 'repos/{owner}/{repo}/issues?state=all&per_page=100',
-  '--jq', '.[] | select(.pull_request | not) | {number, id, title, state, milestone: .milestone.title, labels: [.labels[].name]}',
+  '--jq', '.[] | select(.pull_request | not) | {number, id, title, state, labels: [.labels[].name]}',
 );
 const phaseOf = (i) => {
   const l = i.labels.find((n) => /^phase-\d+$/.test(n));
@@ -76,11 +66,9 @@ const unphased = [];
 for (const t of tickets) {
   const phase = phaseOf(t);
   if (phase === null) { unphased.push(`#${t.number}`); continue; }
-  const want = releaseOf(phase);
-  const edit = [];
-  if (want && t.milestone !== want) edit.push('--milestone', want);
-  if (!t.labels.some((n) => n.startsWith('type:'))) edit.push('--add-label', 'type:feature');
-  if (edit.length) act(`#${t.number} ${t.title.split(' ·')[0]} → ${edit.filter((_, k) => k % 2).join(', ')}`, () => gh('issue', 'edit', String(t.number), ...edit));
+  if (!t.labels.some((n) => n.startsWith('type:'))) {
+    act(`#${t.number} ${t.title.split(' ·')[0]} → type:feature`, () => gh('issue', 'edit', String(t.number), '--add-label', 'type:feature'));
+  }
 }
 
 // ── Phase epics and sub-issues ──────────────────────────────────────────────
@@ -92,9 +80,11 @@ for (const i of issues) {
   if (m && i.labels.includes('epic')) epics.set(Number(m[1]), i);
 }
 const noEpic = new Set();
+const phaseComplete = new Map();
 for (const phase of [...new Set(tickets.map(phaseOf))].filter((p) => p !== null).sort((a, b) => a - b)) {
   const epic = epics.get(phase);
   const children = tickets.filter((t) => phaseOf(t) === phase);
+  phaseComplete.set(phase, children.every((c) => c.state === 'closed'));
   if (!epic) { noEpic.add(phase); continue; }
 
   const linked = new Set(
@@ -107,11 +97,83 @@ for (const phase of [...new Set(tickets.map(phaseOf))].filter((p) => p !== null)
   }
 
   // A phase is open while any of its tickets is.
-  const allClosed = children.every((c) => c.state === 'closed');
+  const allClosed = phaseComplete.get(phase);
   if (epic.state === 'open' && allClosed) {
     act(`close #${epic.number} — all ${children.length} tickets closed`, () => gh('issue', 'close', String(epic.number), '--reason', 'completed'));
   } else if (epic.state === 'closed' && !allClosed) {
     act(`reopen #${epic.number} — it has open tickets`, () => gh('issue', 'reopen', String(epic.number)));
+  }
+}
+
+// ── Project board ───────────────────────────────────────────────────────────
+
+if (PROJECT !== null) {
+  console.log('Project board');
+  const repo = JSON.parse(gh('repo', 'view', '--json', 'nameWithOwner,owner')).nameWithOwner;
+  const login = repo.split('/')[0];
+  const graphql = (query, vars = {}) =>
+    JSON.parse(gh('api', 'graphql', '-f', `query=${query}`, ...Object.entries(vars).flatMap(([k, v]) => [typeof v === 'number' ? '-F' : '-f', `${k}=${v}`]))).data;
+
+  const FIELDS = `fields(first: 50) { nodes { ... on ProjectV2SingleSelectField { id name options { id name } } } }`;
+  const head = graphql(`query($login: String!, $num: Int!) { user(login: $login) { projectV2(number: $num) { id ${FIELDS} } } }`, { login, num: PROJECT }).user.projectV2;
+  const fieldByName = (name) => head.fields.nodes.find((f) => f.name === name);
+
+  const phaseField = fieldByName('Phase');
+  if (!phaseField) throw new Error('The project has no "Phase" single-select field.');
+  let statusField = fieldByName('Phase status');
+  if (!statusField) {
+    act('create field "Phase status" (Active / Complete)', () => {
+      statusField = graphql(`mutation { createProjectV2Field(input: { projectId: "${head.id}", dataType: SINGLE_SELECT, name: "Phase status",
+        singleSelectOptions: [{ name: "Active", color: GREEN, description: "The phase still has open tickets" },
+                              { name: "Complete", color: GRAY, description: "Every ticket in the phase is closed" }] })
+        { projectV2Field { ... on ProjectV2SingleSelectField { id name options { id name } } } } }`).createProjectV2Field.projectV2Field;
+    });
+  }
+
+  // Every item on the board, keyed by issue number, with its single-select values by field name.
+  const items = new Map();
+  for (let cursor = null, more = true; more; ) {
+    const page = graphql(
+      `query($login: String!, $num: Int!${cursor ? ', $cursor: String!' : ''}) { user(login: $login) { projectV2(number: $num) {
+        items(first: 100${cursor ? ', after: $cursor' : ''}) { pageInfo { hasNextPage endCursor } nodes { id
+          content { ... on Issue { number } }
+          fieldValues(first: 20) { nodes { ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2SingleSelectField { name } } } } } } } } } }`,
+      { login, num: PROJECT, ...(cursor ? { cursor } : {}) },
+    ).user.projectV2.items;
+    for (const n of page.nodes) {
+      if (n.content?.number === undefined) continue;
+      const values = Object.fromEntries(n.fieldValues.nodes.filter((v) => v.field).map((v) => [v.field.name, v.name]));
+      items.set(n.content.number, { id: n.id, values });
+    }
+    more = page.pageInfo.hasNextPage;
+    cursor = page.pageInfo.endCursor;
+  }
+
+  const setOption = (itemId, field, option) =>
+    gh('project', 'item-edit', '--id', itemId, '--project-id', head.id, '--field-id', field.id, '--single-select-option-id', option.id);
+
+  const onBoard = [...tickets, ...[...epics.values()]];
+  for (const issue of onBoard) {
+    const phase = phaseOf(issue) ?? Number(/^Phase (\d+) · /.exec(issue.title)?.[1] ?? NaN);
+    if (!Number.isFinite(phase)) continue;
+    const tag = issue.title.split(' ·')[0];
+    let item = items.get(issue.number);
+    if (!item) {
+      act(`add #${issue.number} ${tag} to project ${PROJECT}`, () => {
+        const added = JSON.parse(gh('project', 'item-add', String(PROJECT), '--owner', login, '--url', `https://github.com/${repo}/issues/${issue.number}`, '--format', 'json'));
+        item = { id: added.id, values: {} };
+      });
+    }
+    const wantPhase = phaseField.options.find((o) => o.name.startsWith(`${phase} ·`));
+    if (!wantPhase) { console.log(`    no Phase option for phase ${phase} — add one named "${phase} · <name>"`); continue; }
+    const wantStatus = phaseComplete.get(phase) ? 'Complete' : 'Active';
+    if (item?.values.Phase !== wantPhase.name) {
+      act(`#${issue.number} ${tag} Phase → ${wantPhase.name}`, () => setOption(item.id, phaseField, wantPhase));
+    }
+    if (item?.values['Phase status'] !== wantStatus) {
+      act(`#${issue.number} ${tag} Phase status → ${wantStatus}`, () =>
+        setOption(item.id, statusField, statusField.options.find((o) => o.name === wantStatus)));
+    }
   }
 }
 

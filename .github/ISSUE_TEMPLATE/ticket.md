@@ -7,8 +7,8 @@ labels: ""
 
 **Depends on:** T-NN, T-NN · **Phase:** N
 
-<!-- Add the phase-N label (and a type:feature / type:bug / type:task label), then run
-     `node scripts/github-board.mjs --apply` to set the milestone and phase parent. -->
+<!-- Add the phase-N label (and a type:feature / type:bug / type:task label). The board-sync
+     workflow then attaches it to its phase epic and sets its board fields. -->
 
 ## Ticket
 
