@@ -22,6 +22,7 @@ vi.mock("../../../hooks/useWeek", () => ({
 
 const { default: ReceiptQueuePage } = await import("./page");
 const { StandingCountsProvider } = await import("../../../hooks/standingCountsContext");
+const { productLabel } = await import("../../../lib/transactionFilterConstants");
 
 function item(id: string, o: Partial<ReceiptQueueItem> = {}): ReceiptQueueItem {
   return {
@@ -33,6 +34,7 @@ function item(id: string, o: Partial<ReceiptQueueItem> = {}): ReceiptQueueItem {
     station: { id: "s1", loveNumber: 368, name: "Love's #368", city: "Dallas", state: "TX" },
     qty: 120.5,
     qtyUnit: "gal",
+    products: ["TA"],
     total: 412.37,
     currency: "USD",
     invoiceNumber: "999210",
@@ -75,6 +77,14 @@ describe("Receipt Queue — table", () => {
     expect(text).toContain("Love's #368");
     expect(text).toContain("Dallas, TX");
     expect(text).toContain("80.00 L");
+  });
+
+  it("names the products each row bought, one badge per product", async () => {
+    await renderPage([item("a", { products: ["DF", "TA"] }), item("b", { products: ["TA"] })]);
+    const [first, second] = screen.getAllByTestId("queue-products");
+    expect(first!.querySelectorAll(".product-badge")).toHaveLength(2);
+    expect(first!.textContent).toBe(`${productLabel("DF")}${productLabel("TA")}`);
+    expect(second!.querySelectorAll(".product-badge")).toHaveLength(1);
   });
 
   it("tags every row with the invoice it came from, and searches by invoice number", async () => {

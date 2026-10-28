@@ -65,6 +65,9 @@ export interface ReceiptQueueItem {
   /** The diesel (TA) line's quantity in `qtyUnit`, as BVD printed it; `null` when the stop has no TA line. */
   qty: number | null;
   qtyUnit: InvoiceQtyUnit;
+  /** The product codes the stop bought (`TA`, `DF`, `SC`…), sorted — what the row is for. A
+   * stop's lines are unique on `(fuel_stop_id, product_code)`, so each code appears once. */
+  products: string[];
   /** In `currency`, as billed. */
   total: number;
   currency: InvoiceCurrency;
@@ -97,6 +100,7 @@ interface QueueRow {
   qty_unit: InvoiceQtyUnit;
   invoice_number: string;
   ta_qty: string | null;
+  products: string[];
   receipt_status: ReceiptStatus;
   driver_id: string | null;
   unit_raw: string;
@@ -121,6 +125,7 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
     station: stationSummary(row),
     qty: row.ta_qty === null ? null : Number(row.ta_qty),
     qtyUnit: row.qty_unit,
+    products: row.products,
     total: Number(row.total),
     currency: row.currency,
     invoiceNumber: row.invoice_number,
@@ -189,7 +194,10 @@ export async function listReceiptQueue(
 
   const [{ rows }, progress] = await Promise.all([
     pool.query<QueueRow>(
-      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, i.qty_unit, i.invoice_number, ta.qty AS ta_qty, fs.receipt_status,
+      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, i.qty_unit, i.invoice_number, ta.qty AS ta_qty,
+              COALESCE((SELECT array_agg(fsl.product_code ORDER BY fsl.product_code)
+                        FROM fuel_stop_lines fsl WHERE fsl.fuel_stop_id = fs.id), '{}') AS products,
+              fs.receipt_status,
               fs.driver_id, fs.unit_raw, fs.driver_name_raw,
               t.unit_number AS truck_unit_number,
               d.display_name AS driver_display_name,

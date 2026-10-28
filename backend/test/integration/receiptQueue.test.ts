@@ -153,6 +153,7 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
         station: unknown;
         qty: number | null;
         qtyUnit: string;
+        products: string[];
         total: number;
         receiptStatus: string;
       }>;
@@ -175,6 +176,9 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     expect(item.qtyUnit).toBe("gal");
     const noFuelLine = body.items.find((i) => i.id === ids.stopB1)!;
     expect(noFuelLine.qty).toBeNull();
+    // Each row says what it bought: the diesel stop carries TA, the no-diesel stop does not.
+    expect(item.products).toContain("TA");
+    expect(noFuelLine.products).not.toContain("TA");
 
     expect(body.progress).toEqual({ done: 1, total: 5 }); // stopBConfirmed is the one "done" stop
   });

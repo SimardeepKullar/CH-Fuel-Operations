@@ -13,6 +13,7 @@ import AnomalyFlag, { describeFlag, flagDescription } from "../../../components/
 import SegmentedControl from "../../../components/SegmentedControl";
 import { formatMoney, formatQty2dp } from "../../../lib/formatMoney";
 import { actualRange, formatDay } from "../../../lib/weeks";
+import { productBadgeVariant, productLabel } from "../../../lib/transactionFilterConstants";
 import {
   NO_FILTERS,
   driverName,
@@ -356,7 +357,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
               </div>
               {Array.from({ length: 10 }, (_, i) => (
                 <div className="rq-skel" aria-hidden="true" key={i}>
-                  {Array.from({ length: 8 }, (_, j) => (
+                  {Array.from({ length: 9 }, (_, j) => (
                     <span key={j} />
                   ))}
                 </div>
@@ -384,6 +385,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                     <th scope="col">Driver</th>
                     <th scope="col">Truck</th>
                     <th scope="col">Station</th>
+                    <th scope="col">Products</th>
                     <th scope="col" className="rq-r">
                       Quantity
                     </th>
@@ -419,6 +421,15 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                         <span className="tx-station">
                           <span className="tx-station-name">{r.station === null ? "Unresolved" : r.station.name}</span>
                           <span className="tx-station-place">{r.station === null ? "—" : `${r.station.city}, ${r.station.state}`}</span>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="tx-products" data-testid="queue-products">
+                          {r.products.map((code) => (
+                            <span key={code} className={`product-badge product-badge-${productBadgeVariant(code)}`}>
+                              {productLabel(code)}
+                            </span>
+                          ))}
                         </span>
                       </td>
                       <td className="rq-r">
