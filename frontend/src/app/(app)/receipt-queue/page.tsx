@@ -51,8 +51,8 @@ export default function ReceiptQueuePage() {
     return (
       <>
         <PageBanner title="Receipt Queue" />
-        <div className="rq-page">
-          <section className="rq-panel" aria-label="Fuel purchases" aria-busy={loading}>
+        <div className="tx-page">
+          <section className="tx-panel" aria-label="Fuel purchases" aria-busy={loading}>
             <div className="rq-empty">{loading ? "Loading fuel purchases…" : "No invoices are imported yet."}</div>
           </section>
         </div>
@@ -207,47 +207,73 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
         }
         meta={rangeLabel === null ? "Receipts checked in Samsara" : `Invoices ${rangeLabel} · receipts checked in Samsara`}
       />
-      <div className="rq-page">
-        <section className="rq-panel rq-filters" aria-label="Filters">
-          <label className="rq-field rq-field-search">
-            <span className="rq-label">Search</span>
+      <div className="tx-page">
+        <div className="tx-toolbar" role="search" aria-label="Filters">
+          <div className="tx-toolbar-row">
             <input
               type="search"
+              className="input tx-search"
               value={filters.q}
-              placeholder="Driver, truck, station, or a date like Oct 21"
+              placeholder="Search driver, truck, station, or a date like Oct 21"
+              aria-label="Search fuel purchases"
               onChange={(e) => changeFilters({ q: e.target.value })}
             />
-          </label>
-          <label className="rq-field">
-            <span className="rq-label">Driver</span>
-            <select value={filters.driver} onChange={(e) => changeFilters({ driver: e.target.value })}>
-              <option value="">All drivers</option>
-              {driverOptions.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="rq-field">
-            <span className="rq-label">Day</span>
-            <select value={filters.day} onChange={(e) => changeFilters({ day: e.target.value })}>
-              <option value="">Any day</option>
-              {dayOptions.map(([key, text]) => (
-                <option key={key} value={key}>
-                  {text}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="rq-flagged">
-            <input type="checkbox" checked={filters.flaggedOnly} onChange={(e) => changeFilters({ flaggedOnly: e.target.checked })} />
-            <span>Flagged only</span>
-          </label>
-          <button type="button" className="rq-btn" onClick={() => changeFilters(NO_FILTERS)}>
-            Clear
-          </button>
-        </section>
+            <span className="tx-filter">
+              <span className="tx-filter-label">Driver</span>
+              <select
+                className="input tx-filter-select"
+                aria-label="Driver"
+                value={filters.driver}
+                onChange={(e) => changeFilters({ driver: e.target.value })}
+              >
+                <option value="">All</option>
+                {driverOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </span>
+            <span className="tx-filter">
+              <span className="tx-filter-label">Day</span>
+              <select className="input tx-filter-select" aria-label="Day" value={filters.day} onChange={(e) => changeFilters({ day: e.target.value })}>
+                <option value="">Any</option>
+                {dayOptions.map(([key, text]) => (
+                  <option key={key} value={key}>
+                    {text}
+                  </option>
+                ))}
+              </select>
+            </span>
+            <label className={`tx-anomaly-toggle${filters.flaggedOnly ? " active" : ""}`}>
+              <input type="checkbox" checked={filters.flaggedOnly} onChange={(e) => changeFilters({ flaggedOnly: e.target.checked })} />
+              <span className="tx-anomaly-toggle-label">Flagged only</span>
+            </label>
+            <span className="tx-toolbar-meta">
+              <span className="tx-count">
+                {shown.length} of {total}
+              </span>
+              <button className="tx-clear" type="button" onClick={() => changeFilters(NO_FILTERS)}>
+                Clear
+              </button>
+            </span>
+          </div>
+          <div className="tx-legend">
+            <span className="tx-legend-label">Reading the columns</span>
+            <span className="tx-legend-item">
+              <RawResolved value={{ resolved: "072", raw: "072", agrees: true }} />
+              resolved from the card assignment
+            </span>
+            <span className="tx-legend-item">
+              <RawResolved value={{ resolved: null, raw: "072", agrees: null }} />
+              as entered at the pump
+            </span>
+            <span className="tx-legend-item">
+              <RawResolved value={{ resolved: "072", raw: "0", agrees: false }} />
+              the two disagree
+            </span>
+          </div>
+        </div>
 
         {ready && batchScoped && n > 0 && !confirming && (
           <section className="rq-batch" aria-label="Batch confirm">
@@ -322,7 +348,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
           </div>
         )}
 
-        <section className="rq-panel" aria-label="Fuel purchases" aria-busy={loading && !ready}>
+        <section className="tx-panel" aria-label="Fuel purchases" aria-busy={loading && !ready}>
           {loading && !ready && (
             <>
               <div className="rq-loading" role="status">
@@ -376,43 +402,39 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                       <td>
                         <StatusCell status={r.status} />
                       </td>
-                      <td className="rq-num">
-                        <strong>{formatQueueDay(r.occurredAt)}</strong> <span className="rq-muted">· {formatQueueTime(r.occurredAt)}</span>
+                      <td>
+                        <span className="tx-datetime">
+                          <span className="tx-date">{formatQueueDay(r.occurredAt)}</span>
+                          <span className="tx-time">{formatQueueTime(r.occurredAt)}</span>
+                        </span>
                       </td>
                       <td>
-                        {r.driver.resolved === null ? (
-                          <span className="rq-raw" title="Unmatched invoice text: check this">
-                            {r.driver.raw}
-                          </span>
-                        ) : (
-                          <span className="rq-driver">{r.driver.resolved}</span>
-                        )}
+                        <RawResolved value={r.driver} />
                       </td>
                       <td>
                         <RawResolved value={r.truck} primary="raw" showRawWhenAgreeing />
                       </td>
-                      <td>{stationLabel(r)}</td>
-                      <td className="rq-r rq-num">
-                        {r.qty === null ? (
-                          "—"
-                        ) : (
-                          <>
-                            {formatQty2dp(r.qty)} <span className="rq-muted">{r.qtyUnit === "L" ? "L" : "gal"}</span>
-                          </>
-                        )}
+                      <td>
+                        <span className="tx-station">
+                          <span className="tx-station-name">{r.station === null ? "Unresolved" : r.station.name}</span>
+                          <span className="tx-station-place">{r.station === null ? "—" : `${r.station.city}, ${r.station.state}`}</span>
+                        </span>
                       </td>
-                      <td className="rq-r rq-num rq-total">{formatMoney(r.total, r.currency)}</td>
+                      <td className="rq-r">
+                        <span className="tx-gal">
+                          {r.qty === null ? "—" : formatQty2dp(r.qty)}
+                          {r.qty !== null && <span className="rq-unit"> {r.qtyUnit === "L" ? "L" : "gal"}</span>}
+                        </span>
+                      </td>
+                      <td className="rq-r">{formatMoney(r.total, r.currency)}</td>
                       <td>
                         {r.hasException && (
                           <span
-                            className="rq-badge rq-badge-flag"
+                            className="anomaly-flag anomaly-flag-amber"
                             tabIndex={0}
                             title={r.flags.map((f) => describeFlag(f.rule)).join("\n")}
                             aria-label={`Flagged: ${r.flags.map((f) => describeFlag(f.rule)).join("; ")}`}
                           >
-                            <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true">
-                              <path d="M1 12V1h7l-1.5 3L8 7H1" fill="currentColor" />
-                            </svg>
                             Flagged
                           </span>
                         )}
@@ -427,7 +449,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                             disabled={batchBusy}
                             onClick={() => decide(r, "confirmed")}
                           >
-                            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                            <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
                               <path d="M2 6.3l2.6 2.6L10 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
                             </svg>
                             Yes
@@ -440,7 +462,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                             disabled={batchBusy}
                             onClick={() => decide(r, "missing")}
                           >
-                            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                            <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
                               <path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" strokeWidth="1.8" />
                             </svg>
                             No
@@ -479,11 +501,8 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
             </div>
           )}
 
-          <div className="rq-foot">
+          <div className="rq-foot tx-caption">
             <span className="rq-num">{ready ? `Showing ${shown.length} · newest first` : loading ? "Loading…" : "Nothing loaded"}</span>
-            <span className="rq-legend">
-              <span className="rq-raw">DRVR D</span> raw invoice text, not matched
-            </span>
           </div>
         </section>
       </div>
@@ -492,34 +511,13 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
 }
 
 function StatusCell({ status }: { status: QueueRow["status"] }) {
-  if (status === "confirmed") {
-    return (
-      <span className="rq-status rq-status-ok">
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-          <circle cx="9" cy="9" r="9" fill="#2f7d4f" />
-          <path d="M5 9.3l2.6 2.6L13 6.5" fill="none" stroke="#fff" strokeWidth="2" />
-        </svg>
-        Confirmed
-      </span>
-    );
-  }
-  if (status === "missing") {
-    return (
-      <span className="rq-status rq-status-bad">
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-          <circle cx="9" cy="9" r="9" fill="#b3261e" />
-          <path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#fff" strokeWidth="2" />
-        </svg>
-        Missing
-      </span>
-    );
-  }
+  const mark = status === "confirmed" ? "✓" : status === "missing" ? "✕" : "?";
   return (
-    <span className="rq-status rq-status-pending">
-      <span className="rq-q" aria-hidden="true">
-        ?
+    <span className={`rq-status rq-status-${status}`}>
+      <span className={`tx-receipt-mark ${status}`} aria-hidden="true">
+        {mark}
       </span>
-      Pending
+      {STATUS_WORD[status]}
     </span>
   );
 }

@@ -60,7 +60,7 @@ export default function RawResolved({
 
   if (state === "unmatched") {
     return (
-      <span className="rr rr-unmatched" data-state="unmatched">
+      <span className="rr rr-unmatched" data-state="unmatched" title="Unmatched invoice text: check this">
         {value.raw}
       </span>
     );

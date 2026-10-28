@@ -71,13 +71,14 @@ describe("Receipt Queue — table", () => {
     const text = rows.map((r) => r.textContent).join("|");
     expect(text).toContain("US$412.37");
     expect(text).toContain("CA$150.00");
-    expect(text).toContain("Love's #368 · Dallas, TX");
+    expect(text).toContain("Love's #368");
+    expect(text).toContain("Dallas, TX");
     expect(text).toContain("80.00 L");
   });
 
   it("shows unmatched driver text as raw with the tooltip", async () => {
     await renderPage([item("a", { driver: { resolved: null, raw: "DRVR D", agrees: null } })]);
-    expect(screen.getAllByTitle("Unmatched invoice text: check this")[0]!.textContent).toBe("DRVR D");
+    expect(within(screen.getByTestId("queue-row")).getByTitle("Unmatched invoice text: check this").textContent).toBe("DRVR D");
   });
 
   it("decides optimistically and keeps the row in To check", async () => {
@@ -110,7 +111,7 @@ describe("Receipt Queue — table", () => {
 
   it("searches a date typed as 10/21", async () => {
     await renderPage([item("a"), item("b", { occurredAt: "2026-10-22T09:00:00" })]);
-    fireEvent.change(screen.getByPlaceholderText(/Driver, truck/), { target: { value: "10/21" } });
+    fireEvent.change(screen.getByPlaceholderText(/driver, truck/i), { target: { value: "10/21" } });
     expect(screen.getAllByTestId("queue-row")).toHaveLength(1);
   });
 
