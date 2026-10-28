@@ -12,11 +12,10 @@ When two disagree, the higher one wins and the lower one gets edited.
 
 1. **`migrations/*.sql`** — authoritative for schema. If it disagrees with the scope's §12, the migration is right and §12 gets edited.
 2. **`docs/PROJECT-SCOPE.md`** — the specification (v1, fuel planner, §-numbered). **`docs/PROJECT-SCOPE-v2.md`** extends it (v2, actuals/reconciliation, A-numbered) — where the two disagree, v2 wins and v1 gets edited.
-3. **`docs/TICKETS.md`** — ticket register for T-01–T-24. **`docs/TICKETS-v2.md`** continues it from T-25 onward and is the current source of truth for what's built — see its ticket index rather than hand-tracking status elsewhere.
-4. **`docs/BUILD-PLAN.md`** / **`docs/BUILD-PLAN-v2.md`** — per-ticket steps with test plans, split the same way (T-01–T-24 / T-25+). Work from these.
-5. **`docs/UI-DATA-CONTRACT.md`** — what the frontend needs that §14 does not yet return.
-6. **`docs/HANDOFF-PROMPT.md`** — the bootstrap prompt for a fresh session; read it first when picking this project back up cold.
-7. **This file** — workflow and conventions only. Never duplicate spec content here.
+3. **The ticket's GitHub issue** — `T-NN · <title>`, holding the goal, design, files, dependencies, definition of done and build steps. The issues and the "CH Fuel Planner" project board are the only place ticket scope and status are kept — see Tickets, below.
+4. **`docs/UI-DATA-CONTRACT.md`** — what the frontend needs that §14 does not yet return.
+5. **`docs/HANDOFF-PROMPT.md`** — the bootstrap prompt for a fresh session; read it first when picking this project back up cold.
+6. **This file** — workflow and conventions only. Never duplicate spec content here.
 
 The scope marks claims as **Verified** (measured against `data/`), **Decided** (a choice with a reason), or **Open** (§21 in v1, §A18 in v2). Do not treat an Open item as settled, and do not re-litigate a Decided one without saying why.
 
@@ -59,6 +58,16 @@ Migrations are grouped by domain (planning, actuals), schema apart from seed, an
 
 ---
 
+## Tickets
+
+Tickets are GitHub issues titled `T-<NN> · <title>`; the "CH Fuel Planner" project (`gh project view 4 --owner @me`) is the board over them. Until 28 October 2026 they lived in `docs/TICKETS*.md` and `docs/BUILD-PLAN*.md`; those files were retired, and each closed ticket's issue links to its frozen section.
+
+- **Read a ticket:** `gh issue view <n>`, or find it with `gh issue list --state all --search "T-43 in:title"`. The body's **Ticket** and **Build plan** sections are what the registers used to hold.
+- **New ticket:** open an issue from the *Ticket* template with the next free number, then run `node scripts/github-board.mjs --apply` — from the issue's `phase-<N>` label it sets the release milestone, a type label if none is set, and the phase-epic parent. The project's auto-add workflow puts it on the board.
+- **Changing scope:** edit the issue body. The spec it cites stays in `docs/PROJECT-SCOPE*.md` and changes in a PR as before.
+- **Status:** In progress is set by hand when a branch starts; the PR body's `Closes #<n>` closes the issue on merge and the board moves it to Done. Never close a ticket issue by hand unless it is deferred or folded (close as *not planned*, label `deferred`).
+- Release-level definitions of done live on the Ship epics: *Phase 6 · Ship* (v1) and *Phase 10 · Ship v2*.
+
 ## Workflow: one branch per ticket
 
 One ticket = one branch = one squashed commit on `main`. `main` history then reads as the ticket register, and every commit on it is a state CI verified.
@@ -67,11 +76,11 @@ One ticket = one branch = one squashed commit on `main`. `main` history then rea
 git checkout main && git pull
 git checkout -b ticket/T-01-toolchain
 
-# implement BUILD-PLAN steps one at a time, committing per step
+# implement the issue's build-plan steps one at a time, committing per step
 npm run verify
 
 git push -u origin ticket/T-01-toolchain
-gh pr create --fill          # body must contain "Closes #<issue>" — see Ticket board
+gh pr create --fill          # body must contain "Closes #<issue>"
 # CI green, then:
 gh pr merge --squash --delete-branch
 git checkout main && git pull
@@ -89,21 +98,12 @@ fix(T-06): reject unmapped PROD instead of defaulting
 
 **The squash commit** is what lands on `main`. Title it with the ticket: `T-06 · Ingest service and npm run ingest (#12)`.
 
-### Ticket board
-
-Every ticket has one GitHub issue titled `T-<NN> · <title>`; the GitHub Project "CH Fuel Planner" is the visual board over them. The board is a **view** — `docs/TICKETS-v2.md` stays the authority on scope and state, and nothing on the board is edited by hand.
-
-- Find a ticket's issue with `gh issue list --state all --search "T-43 in:title"`.
-- The PR body carries `Closes #<issue>`. Squash-merging closes the issue and the Project's built-in workflow moves the card to Done.
-- A new ticket gets its issue (label `phase-<N>`) when it is added to the register. A deferred or folded one is closed as "not planned" with label `deferred`.
-- Starting a ticket: move its card to In progress.
-
-**Do not start the next ticket until the current one is merged.** The dependency graph in `TICKETS.md` assumes each ticket builds on merged work, not on a sibling branch.
+**Do not start the next ticket until the current one is merged.** The dependencies each issue names assume each ticket builds on merged work, not on a sibling branch.
 
 ### A ticket is done when
 
-- Every step's tests in `BUILD-PLAN.md` pass.
-- The ticket's definition of done in `TICKETS.md` is fully met — not partly.
+- Every step's tests in the issue's build plan pass.
+- The issue's definition of done is fully met — not partly.
 - `npm run verify` is green from a clean checkout.
 - CI is green on the PR.
 
@@ -119,6 +119,7 @@ If a step cannot be finished, say so and leave it out explicitly. Do not narrow 
 - Invoice fixtures in `backend/test/fixtures/invoices/` are synthetic only, committed regardless of repo visibility. A real BVD invoice belongs in gitignored `data/bvd-invoices/` instead; tests asserting its exact figures check for the file there and skip automatically when it's absent, the same way `DATABASE_URL`-gated integration tests do. Every PDF there is rendered by `generateSamplePdf.ts` from invented data, never copied from a real invoice: `sample-redacted.pdf` (the same invoice as `sample-redacted.csv`), `sample-ca.pdf`, and one `edge-*.pdf` per failure mode. All subtotals and totals are derived from the printed rows. The samples reproduce the real layout (T-50) — a local-only test compares their masked line shapes against `data/bvd-invoices/`, printing kinds and shapes only, never a value. Regenerate after any generator change (`npx tsx test/fixtures/invoices/generateSamplePdf.ts`); a byte-for-byte test fails otherwise.
 - **No real driver name in a committed file, not even inside a `describe.skipIf(!hasRealFixture)` block, a test title, a comment or an identifier.** A real-invoice test that asserts a name reads it with `realName("<key>")` (`backend/test/support/realNames.ts`), inside `it`, from gitignored `data/bvd-invoices/real-names.json`. T-50 found about 20 such lines that T-58 had missed, in every public commit. Real totals and counts may stay in skip-gated tests. Names may not.
 - **BVD price sheets follow the same two-block pattern.** The real sheets in `data/bvd-prices/` are gitignored. `backend/test/fixtures/bvd-prices/` holds small hand-written synthetic CSVs that CI runs: `sample.csv` (a clean baseline — capped-at-retail rows, `SITE` ≠ store number, ambiguous city/state pairs, the one store the operator export cannot place) and one file per failure mode (`edge-rejections`, `edge-format`, `edge-bad-header`, `edge-missing-effective-date`, `edge-short-row`). Each test file that used the real sheets has a synthetic block that always runs and a separate `describe.skipIf(!hasRealData)` block that asserts the real figures and runs only where `data/bvd-prices/` exists — so on the dev machine both run, and in CI only the synthetic one does. Multi-day scenarios (gaps, byte-identical `(1)` duplicates) are composed in a temp directory from `sample.csv`, re-dated, as `backfillInvoices.test.ts` does; nothing multi-file is committed. Read files inside `it`, never at `describe` level — a skipped suite's factory still runs, so a describe-level read of a missing file breaks collection. Build CRLF cases in the test rather than committing them: `core.autocrlf` rewrites committed CSVs, and a fixture edited by splitting on `\n` breaks on a CRLF checkout.
+- Money and per-unit prices are compared **exactly**, as integers of cents and ten-thousandths — never as floats with a tolerance or `toBeCloseTo`. A cent of drift is what reconciliation exists to catch.
 - "Pass" means an assertion, not an eyeball — except the one visual check in T-04 step 4.2.
 - Write the test before the fix for any bug found mid-ticket.
 

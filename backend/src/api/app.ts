@@ -25,7 +25,7 @@ import { problemResponse } from "./problem.js";
  * `POST /plans` / `GET /plans/{id}` (T-16) are the first routes that pull
  * `planning`, `optimizer` and `routing` through this mount. T-32, T-33, and
  * T-34 add `/transactions`, `/overview`, and `/invoices` directly to this
- * table rather than waiting on T-16 — TICKETS-v2.md's critical path does not
+ * table rather than waiting on T-16 — the v2 critical path does not
  * route any of them through it.
  */
 export interface CreateAppOptions {

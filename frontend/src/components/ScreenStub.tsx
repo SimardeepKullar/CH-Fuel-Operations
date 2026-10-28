@@ -24,7 +24,7 @@ export default function ScreenStub({ title, ticket }: ScreenStubProps) {
         <Corners />
         <div className="screen-stub-title">{title}</div>
         <p className="screen-stub-body">
-          Not built yet — see <strong>{ticket}</strong> in <code>docs/TICKETS-v2.md</code>.
+          Not built yet — see <strong>{ticket}</strong> on the project board.
         </p>
         <button className="btn btn-primary blueprint" onClick={() => router.push("/")}>
           <Corners />

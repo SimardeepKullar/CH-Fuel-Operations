@@ -9,7 +9,7 @@ import {
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "./productCode.js";
 
 // Synthetic, invented data — committed, runs on a fresh clone and in CI.
-// See docs/BUILD-PLAN-v2.md step 27.1.
+// See T-27 step 27.1.
 const REDACTED_PATH = fileURLToPath(
   new URL("../../test/fixtures/invoices/sample-redacted.csv", import.meta.url),
 );

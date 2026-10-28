@@ -19,7 +19,7 @@ const hasRealData = existsSync(REAL_AUGUST);
 const SAMPLE_STORE_306_SITE_REF = "71444";
 
 // The real store #306: LOVES #306, Dandridge, TN, site_ref 42284 — the one
-// station T-08's operator-export join could not place (BUILD-PLAN 9.2). It is
+// station T-08's operator-export join could not place (T-09 step 9.2). It is
 // temporarily closed (Love's omits it from the export) and stays unresolved in
 // the dev DB; these tests use it to exercise the manual-entry path.
 const STORE_306_SITE_REF = "42284";

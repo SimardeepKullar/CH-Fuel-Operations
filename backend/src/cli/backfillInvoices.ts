@@ -59,7 +59,7 @@ function printResult(result: BackfillInvoicesResult): void {
  * argv and stdout, nothing else — same split as `cli/backfill.ts` and
  * `cli/importInvoice.ts`. A per-file failure, conflict, or skip is reported,
  * not a reason to exit non-zero: that is the entire point of batching
- * (BUILD-PLAN 7.1/48.1), so only a failure to even start the run (bad
+ * (T-07 step 7.1 / T-48 step 48.1), so only a failure to even start the run (bad
  * directory, etc.) fails the process.
  */
 export async function runBackfillInvoicesCli(argv: string[], pool: Pool): Promise<number> {

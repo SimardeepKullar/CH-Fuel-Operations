@@ -24,7 +24,7 @@ export interface PlanActualResult {
   exclusions: MatchExclusions;
   /** `matched / (matched + skipped_recommendation) * 100` (Decided, T-38). `null` when no dispatched recommendation fell in the period at all — nothing to take a percentage of. */
   adherencePct: number | null;
-  /** Sum of *positive* `delta_usd` across matched rows only — a favourable stop never offsets an unfavourable one in this figure (BUILD-PLAN 38.2). */
+  /** Sum of *positive* `delta_usd` across matched rows only — a favourable stop never offsets an unfavourable one in this figure (T-38 step 38.2). */
   moneyLeftOnTableUsd: number;
   /** Grouped by truck (Decided, T-38 and its T-46 prerequisite amendment) — stop count, planned/actual/variance in dollars, and this truck's own adherence percentage. */
   byTruckVarianceUsd: TruckVariance[];

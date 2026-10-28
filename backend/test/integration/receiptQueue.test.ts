@@ -316,7 +316,7 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
 
 /**
  * The one figure this ticket asks to be measured against the real invoice
- * rather than a synthetic fixture (BUILD-PLAN-v2.md Step 35.1). The real
+ * rather than a synthetic fixture (T-35 step 35.1). The real
  * 999210 CSV holds 66 fuel stops, not A5's stale 60 (see
  * invoice999210.test.ts's own note on that number) — 48 of the 66 are
  * confirmed here, so the figure this test asserts is `{done: 48, total: 66}`,

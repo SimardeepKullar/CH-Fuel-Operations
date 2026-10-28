@@ -80,7 +80,7 @@ Verified from the 2026-08-22 sheet: the spread between the cheapest and dearest 
 
 ## 2. Where the project actually stands
 
-Verified by inspection of the repository on 4 September 2026. **This section is a frozen baseline snapshot, not a live status tracker** — for current build state, see `TICKETS-v2.md`'s ticket index, the single source of truth for what's merged.
+Verified by inspection of the repository on 4 September 2026. **This section is a frozen baseline snapshot, not a live status tracker** — for current build state, see the ticket issues on GitHub (the "CH Fuel Planner" project board), the single source of truth for what's merged.
 
 ### What exists
 
@@ -376,6 +376,39 @@ The honest summary: this change matters for a truck whose physical range falls *
 | 17 | Permanent station coords from operator export, OSM and Census only | Provider geocoding has a 30-day cap (§17) |
 | 18 | Structured logging on every provider call | Keyed by request hash |
 | 19 | No job queue in v1 | Computation fits inside function limits |
+
+
+### 6.1 Register decisions D1–D10
+
+Moved here from the retired v1 ticket register (`TICKETS.md`) on 28 October 2026. D11 onward are in `PROJECT-SCOPE-v2.md` A15.
+
+Answered 6 September 2026. These close §21 Q1–Q3 and the open questions raised during exploration.
+
+| # | Decision | Consequence |
+|---|---|---|
+| **D1** | **No ORM and no query builder.** Raw parameterised SQL over `pg`. | §21 Q1 closed — neither Drizzle nor Kysely. Requires a hand-written migration runner (T-01) and reframes §12.2's drift test (T-02). |
+| **D2** | **`reserve_fraction` = 0.15.** | Affects exactly one column: `truck_profiles.reserve_fraction` — today `trucks.reserve_fraction NOT NULL DEFAULT 0.100` at `migrations/0001_init.sql:78`. The three seeded profiles in §16 already carry 0.15. Nothing else stores it; `plans` records the derived `min_arrival_gallons`, not the fraction. |
+| **D3** | **Mixed primary keys by rule.** `uuid` for anything exposed in a URL, `bigserial` for high-volume append-only rows. | uuid: `users`, `stations`, `truck_profiles`, `price_imports`, `import_batches`, `routes`, `plans`, `saved_locations`. bigserial: `station_prices`, `plan_stops`, `import_rejections`, `station_geocode_candidates`. Composite natural keys: `place_centroids`, `product_codes`, `provider_usage`, `provider_quota`. |
+| **D4** | **Migrate the frontend to TypeScript as early as possible.** | Merged into T-04 with the Next.js move, because both rewrite every component file and doing them separately means touching each file twice. |
+| **D5** | **Next.js from the start.** | T-04 replaces the Vite SPA. `backend/src/api/` still stays framework-free per §13 — the Next route handler is a thin mount, so the API remains testable without a server. |
+| **D6** | ~~**`truck_number` stays `integer`.**~~ **Superseded by D18 (`PROJECT-SCOPE-v2.md` A15).** Real fleet values turned out to include `1012`…`1023` alongside `031`…`073` — a leading zero that `integer` can't preserve, not just a `14-B` shape. `unit_number` is `text`, unpadded. | No schema change from §12. Display is zero-padded to three digits by one shared formatter. The mock's `Truck 14-B` labels are wrong and die with `trips.ts` in T-21. If a `14-B` unit ever exists, the column becomes `text` — a one-line migration, not a redesign. |
+| **D7** | **Login page in v1**, with Auth.js credentials + JWT sessions. | New, requested 6 September. §12's `users` table lacks `password_hash` and `display_name`; T-02 adds both. JWT sessions avoid the `accounts`/`sessions`/`verification_tokens` tables that database sessions would need for a single account. Auth moves from §19 step 14 to T-05. |
+| **D8** | **Migrations apply through a runner, not the Docker init mount.** | `docker-compose.yml` loses its `./migrations:/docker-entrypoint-initdb.d:ro` volume. The init mount only fires on an empty volume and has no equivalent on Neon; a runner is one code path for local and production both. |
+| **D9** | **One ticket = one branch = one squashed commit on `main`.** | Branch `ticket/T-NN-slug`, PR, CI green, squash merge, delete branch, branch fresh for the next ticket. `main` history then reads as the ticket register and every commit on it is a CI-verified state. Workflow detail lives in `CLAUDE.md`. |
+| **D10** | **CI moves from T-24 to T-01.** | Under D9 a gate introduced at the end would leave the preceding 23 merges unverified. `.github/workflows/ci.yml` and the git hooks are built in **T-01 step 1.4**; T-24 only hardens them for release. CI runs the *same* `npm run verify` a developer runs — it maintains no separate suite, it supplies a clean Linux environment with a fresh database. |
+
+#### Still open — not blocking, flagged where they bite
+
+| # | Question | Blocks | Scope ref |
+|---|---|---|---|
+| Q4 | Real fleet MPG | Nothing structurally; every dollar figure is directionally right and absolutely wrong until answered | §16, §21 Q4 |
+| ~~Q5~~ | ~~Exact Google Maps disclaimer wording~~ — **closed 22 September 2026**, wording pinned by `backend/src/planning/disclaimers.test.ts` (T-17) | — | §9.4, §21 Q5 |
+| Q6 | Does this count as Vercel business use | **T-24** — $20/mo Pro | §10, §21 Q6 |
+| Q8 | Is `min_leg_miles` 300 or 350 | Nothing — it is a profile column, tunable per truck. Note `DevToolsTab.jsx` currently shows 350 against the scope's 300; T-04 aligns it to 300 | §5.1, §21 Q8 |
+| — | Trip reference format (`T-1042` vs. raw UUID) | **T-18** list projection and **T-21** header chip | UI contract §7 |
+| — | Status vocabulary — solve status vs. trip lifecycle | **T-18**, **T-23**. The design has one badge for two axes | UI contract §4, §7 |
+| — | "Cheapest along route" set and size | **T-21** §3.7 chart | UI contract §7 |
+| — | DP rejection reasons for the in-corridor layer | **T-23** — optional, label stays generic without it | UI contract §3.8 |
 
 ---
 
@@ -1765,6 +1798,21 @@ Numbered in the order they should be built. Nothing below is done.
 - More complex optimiser strategies dropped into the registry — no orchestration changes needed (§13.1).
 - Possible move to self-hosted routing, which eliminates retention caps but needs a persistent box.
 
+
+### Deferred, deliberately
+
+Moved here from the retired v1 build plan on 28 October 2026. Recorded so they are gaps rather than unknowns.
+
+| Item | Why not now | Scope ref |
+|---|---|---|
+| Stop-penalty tuning | Needs real lanes where a detour is actually taken. v3.4 measured every chosen stop at 0.0 miles of detour, so the penalty term did no work. Tuning against zero evidence is worse than not tuning. | §5.2, §19 step 17 |
+| Range-derived leg window | Needs a trustworthy fleet MPG (Q4) and a truck whose physical range falls below the policy cap. No §16 profile is close — the weakest carries 975 miles against a 500-mile cap. | §5.6 |
+| HTTP `/imports` routes and upload UI | The operator and the user are the same person; a CLI is faster for them. Revisit the day a second person uses the planner — and the Gmail poller is then the better answer, with the upload route as the exception handler. | §11.2 |
+| Gmail poller | Phase 2. `price_imports` is the seam and `ingestFile` does not change. | §20 |
+| HERE routing | v1 cannot cash in better truck data while the driver follows a Google *car* route. Adopt when turn-by-turn ships to drivers, or when a coverage probe shows ORS missing restrictions materially. | §8.2 |
+| Canada, multi-stop, round trips, user-defined profiles | Additive; the schema already carries `country`, `plan_stops.seq` and `owner_user_id`. | §3, §20 |
+| Receipt backtesting | Needs `dispatched_at` accumulating real data. Driver invoices first, OCR second. | §20 Phase 3 |
+
 ---
 
 ## 21. Open questions
@@ -1773,11 +1821,11 @@ These need answers before the steps that depend on them.
 
 | # | Question | Affects | Recommendation |
 |---|---|---|---|
-| **Q1** | ~~Drizzle or Kysely?~~ | §7, all data access | **Closed — see `TICKETS.md` D1.** Decided: no ORM/query builder, raw parameterised SQL over `pg`. |
-| **Q2** | ~~`reserve_fraction`: 0.15 (spec) or 0.10 (current migration)?~~ | §5.5, §12.1 item 6, step 1 | **Closed — see `TICKETS.md` D2.** Decided: 0.15. |
-| **Q3** | ~~`uuid` or `bigserial` primary keys?~~ | §12, step 1 | **Closed — see `TICKETS.md` D3.** Decided: mixed by rule — `bigserial` for high-volume rows, `uuid` for anything exposed in a URL. |
+| **Q1** | ~~Drizzle or Kysely?~~ | §7, all data access | **Closed — see §6.1 D1.** Decided: no ORM/query builder, raw parameterised SQL over `pg`. |
+| **Q2** | ~~`reserve_fraction`: 0.15 (spec) or 0.10 (current migration)?~~ | §5.5, §12.1 item 6, step 1 | **Closed — see §6.1 D2.** Decided: 0.15. |
+| **Q3** | ~~`uuid` or `bigserial` primary keys?~~ | §12, step 1 | **Closed — see §6.1 D3.** Decided: mixed by rule — `bigserial` for high-volume rows, `uuid` for anything exposed in a URL. |
 | **Q4** | **What is the real MPG of the fleet?** | §16, every dollar figure | Cannot be answered from here. Until it is, the app's costs are directionally right and absolutely wrong. Flag it in the UI. |
-| **Q5** | ~~Exact wording of the Google Maps disclaimer.~~ | §9.4, step 13 | **Closed 22 September 2026 — see `TICKETS.md`'s Q5 row.** Wording pinned by `backend/src/planning/disclaimers.test.ts` (T-17). |
+| **Q5** | ~~Exact wording of the Google Maps disclaimer.~~ | §9.4, step 13 | **Closed 22 September 2026 — see §6.1's Q5 row.** Wording pinned by `backend/src/planning/disclaimers.test.ts` (T-17). |
 | **Q6** | **Does this count as business use for Vercel?** | §10, $20/mo | Almost certainly yes. Budget for Pro. |
 | **Q7** | **Ten-year backfill: all of it, or a recent window?** | §11.2, storage | Start with January 2026 (on disk). Extend once the pipeline is proven. 2.2M rows is not a storage problem; it is a "do not do it before it works" problem. |
 | **Q8** | **Is `min_leg_miles = 300` right, or was 350 better?** | §5.1 | 300 is the current decision. It was 350 through v3.3. The value is a profile column, not a constant — so this is tunable per truck rather than a one-way door. |
