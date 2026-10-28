@@ -71,7 +71,7 @@ git checkout -b ticket/T-01-toolchain
 npm run verify
 
 git push -u origin ticket/T-01-toolchain
-gh pr create --fill
+gh pr create --fill          # body must contain "Closes #<issue>" — see Ticket board
 # CI green, then:
 gh pr merge --squash --delete-branch
 git checkout main && git pull
@@ -88,6 +88,15 @@ fix(T-06): reject unmapped PROD instead of defaulting
 ```
 
 **The squash commit** is what lands on `main`. Title it with the ticket: `T-06 · Ingest service and npm run ingest (#12)`.
+
+### Ticket board
+
+Every ticket has one GitHub issue titled `T-<NN> · <title>`; the GitHub Project "CH Fuel Planner" is the visual board over them. The board is a **view** — `docs/TICKETS-v2.md` stays the authority on scope and state, and nothing on the board is edited by hand.
+
+- Find a ticket's issue with `gh issue list --state all --search "T-43 in:title"`.
+- The PR body carries `Closes #<issue>`. Squash-merging closes the issue and the Project's built-in workflow moves the card to Done.
+- A new ticket gets its issue (label `phase-<N>`) when it is added to the register. A deferred or folded one is closed as "not planned" with label `deferred`.
+- Starting a ticket: move its card to In progress.
 
 **Do not start the next ticket until the current one is merged.** The dependency graph in `TICKETS.md` assumes each ticket builds on merged work, not on a sibling branch.
 
