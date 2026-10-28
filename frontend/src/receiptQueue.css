@@ -50,7 +50,19 @@
 .rq-table td.rq-r { text-align: right; }
 .rq-row-failed td { background: var(--color-error-bg); }
 .rq-row-failed td:first-child { box-shadow: inset 3px 0 0 var(--color-error); }
-.anomaly-flag[tabindex] { cursor: help; }
+/* The Flagged badge's hover: the same chips Transactions shows, with what each one means. It opens to the
+   left of the badge so the table's own scroll box does not clip it. */
+.rq-flag { position: relative; display: inline-flex; cursor: help; }
+.rq-flag:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.rq-flag-tip {
+  display: none; position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); z-index: 3;
+  flex-direction: column; gap: 6px; width: max-content; max-width: 300px; padding: 9px 11px;
+  background: #fff; border: 1px solid var(--color-border); border-top: 2px solid var(--color-accent);
+  white-space: normal; text-align: left; font: 400 11.5px var(--font-body); color: var(--color-label);
+}
+.rq-flag:hover .rq-flag-tip, .rq-flag:focus .rq-flag-tip, .rq-flag:focus-within .rq-flag-tip { display: flex; }
+.rq-flag-line { display: flex; align-items: flex-start; gap: 8px; }
+.rq-flag-line .anomaly-flag { flex: none; }
 
 .rq-status { display: inline-flex; align-items: center; gap: 8px; font: 600 12px var(--font-body); }
 .rq-status-confirmed { color: var(--color-candidate); }

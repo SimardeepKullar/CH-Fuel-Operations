@@ -130,6 +130,8 @@ describe("Receipt Queue — table", () => {
 
   it("explains a flag on hover", async () => {
     await renderPage([item("a", { hasException: true, flags: [{ rule: "unit_mismatch", severity: "amber" }] })]);
-    expect(screen.getByText("Flagged").closest("span")!.getAttribute("title")).toContain("Unit mismatch: ");
+    const tip = screen.getByTestId("queue-flag-tip");
+    expect(tip.textContent).toContain("Unit mismatch");
+    expect(tip.textContent).toContain("does not match the truck assigned to the card");
   });
 });

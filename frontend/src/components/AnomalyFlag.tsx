@@ -25,6 +25,11 @@ export function describeFlag(rule: string): string {
   return what === undefined ? labelFor(rule) : `${labelFor(rule)}: ${what}`;
 }
 
+/** The one-line meaning of a rule, or `null` for a rule added without one. */
+export function flagDescription(rule: string): string | null {
+  return RULE_DESCRIPTIONS[rule] ?? null;
+}
+
 function labelFor(rule: string): string {
   return RULE_LABELS[rule] ?? rule.replace(/_/g, " ");
 }

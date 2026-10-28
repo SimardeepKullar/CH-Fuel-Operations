@@ -8,7 +8,7 @@ import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
 import { useWeek } from "../../../hooks/useWeek";
 import PageBanner from "../../../components/PageBanner";
 import RawResolved from "../../../components/RawResolved";
-import { describeFlag } from "../../../components/AnomalyFlag";
+import AnomalyFlag, { describeFlag, flagDescription } from "../../../components/AnomalyFlag";
 import SegmentedControl from "../../../components/SegmentedControl";
 import { formatMoney, formatQty2dp } from "../../../lib/formatMoney";
 import { actualRange, formatDay } from "../../../lib/weeks";
@@ -429,12 +429,19 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                       <td>
                         {r.hasException && (
                           <span
-                            className="anomaly-flag anomaly-flag-amber"
+                            className="rq-flag"
                             tabIndex={0}
-                            title={r.flags.map((f) => describeFlag(f.rule)).join("\n")}
                             aria-label={`Flagged: ${r.flags.map((f) => describeFlag(f.rule)).join("; ")}`}
                           >
-                            Flagged
+                            <span className="anomaly-flag anomaly-flag-amber">Flagged</span>
+                            <span className="rq-flag-tip" role="tooltip" data-testid="queue-flag-tip">
+                              {r.flags.map((f) => (
+                                <span className="rq-flag-line" key={f.rule}>
+                                  <AnomalyFlag flag={f} />
+                                  <span>{flagDescription(f.rule)}</span>
+                                </span>
+                              ))}
+                            </span>
                           </span>
                         )}
                       </td>
