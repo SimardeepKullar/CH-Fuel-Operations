@@ -1356,3 +1356,65 @@ Decisions D24–D30 (PROJECT-SCOPE-v2 §A15). Order: T-60 and T-62 in parallel �
 
 **Tests.** US top left, CA top right, combined below; the CA panel shows before tax / tax / with tax and both per-litre rates; "HST" vs "Sales tax" label rule; "Partial — CA invoice not imported"; "rate pending"; the rate and its date beside the combined figures; the actual-range footnote on `datesDiffer`; both chips highlighted.
 **Pass:** all; `npm run verify` green.
+
+---
+
+## T-79 · Leading zeros in entered unit numbers
+
+Lands before T-78.
+
+### Step 79.1 — `sameUnit`
+
+**Files.** Modified: `backend/src/domain/units.ts` (+ `units.test.ts`).
+
+**Logic.** Trim both; if both match `^\d+$`, compare with leading zeros stripped (`"000"` → `"0"`); otherwise compare exactly. Pure.
+
+**Tests.** `50`/`050`, `72`/`072`, `01012`/`1012`, ` 072 `/`072` match; `0`/`072`, `3224`/`064`, `07a`/`07` do not.
+**Pass:** all.
+
+### Step 79.2 — Every comparison site uses it
+
+**Files.** Modified: `backend/src/anomaly/rules/unitMismatch.ts`, `backend/src/resolve/resolveTruck.ts`, `backend/src/actuals/transactions.ts` (+ tests).
+
+**Tests.** `unitMismatch` does not flag `50` against `050`, still flags `0` and `3224`; resolution's `agrees` is `true` for `50`/`050`; a Transactions row entered `50` on truck `050` returns `truck.agrees: true`. No `unitRaw.trim() ===` / `unit_raw.trim() ===` left in `backend/src`.
+**Pass:** all; `npm run verify` green.
+
+---
+
+## T-78 · One current truck per driver, history kept automatically
+
+### Step 78.1 — One open assignment per driver, and `reassignTruck`
+
+**Files.** Modified: `migrations/synthetic/0003_actuals_schema.sql` (and the `real` mirror), `backend/src/catalog/assignments.ts`, `backend/src/db/schema.ts` (+ `assignments.test.ts`, `actualsSchema.test.ts`).
+
+**Logic.** Partial unique index `truck_assignments (driver_id) WHERE effective_to IS NULL`. `reassignTruck(pool, { driverId, truckId, from })`, one transaction: lock the driver's open row; same truck → no-op; `from` ≤ its `effective_from` → reject; else set its `effective_to = from − 1` and insert `(driverId, truckId, from, NULL)`. No open row → insert only.
+
+**Tests.** A second open row for one driver is rejected by the schema; two drivers on one truck are accepted; `reassignTruck` closes and opens correctly; same-truck no-op; back-dated `from` rejected; a failure leaves the old open row intact.
+**Pass:** all.
+
+### Step 78.2 — `no_truck_on_file` rule
+
+**Files.** New: `backend/src/anomaly/rules/noTruckOnFile.ts` (+ test). Modified: `backend/src/anomaly/runAnomalies.ts`, `migrations/synthetic/0004_actuals_config_seed.sql` (and the `real` mirror), `frontend/src/components/AnomalyFlag.tsx` (+ test).
+
+**Logic.** Pure: one amber `fuel_stop` finding per stop with a null truck; `detail.reason` = `no_driver` when the stop has no driver, else `no_assignment`. `runAnomalies` loads the stop's `driver_id` and `truck_id` for it. Label "No truck", description "No truck on file for this driver on this date".
+
+**Tests.** Both reasons; a stop with a truck is not flagged; a null-truck stop is never also `unit_mismatch`; the integration run on the synthetic roster flags the truckless driver's stops; the chip renders its label and description.
+**Pass:** all.
+
+### Step 78.3 — `reresolve` re-runs anomalies, and old stops do not move
+
+**Files.** Modified: `backend/src/resolve/reresolve.ts`, `backend/src/cli/reresolve.ts` (+ `reresolve.test.ts`).
+
+**Logic.** After updating `truck_id`, re-run `runAnomalies` for each invoice touched, in the same transaction per invoice.
+
+**Tests.** Give a truckless driver a truck, `reresolve` → their stops get it and lose **No truck on file**. `reassignTruck(driver, newTruck, today)` → stops dated before today, whether imported before or after the change or re-run through `reresolve`, keep the old truck and flags. Kit Barnes before/after 2026-09-04 → 1012 / 101.
+**Pass:** all.
+
+### Step 78.4 — Roster from the owner's list
+
+**Files.** Modified: `migrations/real/0005_fleet_roster_seed.sql` (gitignored), `migrations/synthetic/0005_fleet_roster_seed.sql`, `backend/test/integration/actualsSeed.test.ts`, `referenceLayer.test.ts`, `backend/src/actuals/trucks.ts` (+ `trucks.test.ts`).
+
+**Logic.** Real: one open row per driver from the list, plus the known dated handovers. Synthetic: same scenarios, invented names — a team truck, a truckless driver, an entered `0`, a trailer number, one handover. `GET /trucks/{id}` adds the current driver(s) ahead of the history.
+
+**Tests.** Every driver in the real set has an open assignment (gated on `migrations/real`); the synthetic set has exactly one truckless driver and one shared truck; truck detail lists both team drivers as current. `git grep` for each real name and card is empty.
+**Pass:** all; `npm run verify` green.
