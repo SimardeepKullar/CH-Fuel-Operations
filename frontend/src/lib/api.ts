@@ -17,7 +17,7 @@ import type { PlanListResult } from "@ch/core/planning/planPersistence";
 import type { HealthStatus } from "@ch/core/catalog/health";
 import type { ImportInvoiceResponse, InvoiceDetail, InvoiceListItem, InvoiceListResult } from "@ch/core/api/routes/invoices";
 import type { PeriodWeek } from "@ch/core/api/routes/periods";
-import type { BatchConfirmResult, ReceiptCheckResult, ReceiptQueueResult } from "@ch/core/actuals/receipts";
+import type { ReceiptCheckResult, ReceiptQueueResult } from "@ch/core/actuals/receipts";
 import type { ReceiptOutcome } from "@ch/core/db/types";
 import type { DriversResult } from "@ch/core/actuals/drivers";
 import type { ListTransactionsResult, TransactionSortField } from "@ch/core/actuals/transactions";
@@ -187,19 +187,24 @@ export function getReceiptQueue(): Promise<ReceiptQueueResult> {
   return request<ReceiptQueueResult>("/receipt-queue");
 }
 
+/** `GET /receipt-queue?week=&include=all` — the Receipt Queue screen's source: every fuel stop of one
+ * billing week, confirmed ones included, each carrying its own `receiptStatus`. */
+export function getReceiptWeek(week: string): Promise<ReceiptQueueResult> {
+  return request<ReceiptQueueResult>(`/receipt-queue?week=${encodeURIComponent(week)}&include=all`);
+}
+
+/** `POST /receipt-checks` with `fuelStopIds` — confirms exactly the rows the dispatcher's filters show. */
+export function confirmReceiptStops(fuelStopIds: readonly string[]): Promise<{ confirmedCount: number }> {
+  return request<{ confirmedCount: number }>("/receipt-checks", {
+    method: "POST",
+    body: JSON.stringify({ fuelStopIds, outcome: "confirmed" }),
+  });
+}
+
 /** `POST /receipt-checks` with a `fuelStopId` (T-43) — one append-only decision. Skip is not a
  * decision and never reaches here. */
 export function postReceiptCheck(fuelStopId: string, outcome: ReceiptOutcome): Promise<ReceiptCheckResult> {
   return request<ReceiptCheckResult>("/receipt-checks", { method: "POST", body: JSON.stringify({ fuelStopId, outcome }) });
-}
-
-/** `POST /receipt-checks` with a `driverId` (T-43) — confirms every unconfirmed stop of one driver
- * in one transaction. The server's scope is the driver's whole queue, not a week's. */
-export function confirmDriverReceipts(driverId: string): Promise<BatchConfirmResult> {
-  return request<BatchConfirmResult>("/receipt-checks", {
-    method: "POST",
-    body: JSON.stringify({ driverId, outcome: "confirmed" }),
-  });
 }
 
 export interface ListTransactionsParams {

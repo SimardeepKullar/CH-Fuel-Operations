@@ -57,4 +57,16 @@ describe("handlePostReceiptChecks", () => {
     const response = await handlePostReceiptChecks(untouchedPool, request, new URL(request.url), CHECKED_BY);
     expect(response.status).toBe(400);
   });
+
+  it("400s a fuelStopIds batch with an empty list or a non-uuid, without touching the database", async () => {
+    for (const fuelStopIds of [[], ["nope"]]) {
+      const res = await handlePostReceiptChecks(
+        untouchedPool,
+        postRequest({ fuelStopIds, outcome: "confirmed" }),
+        new URL("http://localhost/api/v1/receipt-checks"),
+        CHECKED_BY,
+      );
+      expect(res.status).toBe(400);
+    }
+  });
 });

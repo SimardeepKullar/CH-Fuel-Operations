@@ -44,7 +44,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Overview", href: "/overview", built: true },
       { label: "Transactions", href: "/transactions", built: true },
-      { label: "Receipt Queue", href: "/receipt-queue", built: false, badge: true },
+      { label: "Receipt Queue", href: "/receipt-queue", built: true, badge: true },
       { label: "Other Charges", href: "/other-charges", built: false },
       { label: "Import", href: "/import", built: true },
     ],

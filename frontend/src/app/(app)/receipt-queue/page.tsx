@@ -1,15 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReceiptQueueItem } from "@ch/core/actuals/receipts";
+import { useCallback, useMemo, useState } from "react";
 import type { ReceiptOutcome } from "@ch/core/db/types";
-import { ApiError, confirmDriverReceipts, getReceiptQueue, postReceiptCheck } from "../../../lib/api";
+import { ApiError, confirmReceiptStops, getReceiptWeek, postReceiptCheck } from "../../../lib/api";
 import { useApiResource } from "../../../hooks/useApiResource";
 import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
+import { useWeek } from "../../../hooks/useWeek";
 import PageBanner from "../../../components/PageBanner";
-import QueueCard from "../../../components/QueueCard";
-import BatchConfirm, { type BatchGroup } from "../../../components/BatchConfirm";
-import EmptyState from "../../../components/EmptyState";
+import RawResolved from "../../../components/RawResolved";
+import { describeFlag } from "../../../components/AnomalyFlag";
+import SegmentedControl from "../../../components/SegmentedControl";
+import { formatMoney, formatQty2dp } from "../../../lib/formatMoney";
+import { actualRange, formatDay } from "../../../lib/weeks";
+import {
+  NO_FILTERS,
+  driverName,
+  formatQueueDay,
+  formatQueueTime,
+  hasFilters,
+  localDay,
+  stationLabel,
+  truckName,
+  visibleRows,
+  type QueueFilters,
+  type QueueRow,
+  type QueueView,
+} from "../../../lib/receiptQueueView";
+
+const STATUS_WORD = { pending: "Pending", confirmed: "Confirmed", missing: "Missing" } as const;
 
 function messageOf(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? err.title;
@@ -17,193 +35,491 @@ function messageOf(err: unknown): string {
   return String(err);
 }
 
-/** A shortcut must not fire while the dispatcher is typing into a control that owns the key. */
-function isTypingTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false;
-  return el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName);
-}
-
-function describeStop(item: ReceiptQueueItem): string {
-  const station = item.station === null ? "an unresolved station" : `${item.station.city}, ${item.station.state}`;
-  return `${item.driver.resolved ?? item.driver.raw} at ${station}`;
+interface Failure {
+  message: string;
+  retry: () => void;
 }
 
 /**
- * A8.5's Receipt Queue (T-43): one unconfirmed stop at a time, decided with Y / N / S.
- *
- * A decision is optimistic. The item leaves the card at once and the write follows; if the write
- * fails the item comes back to the front and the failure is shown, so the dispatcher never believes
- * a receipt is checked that is not. State is derived from the fetched queue plus the session's own
- * decisions and skips, so nothing is copied into state by an effect. Skip writes nothing: it only
- * moves the item behind the rest.
- *
- * The queue is unscoped on purpose — a standing worklist across every week (D17) — because batch
- * confirm acts on a driver's whole queue and its stated count must match what the server writes.
+ * A8.5's Receipt Queue (T-43): every fuel purchase of the selected billing week, one row each, with
+ * Yes / No for "was a receipt uploaded in Samsara?". A decision is optimistic: the row, the counts
+ * and the progress bar move at once, and a failed write puts the row back and says so.
  */
 export default function ReceiptQueuePage() {
-  const { data, loading, error, refetch } = useApiResource(getReceiptQueue);
+  const { week, weekEntry, loading } = useWeek();
+  if (week === null) {
+    return (
+      <>
+        <PageBanner title="Receipt Queue" />
+        <div className="rq-page">
+          <section className="rq-panel" aria-label="Fuel purchases" aria-busy={loading}>
+            <div className="rq-empty">{loading ? "Loading fuel purchases…" : "No invoices are imported yet."}</div>
+          </section>
+        </div>
+      </>
+    );
+  }
+  const ranges = weekEntry === null ? [] : weekEntry.invoices.map(actualRange);
+  const label =
+    ranges.length === 0
+      ? null
+      : `${formatDay(ranges.map((r) => r.start).sort()[0]!)} – ${formatDay(ranges.map((r) => r.end).sort().at(-1)!)}`;
+  return <Queue key={week} week={week} rangeLabel={label} />;
+}
+
+function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }) {
+  const fetcher = useCallback(() => getReceiptWeek(week), [week]);
+  const { data, loading, error, refetch } = useApiResource(fetcher);
   const { refresh: refreshCounts } = useStandingCountsValue();
 
-  // Item id -> what the dispatcher decided this session (written, or in flight).
+  const [view, setView] = useState<QueueView>("check");
+  const [filters, setFilters] = useState<QueueFilters>(NO_FILTERS);
+  // Row id -> what the dispatcher decided this session (written, or in flight).
   const [decided, setDecided] = useState<ReadonlyMap<string, ReceiptOutcome>>(new Map());
-  // Item ids in the order they were skipped; they come back after everything not skipped.
-  const [skipped, setSkipped] = useState<readonly string[]>([]);
-  const [failure, setFailure] = useState<string | null>(null);
+  // Rows decided this session that a "To check" view keeps listed until the view or a filter changes.
+  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [flash, setFlash] = useState("");
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
 
-  const serverItems = useMemo(() => data?.items ?? [], [data]);
+  const rows = useMemo<QueueRow[]>(
+    () => (data?.items ?? []).map((i) => ({ ...i, status: decided.get(i.id) ?? i.receiptStatus })),
+    [data, decided],
+  );
+  const total = rows.length;
+  const confirmed = rows.filter((r) => r.status === "confirmed").length;
+  const toCheck = total - confirmed;
+  const pct = total === 0 ? 0 : Math.round((confirmed / total) * 100);
 
-  const items = useMemo(() => {
-    const open = serverItems.filter((i) => !decided.has(i.id));
-    const skippedSet = new Set(skipped);
-    const fresh = open.filter((i) => !skippedSet.has(i.id));
-    const byId = new Map(open.map((i) => [i.id, i]));
-    const back = skipped.flatMap((id) => byId.get(id) ?? []);
-    return [...fresh, ...back];
-  }, [serverItems, decided, skipped]);
+  const shown = useMemo(() => visibleRows(rows, view, filters, kept), [rows, view, filters, kept]);
 
-  const current = items[0] ?? null;
+  const driverOptions = useMemo(() => [...new Set(rows.map(driverName))].sort((a, b) => a.localeCompare(b)), [rows]);
+  const dayOptions = useMemo(() => {
+    const byDay = new Map<string, string>();
+    for (const r of rows) byDay.set(localDay(r.occurredAt), formatQueueDay(r.occurredAt));
+    return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [rows]);
 
-  // Progress is the server's, plus this session's confirmations the fetched `done` does not yet count.
-  const progress = useMemo(() => {
-    if (data === null) return null;
-    const ids = new Set(serverItems.map((i) => i.id));
-    let extra = 0;
-    for (const [id, outcome] of decided) if (outcome === "confirmed" && ids.has(id)) extra += 1;
-    return { done: data.progress.done + extra, total: data.progress.total };
-  }, [data, serverItems, decided]);
-
-  const groups = useMemo<BatchGroup[]>(() => {
-    const byDriver = new Map<string, BatchGroup>();
-    for (const item of serverItems) {
-      if (item.driverId === null || decided.get(item.id) === "confirmed") continue;
-      const group = byDriver.get(item.driverId) ?? {
-        driverId: item.driverId,
-        name: item.driver.resolved ?? item.driver.raw,
-        count: 0,
-        missing: 0,
-      };
-      group.count += 1;
-      if (item.receiptStatus === "missing" || decided.get(item.id) === "missing") group.missing += 1;
-      byDriver.set(item.driverId, group);
-    }
-    return [...byDriver.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [serverItems, decided]);
+  // Any change to the view or a filter lets this session's decided rows leave a "To check" list.
+  const changeView = (v: QueueView) => {
+    setView(v);
+    setKept(new Set());
+    setConfirming(false);
+    setFlash("");
+  };
+  const changeFilters = (patch: Partial<QueueFilters>) => {
+    setFilters((f) => ({ ...f, ...patch }));
+    setKept(new Set());
+    setConfirming(false);
+    setFlash("");
+  };
 
   const decide = useCallback(
-    (item: ReceiptQueueItem, outcome: ReceiptOutcome) => {
+    function decideRow(row: QueueRow, outcome: ReceiptOutcome) {
       setFailure(null);
-      setDecided((m) => new Map(m).set(item.id, outcome));
-      postReceiptCheck(item.id, outcome)
+      setFailedId(null);
+      setFlash("");
+      setDecided((m) => new Map(m).set(row.id, outcome));
+      setKept((k) => new Set(k).add(row.id));
+      postReceiptCheck(row.id, outcome)
         .then(() => refreshCounts?.())
         .catch((err: unknown) => {
           setDecided((m) => {
             const next = new Map(m);
-            next.delete(item.id);
+            next.delete(row.id);
             return next;
           });
-          setSkipped((s) => s.filter((id) => id !== item.id));
-          setFailure(`Could not save ${outcome === "confirmed" ? "Y" : "N"} for ${describeStop(item)} — it is back in the queue. ${messageOf(err)}`);
+          setFailedId(row.id);
+          setFailure({
+            message: `${formatQueueDay(row.occurredAt)} · ${formatQueueTime(row.occurredAt)} · ${driverName(row)} · Truck ${truckName(row)}: your “${outcome === "confirmed" ? "Yes" : "No"}” didn’t save because ${messageOf(err)}. The row is back to ${STATUS_WORD[row.receiptStatus]}.`,
+            retry: () => decideRow(row, outcome),
+          });
         });
     },
     [refreshCounts],
   );
 
-  const skip = useCallback((item: ReceiptQueueItem) => {
+  const undecided = shown.filter((r) => r.status !== "confirmed");
+  const batchMissing = undecided.filter((r) => r.status === "missing").length;
+  const dayLabel = filters.day === "" ? "" : (dayOptions.find(([k]) => k === filters.day)?.[1] ?? "");
+  const who = [filters.driver, dayLabel].filter(Boolean).join(" on ");
+  const batchScoped = filters.driver !== "" || filters.day !== "";
+  const n = undecided.length;
+
+  const confirmBatch = () => {
+    const ids = undecided.map((r) => r.id);
+    setConfirming(false);
     setFailure(null);
-    setSkipped((s) => [...s.filter((id) => id !== item.id), item.id]);
-  }, []);
+    setBatchBusy(true);
+    setDecided((m) => {
+      const next = new Map(m);
+      for (const id of ids) next.set(id, "confirmed");
+      return next;
+    });
+    setKept((k) => new Set([...k, ...ids]));
+    confirmReceiptStops(ids)
+      .then(() => {
+        setFlash(`${ids.length} receipts confirmed for ${who}.`);
+        refreshCounts?.();
+      })
+      .catch((err: unknown) => {
+        setDecided((m) => {
+          const next = new Map(m);
+          for (const id of ids) next.delete(id);
+          return next;
+        });
+        setFailure({
+          message: `Could not confirm ${ids.length} receipts for ${who} — nothing was written. ${messageOf(err)}`,
+          retry: () => setConfirming(true),
+        });
+      })
+      .finally(() => setBatchBusy(false));
+  };
 
-  const confirmBatch = useCallback(
-    (group: BatchGroup) => {
-      setFailure(null);
-      setBatchBusy(true);
-      confirmDriverReceipts(group.driverId)
-        .then(() => {
-          setDecided(new Map());
-          setSkipped([]);
-          refetch();
-          refreshCounts?.();
-        })
-        .catch((err: unknown) => setFailure(`Could not confirm ${group.name}'s receipts — nothing was written. ${messageOf(err)}`))
-        .finally(() => setBatchBusy(false));
-    },
-    [refetch, refreshCounts],
-  );
-
-  // The key handler reads the latest card through a ref so the listener is attached once.
-  const live = useRef({ current, batchBusy, decide, skip });
-  useEffect(() => {
-    live.current = { current, batchBusy, decide, skip };
-  });
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent): void {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || isTypingTarget(e.target)) return;
-      const { current: item, batchBusy: busy, decide: doDecide, skip: doSkip } = live.current;
-      if (item === null || busy) return;
-      const key = e.key.toLowerCase();
-      if (key === "y") doDecide(item, "confirmed");
-      else if (key === "n") doDecide(item, "missing");
-      else if (key === "s") doSkip(item);
-      else return;
-      e.preventDefault();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  const remaining = items.length;
+  const ready = data !== null;
+  const segOptions: { value: QueueView; label: string }[] = [
+    { value: "check", label: `To check ${ready ? toCheck : "—"}` },
+    { value: "confirmed", label: `Confirmed ${ready ? confirmed : "—"}` },
+    { value: "all", label: `All ${ready ? total : "—"}` },
+  ];
+  const nothingLeft = ready && shown.length === 0 && view === "check" && !hasFilters(filters);
 
   return (
     <>
       <PageBanner
         title="Receipt Queue"
-        readout={progress === null ? undefined : <span data-testid="queue-remaining">{remaining} to review</span>}
+        controls={<SegmentedControl options={segOptions} value={view} onChange={changeView} ariaLabel="View" />}
+        readout={
+          <span className="rq-readout">
+            <span className="rq-bar" role="progressbar" aria-label="Receipts confirmed" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+              <span className="rq-bar-fill" style={{ width: `${pct}%` }} />
+            </span>
+            <span data-testid="queue-progress">
+              <strong>{ready ? confirmed : "—"}</strong> of {ready ? total : "—"} confirmed
+            </span>
+            <span aria-hidden="true">·</span>
+            <span data-testid="queue-to-check">
+              <strong>{ready ? toCheck : "—"}</strong> to check
+            </span>
+          </span>
+        }
+        meta={rangeLabel === null ? "Receipts checked in Samsara" : `Invoices ${rangeLabel} · receipts checked in Samsara`}
       />
       <div className="rq-page">
-        {failure !== null && (
-          <div className="rq-failure" role="alert" data-testid="queue-failure">
-            {failure}
+        <section className="rq-panel rq-filters" aria-label="Filters">
+          <label className="rq-field rq-field-search">
+            <span className="rq-label">Search</span>
+            <input
+              type="search"
+              value={filters.q}
+              placeholder="Driver, truck, station, or a date like Oct 21"
+              onChange={(e) => changeFilters({ q: e.target.value })}
+            />
+          </label>
+          <label className="rq-field">
+            <span className="rq-label">Driver</span>
+            <select value={filters.driver} onChange={(e) => changeFilters({ driver: e.target.value })}>
+              <option value="">All drivers</option>
+              {driverOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="rq-field">
+            <span className="rq-label">Day</span>
+            <select value={filters.day} onChange={(e) => changeFilters({ day: e.target.value })}>
+              <option value="">Any day</option>
+              {dayOptions.map(([key, text]) => (
+                <option key={key} value={key}>
+                  {text}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="rq-flagged">
+            <input type="checkbox" checked={filters.flaggedOnly} onChange={(e) => changeFilters({ flaggedOnly: e.target.checked })} />
+            <span>Flagged only</span>
+          </label>
+          <button type="button" className="rq-btn" onClick={() => changeFilters(NO_FILTERS)}>
+            Clear
+          </button>
+        </section>
+
+        {ready && batchScoped && n > 0 && !confirming && (
+          <section className="rq-batch" aria-label="Batch confirm">
+            <div className="rq-batch-text">
+              <span className="rq-batch-title">
+                {n} shown for {who} still need a decision
+              </span>
+              <span className="rq-batch-hint">{batchMissing === 0 ? "None marked missing" : `Includes ${batchMissing} you marked missing`}</span>
+            </div>
+            <button type="button" className="rq-btn rq-btn-primary rq-batch-go" disabled={batchBusy} onClick={() => setConfirming(true)}>
+              Confirm all {n} shown for {who}
+            </button>
+          </section>
+        )}
+
+        {ready && confirming && n > 0 && (
+          <section className="rq-confirm" aria-label="Confirm batch">
+            <div className="rq-confirm-text">
+              <span className="rq-confirm-title">
+                Confirm {n} receipts for {who}?
+              </span>
+              <span>
+                This writes {n} checks.{" "}
+                <strong className="rq-red">
+                  {batchMissing === 0
+                    ? "None of them were marked missing."
+                    : batchMissing === 1
+                      ? "1 of them you marked missing — it becomes Confirmed."
+                      : `${batchMissing} of them you marked missing — they become Confirmed.`}
+                </strong>
+              </span>
+            </div>
+            <div className="rq-confirm-actions">
+              <button type="button" className="rq-btn rq-btn-primary" onClick={confirmBatch}>
+                Confirm {n}
+              </button>
+              <button type="button" className="rq-btn" onClick={() => setConfirming(false)}>
+                Cancel
+              </button>
+            </div>
+          </section>
+        )}
+
+        {flash !== "" && (
+          <div className="rq-flash" role="status">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="2" />
+            </svg>
+            {flash}
           </div>
         )}
 
-        {loading && data === null && <EmptyState title="Loading the queue…" />}
-        {error !== null && data === null && (
-          <div className="rq-load-error" data-testid="queue-load-error">
-            <EmptyState title="Could not load the queue" detail={error.message} />
-            <button className="btn btn-ghost" type="button" onClick={refetch}>
-              Try again
+        {failure !== null && (
+          <div className="rq-alert" role="alert" data-testid="queue-failure">
+            <div className="rq-alert-text">
+              <strong>Couldn’t save — row reverted</strong>
+              <span>{failure.message}</span>
+            </div>
+            <button type="button" className="rq-btn rq-btn-danger" onClick={failure.retry}>
+              Retry
+            </button>
+            <button
+              type="button"
+              className="rq-btn rq-btn-danger-ghost"
+              onClick={() => {
+                setFailure(null);
+                setFailedId(null);
+              }}
+            >
+              Dismiss
             </button>
           </div>
         )}
 
-        {progress !== null && (
-          <>
-            <div className="rq-progress" data-testid="queue-progress-block">
-              <span className="rq-progress-count" data-testid="queue-progress">
-                {progress.done} of {progress.total}
-              </span>
-              <span className="rq-progress-label">confirmed</span>
-              <span className="rq-progress-bar" aria-hidden="true">
-                <span
-                  className="rq-progress-fill"
-                  style={{ width: progress.total === 0 ? "0%" : `${(progress.done / progress.total) * 100}%` }}
-                />
-              </span>
-            </div>
-
-            {current !== null ? (
-              <QueueCard item={current} busy={batchBusy} onDecide={(outcome) => decide(current, outcome)} onSkip={() => skip(current)} />
-            ) : (
-              <div className="rq-clear" data-testid="queue-clear">
-                <EmptyState title="Nothing left to check" detail="Every stop in the queue has a decision." />
+        <section className="rq-panel" aria-label="Fuel purchases" aria-busy={loading && !ready}>
+          {loading && !ready && (
+            <>
+              <div className="rq-loading" role="status">
+                Loading fuel purchases…
               </div>
-            )}
+              {Array.from({ length: 10 }, (_, i) => (
+                <div className="rq-skel" aria-hidden="true" key={i}>
+                  {Array.from({ length: 8 }, (_, j) => (
+                    <span key={j} />
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
 
-            <BatchConfirm groups={groups} busy={batchBusy} onConfirm={confirmBatch} />
-          </>
-        )}
+          {error !== null && !ready && (
+            <div className="rq-error" role="alert">
+              <strong>Couldn’t load fuel purchases</strong>
+              <span>{error.message}</span>
+              <button type="button" className="rq-btn rq-btn-primary" onClick={refetch}>
+                Try again
+              </button>
+            </div>
+          )}
+
+          {ready && shown.length > 0 && (
+            <div className="rq-scroll">
+              <table className="rq-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Receipt</th>
+                    <th scope="col">Date · time</th>
+                    <th scope="col">Driver</th>
+                    <th scope="col">Truck</th>
+                    <th scope="col">Station</th>
+                    <th scope="col" className="rq-r">
+                      Quantity
+                    </th>
+                    <th scope="col" className="rq-r">
+                      Total
+                    </th>
+                    <th scope="col">Reason</th>
+                    <th scope="col" className="rq-r">
+                      Receipt uploaded?
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((r) => (
+                    <tr key={r.id} className={r.id === failedId ? "rq-row-failed" : undefined} data-testid="queue-row">
+                      <td>
+                        <StatusCell status={r.status} />
+                      </td>
+                      <td className="rq-num">
+                        <strong>{formatQueueDay(r.occurredAt)}</strong> <span className="rq-muted">· {formatQueueTime(r.occurredAt)}</span>
+                      </td>
+                      <td>
+                        {r.driver.resolved === null ? (
+                          <span className="rq-raw" title="Unmatched invoice text: check this">
+                            {r.driver.raw}
+                          </span>
+                        ) : (
+                          <span className="rq-driver">{r.driver.resolved}</span>
+                        )}
+                      </td>
+                      <td>
+                        <RawResolved value={r.truck} primary="raw" showRawWhenAgreeing />
+                      </td>
+                      <td>{stationLabel(r)}</td>
+                      <td className="rq-r rq-num">
+                        {r.qty === null ? (
+                          "—"
+                        ) : (
+                          <>
+                            {formatQty2dp(r.qty)} <span className="rq-muted">{r.qtyUnit === "L" ? "L" : "gal"}</span>
+                          </>
+                        )}
+                      </td>
+                      <td className="rq-r rq-num rq-total">{formatMoney(r.total, r.currency)}</td>
+                      <td>
+                        {r.hasException && (
+                          <span
+                            className="rq-badge rq-badge-flag"
+                            tabIndex={0}
+                            title={r.flags.map((f) => describeFlag(f.rule)).join("\n")}
+                            aria-label={`Flagged: ${r.flags.map((f) => describeFlag(f.rule)).join("; ")}`}
+                          >
+                            <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true">
+                              <path d="M1 12V1h7l-1.5 3L8 7H1" fill="currentColor" />
+                            </svg>
+                            Flagged
+                          </span>
+                        )}
+                      </td>
+                      <td className="rq-r">
+                        <div className="rq-yn">
+                          <button
+                            type="button"
+                            className="rq-yes"
+                            aria-pressed={r.status === "confirmed"}
+                            aria-label="Yes, receipt uploaded"
+                            disabled={batchBusy}
+                            onClick={() => decide(r, "confirmed")}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                              <path d="M2 6.3l2.6 2.6L10 3.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                            </svg>
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            className="rq-no"
+                            aria-pressed={r.status === "missing"}
+                            aria-label="No, receipt missing"
+                            disabled={batchBusy}
+                            onClick={() => decide(r, "missing")}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                              <path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                            </svg>
+                            No
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {nothingLeft && (
+            <div className="rq-done" data-testid="queue-clear">
+              <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+                <circle cx="22" cy="22" r="22" fill="#2f7d4f" />
+                <path d="M13 22.5l6 6L31 16" fill="none" stroke="#fff" strokeWidth="3" />
+              </svg>
+              <h2>Nothing left to check</h2>
+              <p>
+                {confirmed} of {total} confirmed{rangeLabel === null ? "" : ` for ${rangeLabel}`}.
+              </p>
+              <button type="button" className="rq-btn" onClick={() => changeView("all")}>
+                View all {total}
+              </button>
+            </div>
+          )}
+
+          {ready && shown.length === 0 && !nothingLeft && (
+            <div className="rq-empty">
+              <strong>No fuel purchases match these filters.</strong>
+              <button type="button" className="rq-btn" onClick={() => changeFilters(NO_FILTERS)}>
+                Clear filters
+              </button>
+            </div>
+          )}
+
+          <div className="rq-foot">
+            <span className="rq-num">{ready ? `Showing ${shown.length} · newest first` : loading ? "Loading…" : "Nothing loaded"}</span>
+            <span className="rq-legend">
+              <span className="rq-raw">DRVR D</span> raw invoice text, not matched
+            </span>
+          </div>
+        </section>
       </div>
     </>
+  );
+}
+
+function StatusCell({ status }: { status: QueueRow["status"] }) {
+  if (status === "confirmed") {
+    return (
+      <span className="rq-status rq-status-ok">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <circle cx="9" cy="9" r="9" fill="#2f7d4f" />
+          <path d="M5 9.3l2.6 2.6L13 6.5" fill="none" stroke="#fff" strokeWidth="2" />
+        </svg>
+        Confirmed
+      </span>
+    );
+  }
+  if (status === "missing") {
+    return (
+      <span className="rq-status rq-status-bad">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+          <circle cx="9" cy="9" r="9" fill="#b3261e" />
+          <path d="M6 6l6 6M12 6l-6 6" fill="none" stroke="#fff" strokeWidth="2" />
+        </svg>
+        Missing
+      </span>
+    );
+  }
+  return (
+    <span className="rq-status rq-status-pending">
+      <span className="rq-q" aria-hidden="true">
+        ?
+      </span>
+      Pending
+    </span>
   );
 }

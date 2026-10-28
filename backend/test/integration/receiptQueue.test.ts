@@ -279,6 +279,26 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     expect(checkCountsAfter[0]!.count).toBe("3"); // unchanged
   });
 
+  it("include=all returns confirmed stops too; batch-confirm by ids writes only the unconfirmed ones", async () => {
+    const all = await app.handle(new Request("http://localhost/api/v1/receipt-queue?week=2026-02-07&include=all"), {
+      userId: ids.checker,
+    });
+    const allBody = (await all.json()) as { items: { id: string }[] };
+    expect(allBody.items.map((i) => i.id)).toContain(ids.stopBConfirmed);
+
+    const res = await app.handle(
+      postReceiptCheck({ fuelStopIds: [ids.stopA1, ids.stopA2, ids.stopBConfirmed], outcome: "confirmed" }),
+      { userId: ids.checker },
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { confirmedCount: number }).confirmedCount).toBe(2);
+    const { rows } = await scopedPool.query<{ receipt_status: string }>(
+      "SELECT receipt_status FROM fuel_stops WHERE id = $1",
+      [ids.stopA3],
+    );
+    expect(rows[0]!.receipt_status).toBe("pending"); // not in the list, untouched
+  });
+
   it("a confirmed stop never reappears in the queue", async () => {
     await app.handle(postReceiptCheck({ fuelStopId: ids.stopB1, outcome: "confirmed" }), {
       userId: ids.checker,

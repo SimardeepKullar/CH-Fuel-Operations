@@ -72,6 +72,9 @@ export interface ReceiptQueueItem {
   /** Whether this stop carries an undismissed anomaly — the field
    * `EXCEPTIONS_FIRST_QUEUE_ORDER` sorts on (D17). */
   hasException: boolean;
+  /** The open anomalies behind `hasException`, for a hover. `charges_no_fuel` is left out, as
+   * Transactions never shows it as a flag. */
+  flags: { rule: string; severity: "amber" | "red" }[];
 }
 
 export interface ReceiptQueueProgress {
@@ -102,6 +105,7 @@ interface QueueRow {
   station_city_raw: string | null;
   station_state_usps: string | null;
   has_exception: boolean;
+  flags: { rule: string; severity: "amber" | "red" }[];
 }
 
 function toQueueItem(row: QueueRow): ReceiptQueueItem {
@@ -118,6 +122,7 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
     currency: row.currency,
     receiptStatus: row.receipt_status,
     hasException: row.has_exception,
+    flags: row.flags,
   };
 }
 
@@ -128,6 +133,9 @@ export interface ReceiptQueueScope {
   /** A billing week's end, `YYYY-MM-DD`. */
   week?: string;
   currency?: InvoiceCurrency;
+  /** Also return stops already confirmed — the Receipt Queue screen's Confirmed and All views.
+   * Off by default, so the sidebar badge and every older caller still get the work queue only. */
+  includeConfirmed?: boolean;
 }
 
 /** Parameterised `AND` conditions over `invoices i`, shared by the queue and its progress. */
@@ -186,7 +194,14 @@ export async function listReceiptQueue(
               EXISTS (
                 SELECT 1 FROM anomalies a
                 WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL
-              ) AS has_exception
+                  AND a.rule <> 'charges_no_fuel'
+              ) AS has_exception,
+              COALESCE((
+                SELECT jsonb_agg(jsonb_build_object('rule', a.rule, 'severity', a.severity) ORDER BY a.rule)
+                FROM anomalies a
+                WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL
+                  AND a.rule <> 'charges_no_fuel'
+              ), '[]'::jsonb) AS flags
        FROM fuel_stops fs
        JOIN invoices i ON i.id = fs.invoice_id
        LEFT JOIN trucks t ON t.id = fs.truck_id
@@ -195,7 +210,7 @@ export async function listReceiptQueue(
        LEFT JOIN LATERAL (
          SELECT qty FROM fuel_stop_lines WHERE fuel_stop_id = fs.id AND product_code = 'TA' LIMIT 1
        ) ta ON true
-       WHERE fs.receipt_status <> 'confirmed'${scopeSql}
+       WHERE ${scope.includeConfirmed === true ? "true" : "fs.receipt_status <> 'confirmed'"}${scopeSql}
        ${orderClause}`,
       scopeParams,
     ),
@@ -305,6 +320,41 @@ export async function confirmReceiptsForDriver(
 
     await client.query("COMMIT");
     return { driverId: params.driverId, confirmedCount: stopRows.length };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * `POST /receipt-checks`, batch confirm for an explicit list of stops — what the Receipt Queue's
+ * "Confirm all N shown" posts, because the dispatcher confirms the rows a driver and/or day
+ * filter shows, not the driver's whole queue. Already-confirmed ids are skipped, so a retry
+ * writes nothing twice; `confirmedCount` is the number actually written. One transaction.
+ */
+export async function confirmReceiptStops(
+  pool: Pool,
+  params: { fuelStopIds: readonly string[]; checkedBy: string },
+): Promise<{ confirmedCount: number }> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{ id: string }>(
+      "SELECT id FROM fuel_stops WHERE id = ANY($1::uuid[]) AND receipt_status <> 'confirmed'",
+      [params.fuelStopIds],
+    );
+    const ids = rows.map((r) => r.id);
+    if (ids.length > 0) {
+      await client.query(
+        "INSERT INTO receipt_checks (fuel_stop_id, checked_by, outcome) SELECT unnest($1::uuid[]), $2, 'confirmed'",
+        [ids, params.checkedBy],
+      );
+      await client.query("UPDATE fuel_stops SET receipt_status = 'confirmed' WHERE id = ANY($1::uuid[])", [ids]);
+    }
+    await client.query("COMMIT");
+    return { confirmedCount: ids.length };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

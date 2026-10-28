@@ -139,7 +139,7 @@ function buildColumns(
         const station = row.original.station;
         return (
           <span className="tx-station">
-            <span className="tx-station-name">{station ? `Love's #${station.loveNumber ?? "?"}` : "Unresolved"}</span>
+            <span className="tx-station-name">{station ? station.name : "Unresolved"}</span>
             <span className="tx-station-place">{station ? `${station.city}, ${station.state}` : "—"}</span>
           </span>
         );
