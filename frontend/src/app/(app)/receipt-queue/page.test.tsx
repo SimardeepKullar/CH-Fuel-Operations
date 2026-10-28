@@ -35,6 +35,7 @@ function item(id: string, o: Partial<ReceiptQueueItem> = {}): ReceiptQueueItem {
     qtyUnit: "gal",
     total: 412.37,
     currency: "USD",
+    invoiceNumber: "999210",
     receiptStatus: "pending",
     hasException: false,
     flags: [],
@@ -74,6 +75,17 @@ describe("Receipt Queue — table", () => {
     expect(text).toContain("Love's #368");
     expect(text).toContain("Dallas, TX");
     expect(text).toContain("80.00 L");
+  });
+
+  it("tags every row with the invoice it came from, and searches by invoice number", async () => {
+    await renderPage([
+      item("a", { occurredAt: "2026-10-22T10:00:00" }),
+      item("b", { currency: "CAD", qtyUnit: "L", invoiceNumber: "999217" }),
+    ]);
+    expect(screen.getAllByTestId("tx-invoice-tag").map((t) => t.textContent)).toEqual(["🇺🇸 999210", "🇨🇦 999217"]);
+    fireEvent.change(screen.getByLabelText("Search fuel purchases"), { target: { value: "999217" } });
+    expect(screen.getAllByTestId("queue-row")).toHaveLength(1);
+    expect(within(screen.getByTestId("queue-row")).getByTestId("tx-invoice-tag").textContent).toBe("🇨🇦 999217");
   });
 
   it("shows unmatched driver text as raw with the tooltip", async () => {

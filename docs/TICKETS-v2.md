@@ -781,6 +781,7 @@ The design file **`CH Fuel App.dc.html`** is the visual authority. It already re
 - [x] Optimistic decisions: counts and progress move at once; a failed save reverts the row, highlights it and shows an alert naming the row and reason with Retry and Dismiss; a row decided this session stays listed in To check until the view or a filter changes.
 - [x] Loading skeleton, load-error panel with Try again, "Nothing left to check" with View all, and a no-match state with Clear filters.
 - [x] The station column prints the site's own name (`BVD Mississauga - Shawson`; `Love's #368` for a US store), title-cased when BVD sends capitals — on Transactions too.
+- [x] Every row names the invoice it came from — Transactions' tag under the date (`🇺🇸 999210`, `🇨🇦 999217`), now a shared `InvoiceTag` component — and search matches the invoice number. Each queue item carries `invoiceNumber`.
 - [x] The truck cell is Transactions' `RawResolved`; the Flagged badge hovers (and takes focus) to name each open anomaly. `charges_no_fuel` never flags, here or in the Flagged-only filter.
 - [x] Phone: filters wrap and the table scrolls horizontally inside its card.
 - [ ] **"No upload found" reason badge** — nothing records an automated check result yet. Needs a source on `receipt_checks` (e.g. `manual` | `samsara`) and a flag on `fuel_stops`; blocked on A18 Q3 (does Samsara expose receipt uploads?).

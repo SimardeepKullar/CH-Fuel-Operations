@@ -8,6 +8,7 @@ import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
 import { useWeek } from "../../../hooks/useWeek";
 import PageBanner from "../../../components/PageBanner";
 import RawResolved from "../../../components/RawResolved";
+import InvoiceTag from "../../../components/InvoiceTag";
 import AnomalyFlag, { describeFlag, flagDescription } from "../../../components/AnomalyFlag";
 import SegmentedControl from "../../../components/SegmentedControl";
 import { formatMoney, formatQty2dp } from "../../../lib/formatMoney";
@@ -405,6 +406,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                         <span className="tx-datetime">
                           <span className="tx-date">{formatQueueDay(r.occurredAt)}</span>
                           <span className="tx-time">{formatQueueTime(r.occurredAt)}</span>
+                          <InvoiceTag currency={r.currency} invoiceNumber={r.invoiceNumber} />
                         </span>
                       </td>
                       <td>

@@ -68,6 +68,8 @@ export interface ReceiptQueueItem {
   /** In `currency`, as billed. */
   total: number;
   currency: InvoiceCurrency;
+  /** The BVD invoice the stop was billed on (`999217`); with `currency`, it names the US or CA side of the week. */
+  invoiceNumber: string;
   receiptStatus: ReceiptStatus;
   /** Whether this stop carries an undismissed anomaly — the field
    * `EXCEPTIONS_FIRST_QUEUE_ORDER` sorts on (D17). */
@@ -93,6 +95,7 @@ interface QueueRow {
   total: string;
   currency: InvoiceCurrency;
   qty_unit: InvoiceQtyUnit;
+  invoice_number: string;
   ta_qty: string | null;
   receipt_status: ReceiptStatus;
   driver_id: string | null;
@@ -120,6 +123,7 @@ function toQueueItem(row: QueueRow): ReceiptQueueItem {
     qtyUnit: row.qty_unit,
     total: Number(row.total),
     currency: row.currency,
+    invoiceNumber: row.invoice_number,
     receiptStatus: row.receipt_status,
     hasException: row.has_exception,
     flags: row.flags,
@@ -185,7 +189,7 @@ export async function listReceiptQueue(
 
   const [{ rows }, progress] = await Promise.all([
     pool.query<QueueRow>(
-      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, i.qty_unit, ta.qty AS ta_qty, fs.receipt_status,
+      `SELECT fs.id, fs.occurred_at, fs.total, i.currency, i.qty_unit, i.invoice_number, ta.qty AS ta_qty, fs.receipt_status,
               fs.driver_id, fs.unit_raw, fs.driver_name_raw,
               t.unit_number AS truck_unit_number,
               d.display_name AS driver_display_name,

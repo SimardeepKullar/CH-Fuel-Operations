@@ -283,8 +283,9 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     const all = await app.handle(new Request("http://localhost/api/v1/receipt-queue?week=2026-02-07&include=all"), {
       userId: ids.checker,
     });
-    const allBody = (await all.json()) as { items: { id: string }[] };
+    const allBody = (await all.json()) as { items: { id: string; invoiceNumber: string }[] };
     expect(allBody.items.map((i) => i.id)).toContain(ids.stopBConfirmed);
+    expect(new Set(allBody.items.map((i) => i.invoiceNumber))).toEqual(new Set(["T35-TEST"]));
 
     const res = await app.handle(
       postReceiptCheck({ fuelStopIds: [ids.stopA1, ids.stopA2, ids.stopBConfirmed], outcome: "confirmed" }),
