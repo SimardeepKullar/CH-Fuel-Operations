@@ -425,7 +425,7 @@ describe("TransactionsTable — printed times (T-81)", () => {
     const cells = [...document.querySelectorAll(".tx-row .tx-datetime")].map(
       (c) => `${c.querySelector(".tx-date")!.textContent} ${c.querySelector(".tx-time")!.textContent}`,
     );
-    expect(cells.sort()).toEqual(["Sep 8, 2026 23:50", "Sep 9, 2026 00:00"]);
+    expect(cells.sort()).toEqual(["Sep 8, 2026 23:50:28", "Sep 9, 2026 00:00:47"]);
     // Hovering the time shows the exact printed value, seconds included.
     expect([...document.querySelectorAll(".tx-row .tx-time")].map((e) => e.getAttribute("title")).sort()).toEqual([
       "2026-09-08 23:50:28",

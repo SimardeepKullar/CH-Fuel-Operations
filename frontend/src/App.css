@@ -1173,7 +1173,7 @@ select.tx-filter-select {
 .tx-cell { padding: 8px 8px 8px 0; }
 .tx-cell.num { text-align: right; }
 .tx-chev { font: 600 11px var(--font-body); color: #a4abb9; }
-.tx-datetime { display: flex; flex-direction: column; gap: 1px; }
+.tx-datetime { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
 .tx-date { font: 600 12px var(--font-body); color: var(--color-accent-800); }
 .tx-time { font: 400 10.5px var(--font-mono); color: #a4abb9; }
 .tx-invoice-tag {

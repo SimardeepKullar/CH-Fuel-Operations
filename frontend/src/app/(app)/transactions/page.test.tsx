@@ -146,7 +146,7 @@ describe("TransactionsPage (T-40)", () => {
       render(<TransactionsPage />);
 
       await waitFor(() => expect(document.querySelectorAll(".tx-row")).toHaveLength(1));
-      expect(document.querySelector(".tx-row .tx-time")!.textContent).toBe("00:00");
+      expect(document.querySelector(".tx-row .tx-time")!.textContent).toBe("00:00:47");
     },
   );
 

@@ -16,7 +16,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export interface PrintedAt {
   /** `Sep 8, 2026`. */
   date: string;
-  /** 24-hour, as BVD prints it: `23:50`. */
+  /** 24-hour with seconds, as BVD prints it: `23:50:28`. */
   time: string;
   /** `2026-09-08` — the Receipt Queue's day filter and grouping key. */
   dayKey: string;
@@ -31,7 +31,7 @@ export function printedAt(iso: string): PrintedAt {
   const day = Number(iso.slice(8, 10));
   return {
     date: `${MONTHS[month - 1]} ${day}, ${iso.slice(0, 4)}`,
-    time: iso.slice(11, 16),
+    time: iso.slice(11, 19),
     dayKey: iso.slice(0, 10),
     slashDate: `${month}/${day}/${iso.slice(0, 4)}`,
     full: `${iso.slice(0, 10)} ${iso.slice(11, 19)}`,

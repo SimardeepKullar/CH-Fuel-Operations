@@ -143,7 +143,7 @@ describe("Receipt Queue — table", () => {
       item("after", { occurredAt: "2026-09-09T00:00:47.000Z" }),
     ]);
     const cells = screen.getAllByTestId("queue-row").map((r) => `${r.querySelector(".tx-date")!.textContent} ${r.querySelector(".tx-time")!.textContent}`);
-    expect(cells).toEqual(["Sep 9, 2026 00:00", "Sep 8, 2026 23:50"]);
+    expect(cells).toEqual(["Sep 9, 2026 00:00:47", "Sep 8, 2026 23:50:28"]);
     expect(screen.getAllByTestId("queue-row").map((r) => r.querySelector(".tx-time")!.getAttribute("title"))).toEqual([
       "2026-09-09 00:00:47",
       "2026-09-08 23:50:28",
@@ -155,7 +155,7 @@ describe("Receipt Queue — table", () => {
     fireEvent.change(day, { target: { value: "" } });
     fireEvent.change(screen.getByPlaceholderText(/driver, truck/i), { target: { value: "9/9" } });
     expect(screen.getAllByTestId("queue-row")).toHaveLength(1);
-    expect(screen.getByTestId("queue-row").querySelector(".tx-time")!.textContent).toBe("00:00");
+    expect(screen.getByTestId("queue-row").querySelector(".tx-time")!.textContent).toBe("00:00:47");
   });
 
   it("shows the empty state when nothing is left", async () => {
