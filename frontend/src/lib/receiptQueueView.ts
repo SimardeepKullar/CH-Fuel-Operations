@@ -1,6 +1,6 @@
 import type { ReceiptQueueItem } from "@ch/core/actuals/receipts";
 import type { ReceiptStatus } from "@ch/core/db/types";
-import { printedDayKey, printedMonthDay, printedTime, printedWeekdayDate } from "./wallClock";
+import { printedAt } from "./wallClock";
 
 export type QueueView = "check" | "confirmed" | "all";
 
@@ -27,21 +27,6 @@ export function truckName(item: ReceiptQueueItem): string {
   return item.truck.resolved ?? item.truck.raw;
 }
 
-/** The day BVD printed, `YYYY-MM-DD` — the same clock the row's time prints in. */
-export function printedDay(iso: string): string {
-  return printedDayKey(iso);
-}
-
-/** `Wed Oct 21`. */
-export function formatQueueDay(iso: string): string {
-  return printedWeekdayDate(iso);
-}
-
-/** `3:30 PM`. */
-export function formatQueueTime(iso: string): string {
-  return printedTime(iso);
-}
-
 export function stationLabel(item: ReceiptQueueItem): string {
   if (item.station === null) return "Unresolved";
   return `${item.station.name} · ${item.station.city}, ${item.station.state}`;
@@ -57,8 +42,8 @@ function haystack(row: QueueRow): string {
     `truck ${truckName(row)}`,
     stationLabel(row),
     row.invoiceNumber,
-    formatQueueDay(row.occurredAt),
-    printedMonthDay(row.occurredAt),
+    printedAt(row.occurredAt).date,
+    printedAt(row.occurredAt).monthDay,
   ]
     .join(" ")
     .toLowerCase();
@@ -66,7 +51,7 @@ function haystack(row: QueueRow): string {
 
 export function matchesFilters(row: QueueRow, f: QueueFilters): boolean {
   if (f.driver !== "" && driverName(row) !== f.driver) return false;
-  if (f.day !== "" && printedDay(row.occurredAt) !== f.day) return false;
+  if (f.day !== "" && printedAt(row.occurredAt).dayKey !== f.day) return false;
   if (f.flaggedOnly && !row.hasException) return false;
   const q = f.q.trim().toLowerCase();
   return q === "" || haystack(row).includes(q);

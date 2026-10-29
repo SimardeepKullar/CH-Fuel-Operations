@@ -425,6 +425,6 @@ describe("TransactionsTable — printed times (T-81)", () => {
     const cells = [...document.querySelectorAll(".tx-row .tx-datetime")].map(
       (c) => `${c.querySelector(".tx-date")!.textContent} ${c.querySelector(".tx-time")!.textContent}`,
     );
-    expect(cells.sort()).toEqual(["Sep 8 11:50 PM", "Sep 9 12:00 AM"]);
+    expect(cells.sort()).toEqual(["Sep 8 23:50", "Sep 9 00:00"]);
   });
 });

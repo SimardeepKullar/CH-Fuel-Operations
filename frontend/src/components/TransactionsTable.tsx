@@ -34,15 +34,10 @@ import AnomalyFlag from "./AnomalyFlag";
 import BilledPrice from "./BilledPrice";
 import RawResolved from "./RawResolved";
 import StopExpansion from "./StopExpansion";
-import { printedDate, printedTime } from "../lib/wallClock";
+import { printedAt } from "../lib/wallClock";
 
 const RECEIPT_MARKS: Record<ReceiptStatus, string> = { confirmed: "✓", missing: "✗", pending: "?" };
 const RECEIPT_LABELS: Record<ReceiptStatus, string> = { confirmed: "Confirmed", missing: "Missing", pending: "Pending" };
-
-/** As BVD printed it, not in the viewer's zone (`wallClock.ts`, T-81). */
-function formatDateTime(iso: string): { date: string; time: string } {
-  return { date: printedDate(iso), time: printedTime(iso) };
-}
 
 /** True when the given event target is a form control that should keep its
  * own keystrokes — the `/`-focuses-search shortcut must not fire while the
@@ -80,7 +75,7 @@ function buildColumns(
     columnHelper.accessor("occurredAt", {
       header: "Date · time",
       cell: ({ row, getValue }) => {
-        const { date, time } = formatDateTime(getValue());
+        const { date, time } = printedAt(getValue());
         return (
           <span className="tx-datetime">
             <span className="tx-date">{date}</span>
