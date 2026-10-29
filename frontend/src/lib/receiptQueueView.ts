@@ -32,7 +32,7 @@ export function stationLabel(item: ReceiptQueueItem): string {
   return `${item.station.name} · ${item.station.city}, ${item.station.state}`;
 }
 
-/** What a typed search is matched against: driver, truck, station, invoice number, and the row's date as "Oct 21" and "10/21". */
+/** What a typed search is matched against: driver, truck, station, invoice number, and the row's date as "Oct 21, 2026", "10/21" and "2026-10-21", and its time. */
 function haystack(row: QueueRow): string {
   return [
     driverName(row),
@@ -43,7 +43,8 @@ function haystack(row: QueueRow): string {
     stationLabel(row),
     row.invoiceNumber,
     printedAt(row.occurredAt).date,
-    printedAt(row.occurredAt).monthDay,
+    printedAt(row.occurredAt).slashDate,
+    printedAt(row.occurredAt).full,
   ]
     .join(" ")
     .toLowerCase();

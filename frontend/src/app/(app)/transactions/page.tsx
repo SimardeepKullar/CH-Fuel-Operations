@@ -19,6 +19,7 @@ import ConversionToggle from "../../../components/ConversionToggle";
 import { useTransactionFilterOptions } from "../../../hooks/useTransactionFilterOptions";
 import { useTransactionFilters } from "../../../hooks/useTransactionFilters";
 import TransactionsTable from "../../../components/TransactionsTable";
+import { printedAt } from "../../../lib/wallClock";
 
 const RECEIPT_STATUSES = new Set(["pending", "confirmed", "missing"]);
 
@@ -30,6 +31,7 @@ const RECEIPT_STATUSES = new Set(["pending", "confirmed", "missing"]);
 function matchesSearch(row: TransactionListItem, query: string): boolean {
   if (query === "") return true;
   const q = query.toLowerCase();
+  const printed = printedAt(row.occurredAt);
   const haystack = [
     row.baseAuthCode,
     row.card.number,
@@ -40,6 +42,10 @@ function matchesSearch(row: TransactionListItem, query: string): boolean {
     row.station?.city,
     row.station?.state,
     row.station?.loveNumber !== null && row.station?.loveNumber !== undefined ? String(row.station.loveNumber) : null,
+    // The printed date and time, in each form a dispatcher might type (T-81).
+    printed.date,
+    printed.slashDate,
+    printed.full,
   ];
   return haystack.some((field) => field !== null && field !== undefined && field.toLowerCase().includes(q));
 }

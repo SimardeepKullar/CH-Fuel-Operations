@@ -383,7 +383,7 @@ export default function TransactionsTable({
             className="input tx-search"
             value={filters.q}
             onChange={(e) => setFilter("q", e.target.value)}
-            placeholder="Search driver, card, unit, station, auth code"
+            placeholder="Search driver, card, unit, station, auth code or date"
             aria-label="Search transactions"
           />
           <span className="tx-filter">

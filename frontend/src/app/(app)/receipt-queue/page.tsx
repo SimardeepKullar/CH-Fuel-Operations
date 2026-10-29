@@ -213,7 +213,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
               type="search"
               className="input tx-search"
               value={filters.q}
-              placeholder="Search driver, truck, station, or a date like Oct 21"
+              placeholder="Search driver, truck, station, or a date like Oct 21, 2026"
               aria-label="Search fuel purchases"
               onChange={(e) => changeFilters({ q: e.target.value })}
             />

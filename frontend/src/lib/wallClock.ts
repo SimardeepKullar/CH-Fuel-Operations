@@ -14,14 +14,14 @@
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export interface PrintedAt {
-  /** `Sep 8`. */
+  /** `Sep 8, 2026`. */
   date: string;
   /** 24-hour, as BVD prints it: `23:50`. */
   time: string;
   /** `2026-09-08` — the Receipt Queue's day filter and grouping key. */
   dayKey: string;
-  /** `9/8` — the date as a dispatcher types it into a search. */
-  monthDay: string;
+  /** `9/8/2026` — the date as a dispatcher types it into a search (`9/8` matches it too). */
+  slashDate: string;
   /** `2026-09-08 23:50:28` — the full printed value, for a tooltip. */
   full: string;
 }
@@ -30,10 +30,10 @@ export function printedAt(iso: string): PrintedAt {
   const month = Number(iso.slice(5, 7));
   const day = Number(iso.slice(8, 10));
   return {
-    date: `${MONTHS[month - 1]} ${day}`,
+    date: `${MONTHS[month - 1]} ${day}, ${iso.slice(0, 4)}`,
     time: iso.slice(11, 16),
     dayKey: iso.slice(0, 10),
-    monthDay: `${month}/${day}`,
+    slashDate: `${month}/${day}/${iso.slice(0, 4)}`,
     full: `${iso.slice(0, 10)} ${iso.slice(11, 19)}`,
   };
 }

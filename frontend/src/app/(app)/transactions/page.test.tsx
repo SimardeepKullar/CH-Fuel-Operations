@@ -125,6 +125,31 @@ describe("TransactionsPage (T-40)", () => {
     expect(screen.queryByText("OTHER")).toBeNull();
   });
 
+  it.each(["Sep 9", "sep 9, 2026", "9/9", "9/9/2026", "2026-09-09", "00:00"])(
+    "searches the printed date and time: %s finds the 00:00 stop on Sep 9, not the 23:50 one on Sep 8 (T-81)",
+    async (term) => {
+      searchParams = new URLSearchParams({ week: "2026-09-09", q: term });
+      getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
+      listPeriods.mockResolvedValue({ weeks: [] });
+      listDrivers.mockResolvedValue({ week: "2026-09-09", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
+      listTrucks.mockResolvedValue({ rows: [] });
+      listTransactions.mockResolvedValue({
+        rows: [
+          stop({ id: "after", baseAuthCode: "AFTER", occurredAt: "2026-09-09T00:00:47.000Z" }),
+          stop({ id: "before", baseAuthCode: "BEFORE", occurredAt: "2026-09-08T23:50:28.000Z" }),
+        ],
+        page: 1,
+        pageSize: 200,
+        total: 2,
+      });
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => expect(document.querySelectorAll(".tx-row")).toHaveLength(1));
+      expect(document.querySelector(".tx-row .tx-time")!.textContent).toBe("00:00");
+    },
+  );
+
   it("a failed fetch surfaces the error rather than an indefinite loading state", async () => {
     searchParams = new URLSearchParams({ week: "2026-09-03" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
