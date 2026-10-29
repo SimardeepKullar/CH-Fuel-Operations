@@ -21,6 +21,7 @@ const STATUS_LABEL: Record<PlanListItem["status"], string> = {
   infeasible: "Infeasible",
 };
 
+/** A plan's `createdAt` — a real instant, so the viewer's zone (unlike an invoice's printed time, `wallClock.ts`). */
 function shortDate(iso: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(iso));
 }

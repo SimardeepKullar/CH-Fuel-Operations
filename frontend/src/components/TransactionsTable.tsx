@@ -34,17 +34,10 @@ import AnomalyFlag from "./AnomalyFlag";
 import BilledPrice from "./BilledPrice";
 import RawResolved from "./RawResolved";
 import StopExpansion from "./StopExpansion";
+import { printedAt } from "../lib/wallClock";
 
 const RECEIPT_MARKS: Record<ReceiptStatus, string> = { confirmed: "✓", missing: "✗", pending: "?" };
 const RECEIPT_LABELS: Record<ReceiptStatus, string> = { confirmed: "Confirmed", missing: "Missing", pending: "Pending" };
-
-function formatDateTime(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  return {
-    date: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(d),
-    time: new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(d),
-  };
-}
 
 /** True when the given event target is a form control that should keep its
  * own keystrokes — the `/`-focuses-search shortcut must not fire while the
@@ -82,11 +75,11 @@ function buildColumns(
     columnHelper.accessor("occurredAt", {
       header: "Date · time",
       cell: ({ row, getValue }) => {
-        const { date, time } = formatDateTime(getValue());
+        const { date, time, full } = printedAt(getValue());
         return (
           <span className="tx-datetime">
             <span className="tx-date">{date}</span>
-            <span className="tx-time">{time}</span>
+            <span className="tx-time" title={full}>{time}</span>
             {showInvoice && (
               <InvoiceTag
                 currency={row.original.invoiceCurrency}
@@ -390,7 +383,7 @@ export default function TransactionsTable({
             className="input tx-search"
             value={filters.q}
             onChange={(e) => setFilter("q", e.target.value)}
-            placeholder="Search driver, card, unit, station, auth code"
+            placeholder="Search driver, card, unit, station, auth code or date"
             aria-label="Search transactions"
           />
           <span className="tx-filter">

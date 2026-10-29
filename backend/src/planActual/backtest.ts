@@ -240,7 +240,7 @@ async function loadTruckDays(pool: Pool, from: string, to: string): Promise<Truc
        JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id AND fsl.product_code = 'TA'
       WHERE fs.truck_id IS NOT NULL
         AND fs.station_id IS NOT NULL
-        AND fs.occurred_at::date BETWEEN $1::date AND $2::date
+        AND (fs.occurred_at AT TIME ZONE 'UTC')::date BETWEEN $1::date AND $2::date
       GROUP BY fs.truck_id, (fs.occurred_at AT TIME ZONE 'UTC')::date`,
     [from, to],
   );

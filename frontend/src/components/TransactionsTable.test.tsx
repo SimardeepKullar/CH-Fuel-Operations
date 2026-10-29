@@ -131,7 +131,7 @@ describe("TransactionsTable", () => {
 
   it("pressing / focuses the search box, even when nothing inside the table has focus", () => {
     render(<TransactionsTable {...baseProps([stop()])} />);
-    const search = screen.getByPlaceholderText("Search driver, card, unit, station, auth code") as HTMLInputElement;
+    const search = screen.getByPlaceholderText("Search driver, card, unit, station, auth code or date") as HTMLInputElement;
     expect(document.activeElement).not.toBe(search);
 
     fireEvent.keyDown(window, { key: "/" });
@@ -409,5 +409,27 @@ describe("TransactionsTable", () => {
     // Keyboard navigation still works on the sorted rows.
     fireEvent.keyDown(rowEls[0]!, { key: "ArrowDown" });
     expect(document.querySelectorAll(".tx-row")[1]!.className).toContain("active");
+  });
+});
+
+describe("TransactionsTable — printed times (T-81)", () => {
+  it("shows the date and time BVD printed, not shifted to the viewer's zone", () => {
+    render(
+      <TransactionsTable
+        {...baseProps([
+          caStop({ id: "before", occurredAt: "2026-09-08T23:50:28.000Z" }),
+          caStop({ id: "after", occurredAt: "2026-09-09T00:00:47.000Z" }),
+        ])}
+      />,
+    );
+    const cells = [...document.querySelectorAll(".tx-row .tx-datetime")].map(
+      (c) => `${c.querySelector(".tx-date")!.textContent} ${c.querySelector(".tx-time")!.textContent}`,
+    );
+    expect(cells.sort()).toEqual(["Sep 8, 2026 23:50:28", "Sep 9, 2026 00:00:47"]);
+    // Hovering the time shows the exact printed value, seconds included.
+    expect([...document.querySelectorAll(".tx-row .tx-time")].map((e) => e.getAttribute("title")).sort()).toEqual([
+      "2026-09-08 23:50:28",
+      "2026-09-09 00:00:47",
+    ]);
   });
 });

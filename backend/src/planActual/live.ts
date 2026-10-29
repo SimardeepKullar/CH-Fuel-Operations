@@ -69,7 +69,7 @@ async function loadDispatchedPlanStops(pool: Pool, periodStart: string, periodEn
        FROM plans p
        JOIN plan_stops ps ON ps.plan_id = p.id
       WHERE p.dispatched_at IS NOT NULL
-        AND p.dispatched_at::date BETWEEN $1::date AND $2::date
+        AND (p.dispatched_at AT TIME ZONE 'UTC')::date BETWEEN $1::date AND $2::date
         AND ps.stop_type = 'fuel'
         AND ps.station_id IS NOT NULL`,
     [periodStart, periodEnd],

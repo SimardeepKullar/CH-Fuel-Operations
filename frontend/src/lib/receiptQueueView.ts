@@ -1,12 +1,13 @@
 import type { ReceiptQueueItem } from "@ch/core/actuals/receipts";
 import type { ReceiptStatus } from "@ch/core/db/types";
+import { printedAt } from "./wallClock";
 
 export type QueueView = "check" | "confirmed" | "all";
 
 export interface QueueFilters {
   q: string;
   driver: string;
-  /** A local `YYYY-MM-DD`; "" is any day. */
+  /** The printed `YYYY-MM-DD` (see `wallClock.ts`); "" is any day. */
   day: string;
   flaggedOnly: boolean;
 }
@@ -26,32 +27,13 @@ export function truckName(item: ReceiptQueueItem): string {
   return item.truck.resolved ?? item.truck.raw;
 }
 
-/** The dispatcher's local calendar day, `YYYY-MM-DD` — the same clock the row's time prints in. */
-export function localDay(iso: string): string {
-  const d = new Date(iso);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
-/** `Wed Oct 21`. */
-export function formatQueueDay(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" }).format(new Date(iso)).replace(",", "");
-}
-
-/** `3:30 PM`. */
-export function formatQueueTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
-}
-
 export function stationLabel(item: ReceiptQueueItem): string {
   if (item.station === null) return "Unresolved";
   return `${item.station.name} · ${item.station.city}, ${item.station.state}`;
 }
 
-/** What a typed search is matched against: driver, truck, station, invoice number, and the row's date as "Oct 21" and "10/21". */
+/** What a typed search is matched against: driver, truck, station, invoice number, and the row's date as "Oct 21, 2026", "10/21" and "2026-10-21", and its time. */
 function haystack(row: QueueRow): string {
-  const d = new Date(row.occurredAt);
   return [
     driverName(row),
     row.driver.raw,
@@ -60,8 +42,9 @@ function haystack(row: QueueRow): string {
     `truck ${truckName(row)}`,
     stationLabel(row),
     row.invoiceNumber,
-    formatQueueDay(row.occurredAt),
-    `${d.getMonth() + 1}/${d.getDate()}`,
+    printedAt(row.occurredAt).date,
+    printedAt(row.occurredAt).slashDate,
+    printedAt(row.occurredAt).full,
   ]
     .join(" ")
     .toLowerCase();
@@ -69,7 +52,7 @@ function haystack(row: QueueRow): string {
 
 export function matchesFilters(row: QueueRow, f: QueueFilters): boolean {
   if (f.driver !== "" && driverName(row) !== f.driver) return false;
-  if (f.day !== "" && localDay(row.occurredAt) !== f.day) return false;
+  if (f.day !== "" && printedAt(row.occurredAt).dayKey !== f.day) return false;
   if (f.flaggedOnly && !row.hasException) return false;
   const q = f.q.trim().toLowerCase();
   return q === "" || haystack(row).includes(q);

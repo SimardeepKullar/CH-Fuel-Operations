@@ -73,7 +73,10 @@ interface ExistingInvoiceRow {
 /** Invoice timestamps carry no timezone offset (parseInvoiceCsv's
  * "2026-09-09T00:41:38"); treated as UTC for storage into a `timestamptz`
  * column, matching this schema's other UTC-anchored comparisons
- * (resolveAssignment's `AT TIME ZONE 'UTC'` cast). */
+ * (resolveAssignment's `AT TIME ZONE 'UTC'` cast). It is the printed wall
+ * clock, not a real instant: the frontend formats it in UTC too
+ * (`frontend/src/lib/wallClock.ts`), and SQL takes its day with
+ * `AT TIME ZONE 'UTC'`, never a bare `::date` (T-81). */
 function asUtcTimestamp(occurredAt: string): string {
   return `${occurredAt}Z`;
 }

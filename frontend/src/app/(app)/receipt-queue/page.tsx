@@ -13,14 +13,12 @@ import AnomalyFlag, { describeFlag, flagDescription } from "../../../components/
 import SegmentedControl from "../../../components/SegmentedControl";
 import { formatMoney, formatQty2dp } from "../../../lib/formatMoney";
 import { actualRange, formatDay } from "../../../lib/weeks";
+import { printedAt } from "../../../lib/wallClock";
 import { productBadgeVariant, productLabel } from "../../../lib/transactionFilterConstants";
 import {
   NO_FILTERS,
   driverName,
-  formatQueueDay,
-  formatQueueTime,
   hasFilters,
-  localDay,
   truckName,
   visibleRows,
   type QueueFilters,
@@ -99,7 +97,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
   const driverOptions = useMemo(() => [...new Set(rows.map(driverName))].sort((a, b) => a.localeCompare(b)), [rows]);
   const dayOptions = useMemo(() => {
     const byDay = new Map<string, string>();
-    for (const r of rows) byDay.set(localDay(r.occurredAt), formatQueueDay(r.occurredAt));
+    for (const r of rows) byDay.set(printedAt(r.occurredAt).dayKey, printedAt(r.occurredAt).date);
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [rows]);
 
@@ -134,7 +132,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
           });
           setFailedId(row.id);
           setFailure({
-            message: `${formatQueueDay(row.occurredAt)} · ${formatQueueTime(row.occurredAt)} · ${driverName(row)} · Truck ${truckName(row)}: your “${outcome === "confirmed" ? "Yes" : "No"}” didn’t save because ${messageOf(err)}. The row is back to ${STATUS_WORD[row.receiptStatus]}.`,
+            message: `${printedAt(row.occurredAt).date} · ${printedAt(row.occurredAt).time} · ${driverName(row)} · Truck ${truckName(row)}: your “${outcome === "confirmed" ? "Yes" : "No"}” didn’t save because ${messageOf(err)}. The row is back to ${STATUS_WORD[row.receiptStatus]}.`,
             retry: () => decideRow(row, outcome),
           });
         });
@@ -215,7 +213,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
               type="search"
               className="input tx-search"
               value={filters.q}
-              placeholder="Search driver, truck, station, or a date like Oct 21"
+              placeholder="Search driver, truck, station, or a date like Oct 21, 2026"
               aria-label="Search fuel purchases"
               onChange={(e) => changeFilters({ q: e.target.value })}
             />
@@ -406,8 +404,8 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                       </td>
                       <td>
                         <span className="tx-datetime">
-                          <span className="tx-date">{formatQueueDay(r.occurredAt)}</span>
-                          <span className="tx-time">{formatQueueTime(r.occurredAt)}</span>
+                          <span className="tx-date">{printedAt(r.occurredAt).date}</span>
+                          <span className="tx-time" title={printedAt(r.occurredAt).full}>{printedAt(r.occurredAt).time}</span>
                           <InvoiceTag currency={r.currency} invoiceNumber={r.invoiceNumber} />
                         </span>
                       </td>
