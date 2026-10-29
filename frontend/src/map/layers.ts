@@ -92,7 +92,7 @@ export const MAP_LAYERS: LayerSpecification[] = [
     // UI-DATA-CONTRACT §3.8's small solid dots.
     layout: { visibility: "none" },
     paint: {
-      "circle-radius": 4.5,
+      "circle-radius": 3,
       "circle-color": COLOR.candidate,
       "circle-opacity": 0.9,
     },
@@ -106,7 +106,7 @@ export const MAP_LAYERS: LayerSpecification[] = [
     // solid amber instead of green so the two stay visually distinct.
     layout: { visibility: "none" },
     paint: {
-      "circle-radius": 4.5,
+      "circle-radius": 3,
       "circle-color": COLOR.amber,
       "circle-opacity": 0.9,
     },
@@ -117,7 +117,7 @@ export const MAP_LAYERS: LayerSpecification[] = [
     source: SOURCE.endpoints,
     // Origin a hollow ring, destination solid — the wireframe's two endpoint marks.
     paint: {
-      "circle-radius": 7,
+      "circle-radius": 5.5,
       "circle-color": ["match", ["get", "role"], "origin", COLOR.white, COLOR.navy],
       "circle-stroke-color": COLOR.navy,
       "circle-stroke-width": 3,
@@ -131,7 +131,7 @@ export const MAP_LAYERS: LayerSpecification[] = [
     // circle is smaller than the pin at route zoom, so the pin itself has to
     // say "town, not forecourt" until the dispatcher zooms in.
     paint: {
-      "circle-radius": 10,
+      "circle-radius": 8,
       "circle-color": ["case", ["get", "approx"], COLOR.white, COLOR.accent],
       "circle-stroke-color": ["case", ["get", "approx"], COLOR.accent, COLOR.white],
       "circle-stroke-width": ["case", ["get", "approx"], 2.5, 2],
@@ -159,7 +159,7 @@ export const MAP_LAYERS: LayerSpecification[] = [
     // so this would just double it.
     filter: ["==", ["get", "kind"], "candidate"],
     paint: {
-      "circle-radius": 4.5,
+      "circle-radius": 3,
       "circle-color": COLOR.amber,
       "circle-opacity": 0.9,
     },
@@ -171,7 +171,7 @@ export const MAP_LAYERS: LayerSpecification[] = [
     // Drawn for either kind, on top of everything — the "you're pointing at
     // this one" ring, hollow so it never hides the pin/dot underneath.
     paint: {
-      "circle-radius": 10,
+      "circle-radius": 8,
       "circle-color": COLOR.white,
       "circle-opacity": 0,
       "circle-stroke-color": COLOR.highlight,
