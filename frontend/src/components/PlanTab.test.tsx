@@ -170,6 +170,13 @@ describe("PlanTab sheet picker", () => {
     expect(select.options[1]!.value).toBe("2026-09-21");
   });
 
+  it("no sheet imported and no load error: says so", () => {
+    usePriceSheets.mockReturnValue({ sheets: [], loading: false, error: null, refetch: vi.fn() });
+    renderPlanTab();
+
+    expect(screen.getByText(/No price sheet imported yet/)).toBeTruthy();
+  });
+
   it("a failed sheet load says so and offers a retry, not 'No price sheet imported yet'", () => {
     const refetch = vi.fn();
     usePriceSheets.mockReturnValue({ sheets: [], loading: false, error: new Error("boom"), refetch });
