@@ -192,6 +192,10 @@ function toTotalsRecord(tokens: readonly string[]): string[] | null {
   } else if (tokens[0] === "Express") {
     label = "Express Codes";
     values = tokens.slice(1);
+  } else if (tokens[0] === "BVD" && tokens[1] === "Codes") {
+    // BVD's later invoices print "BVD Codes" for the same total.
+    label = "Express Codes";
+    values = tokens.slice(2);
   } else if (PRODUCT_CODE_LABELS.has(tokens[0] ?? "")) {
     label = tokens[0]!;
     values = tokens.slice(1);
@@ -342,6 +346,10 @@ const FUEL_HEADER_RECORD = [
   "HST", "GST", "PST", "QST", "Disc Rate", "Disc AMT", "Final AMT", "CUR",
 ];
 
+/** The express table's column header as later invoices print it: "TYPE BVD
+ * CODE" where earlier ones print "EXP. CODE". Same columns, same order. */
+const BVD_CODES_HEADER_WORDS = "DATE TYPE BVD CODE AUTH CODE TRACTOR TRAILER DRIVER NAME/ID CDL TRIP # AMOUNT CASHED FEE TOTAL CUR Payee NOTES".split(" ");
+
 const EXPRESS_HEADER_RECORD = [
   "DATE", "EXP. CODE", "AUTH CODE", "TRACTOR", "TRAILER", "DRIVER NAME/ID",
   "CDL", "TRIP #", "AMOUNT CASHED", "FEE", "TOTAL", "CUR", "PAYEE", "NOTES",
@@ -365,6 +373,9 @@ interface TableHeader {
   words: readonly string[];
 }
 
+/** The express table has had two printed headers; every other table has one. */
+const ALTERNATE_HEADERS: readonly TableHeader[] = [{ table: "express", words: BVD_CODES_HEADER_WORDS }];
+
 const PRINTED_HEADERS: readonly TableHeader[] = [
   { table: "fuel", words: FUEL_HEADER_RECORD.join(" ").split(" ") },
   { table: "express", words: EXPRESS_HEADER_RECORD.map((c) => (c === "PAYEE" ? "Payee" : c)).join(" ").split(" ") },
@@ -381,11 +392,14 @@ const MERGED_CARD_HEADING = /^Transactions for card \S+$/;
  * header's first two words is one, and must then be that header exactly —
  * anything else throws rather than being skipped as a roll-up.
  */
-function isColumnHeader(tokens: readonly string[], header: TableHeader): boolean {
-  const { words } = header;
-  if (tokens[0] !== words[0] || tokens[1] !== words[1]) {
+function isColumnHeader(tokens: readonly string[], table: TableHeader["table"]): boolean {
+  const candidates = [headerFor(table), ...ALTERNATE_HEADERS.filter((h) => h.table === table)];
+  // A line opening like one variant must match that variant exactly.
+  const header = candidates.find((h) => tokens[0] === h.words[0] && tokens[1] === h.words[1]);
+  if (header === undefined) {
     return false;
   }
+  const { words } = header;
   const printed = tokens.slice(0, words.length).join(" ");
   const tail = tokens.slice(words.length).join(" ");
   if (printed !== words.join(" ") || (tail !== "" && !(header.table === "fuel" && MERGED_CARD_HEADING.test(tail)))) {
@@ -466,7 +480,7 @@ export async function parseInvoicePdf(
     const tokens = tokenize(line);
     if (tokens.length === 0) continue;
 
-    if (line === "Express Codes") {
+    if (line === "Express Codes" || line === "BVD Codes") {
       records.push(["Express Codes"], EXPRESS_HEADER_RECORD);
       section = "express";
       headerChecked = false;
@@ -478,7 +492,7 @@ export async function parseInvoicePdf(
       headerChecked = false;
       continue;
     }
-    if (isColumnHeader(tokens, headerFor(section))) {
+    if (isColumnHeader(tokens, section)) {
       headerChecked = true;
       continue;
     }
