@@ -27,6 +27,7 @@ const listPriceSheets = vi.fn();
 const listStations = vi.fn().mockResolvedValue({ stations: [], page: 1, pageSize: 500, total: 0 });
 
 vi.mock("../../lib/api", () => ({
+  ApiError: class ApiError extends Error {},
   createPlan: (...args: unknown[]) => createPlan(...args),
   getPlan: (...args: unknown[]) => getPlan(...args),
   listTrucks: (...args: unknown[]) => listTrucks(...args),
@@ -180,6 +181,23 @@ describe("New Plan page — solve-in-flight spinner (T-23 step 23.3, §8)", () =
 
     resolveCreate(COMPLETED_PLAN);
     await waitFor(() => expect(screen.queryByTestId("map-loading")).toBeNull());
+    expect(screen.getByRole("button", { name: /Plan route/ })).toBeTruthy();
+  });
+
+  it("clears on failure too, and the error shows", async () => {
+    setup();
+    createPlan.mockRejectedValue(new Error("boom"));
+    render(<NewPlanPage />);
+
+    await waitFor(() => expect((screen.getByLabelText("Truck") as HTMLSelectElement).options).toHaveLength(2));
+    fireEvent.change(screen.getByLabelText("Truck"), { target: { value: TRUCK.id } });
+    fireEvent.click(screen.getByRole("button", { name: "Dev Tools" }));
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "Bakersfield, CA" } });
+    fireEvent.change(screen.getByLabelText("Destination"), { target: { value: "Reno, NV" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Plan route/ }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.queryByTestId("map-loading")).toBeNull();
     expect(screen.getByRole("button", { name: /Plan route/ })).toBeTruthy();
   });
 });
