@@ -405,7 +405,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
                       <td>
                         <span className="tx-datetime">
                           <span className="tx-date">{printedAt(r.occurredAt).date}</span>
-                          <span className="tx-time">{printedAt(r.occurredAt).time}</span>
+                          <span className="tx-time" title={printedAt(r.occurredAt).full}>{printedAt(r.occurredAt).time}</span>
                           <InvoiceTag currency={r.currency} invoiceNumber={r.invoiceNumber} />
                         </span>
                       </td>

@@ -426,5 +426,10 @@ describe("TransactionsTable — printed times (T-81)", () => {
       (c) => `${c.querySelector(".tx-date")!.textContent} ${c.querySelector(".tx-time")!.textContent}`,
     );
     expect(cells.sort()).toEqual(["Sep 8 23:50", "Sep 9 00:00"]);
+    // Hovering the time shows the exact printed value, seconds included.
+    expect([...document.querySelectorAll(".tx-row .tx-time")].map((e) => e.getAttribute("title")).sort()).toEqual([
+      "2026-09-08 23:50:28",
+      "2026-09-09 00:00:47",
+    ]);
   });
 });

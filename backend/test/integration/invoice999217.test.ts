@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runMigrations } from "../../src/db/migrate.js";
+import { listTransactions } from "../../src/actuals/transactions.js";
 import { importInvoice, type ImportInvoiceResult } from "../../src/invoice/importInvoice.js";
 import { parseInvoicePdf } from "../../src/invoice/parseInvoicePdf.js";
 
@@ -145,5 +146,41 @@ describe.skipIf(!hasDatabase || !hasRealFixture || !python)("invoice 999217 impo
          WHERE (fs.occurred_at AT TIME ZONE 'UTC')::date > i.period_end`,
       ),
     ).toBe("1");
+  });
+
+  // T-81: the screens print `occurredAt`'s digits as-is (frontend `printedAt`),
+  // so the chain is only right if those digits are the ones BVD printed. The
+  // PDF's own text is the reference, read here without the parser.
+  it("serves every transaction time exactly as the PDF prints it (T-81)", async () => {
+    const { PDFParse } = await import("pdf-parse");
+    const reader = new PDFParse({ data: readFileSync(realPdfPath) });
+    let text: string;
+    try {
+      text = (await reader.getText()).text;
+    } finally {
+      await reader.destroy();
+    }
+    const printed = [...text.matchAll(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/g)].map((m) => `${m[1]} ${m[2]}`);
+    // The header table prints four of its own: invoice, start, end and due date.
+    const header = ["2026-09-10 00:00:00", "2026-08-01 00:00:00", "2026-09-09 23:59:59", "2026-09-11 23:59:59"];
+    const rest = [...printed];
+    for (const h of header) {
+      const i = rest.indexOf(h);
+      expect(i, `header timestamp ${h}`).toBeGreaterThanOrEqual(0);
+      rest.splice(i, 1);
+    }
+
+    const { rows: items } = await listTransactions(
+      pool,
+      {},
+      { field: "occurred_at", direction: "asc" },
+      { page: 1, pageSize: 200 },
+      { includeLines: true },
+    );
+    // One timestamp per printed line: a stop with two products prints its time twice.
+    const served = items.flatMap((t) => (t.lines ?? []).map(() => `${t.occurredAt.slice(0, 10)} ${t.occurredAt.slice(11, 19)}`));
+    expect(items).toHaveLength(59);
+    expect(served).toHaveLength(60);
+    expect([...served].sort()).toEqual([...rest].sort());
   });
 });

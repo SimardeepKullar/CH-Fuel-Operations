@@ -144,6 +144,10 @@ describe("Receipt Queue — table", () => {
     ]);
     const cells = screen.getAllByTestId("queue-row").map((r) => `${r.querySelector(".tx-date")!.textContent} ${r.querySelector(".tx-time")!.textContent}`);
     expect(cells).toEqual(["Sep 9 00:00", "Sep 8 23:50"]);
+    expect(screen.getAllByTestId("queue-row").map((r) => r.querySelector(".tx-time")!.getAttribute("title"))).toEqual([
+      "2026-09-09 00:00:47",
+      "2026-09-08 23:50:28",
+    ]);
     const day = screen.getByLabelText("Day") as HTMLSelectElement;
     expect([...day.options].map((o) => o.value).filter((v) => v !== "")).toEqual(["2026-09-08", "2026-09-09"]);
     fireEvent.change(day, { target: { value: "2026-09-09" } });

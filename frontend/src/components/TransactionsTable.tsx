@@ -75,11 +75,11 @@ function buildColumns(
     columnHelper.accessor("occurredAt", {
       header: "Date · time",
       cell: ({ row, getValue }) => {
-        const { date, time } = printedAt(getValue());
+        const { date, time, full } = printedAt(getValue());
         return (
           <span className="tx-datetime">
             <span className="tx-date">{date}</span>
-            <span className="tx-time">{time}</span>
+            <span className="tx-time" title={full}>{time}</span>
             {showInvoice && (
               <InvoiceTag
                 currency={row.original.invoiceCurrency}

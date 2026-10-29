@@ -22,6 +22,8 @@ export interface PrintedAt {
   dayKey: string;
   /** `9/8` — the date as a dispatcher types it into a search. */
   monthDay: string;
+  /** `2026-09-08 23:50:28` — the full printed value, for a tooltip. */
+  full: string;
 }
 
 export function printedAt(iso: string): PrintedAt {
@@ -32,5 +34,6 @@ export function printedAt(iso: string): PrintedAt {
     time: iso.slice(11, 16),
     dayKey: iso.slice(0, 10),
     monthDay: `${month}/${day}`,
+    full: `${iso.slice(0, 10)} ${iso.slice(11, 19)}`,
   };
 }
