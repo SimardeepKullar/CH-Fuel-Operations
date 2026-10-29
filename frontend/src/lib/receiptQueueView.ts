@@ -1,12 +1,13 @@
 import type { ReceiptQueueItem } from "@ch/core/actuals/receipts";
 import type { ReceiptStatus } from "@ch/core/db/types";
+import { printedDayKey, printedMonthDay, printedTime, printedWeekdayDate } from "./wallClock";
 
 export type QueueView = "check" | "confirmed" | "all";
 
 export interface QueueFilters {
   q: string;
   driver: string;
-  /** A local `YYYY-MM-DD`; "" is any day. */
+  /** The printed `YYYY-MM-DD` (see `wallClock.ts`); "" is any day. */
   day: string;
   flaggedOnly: boolean;
 }
@@ -26,22 +27,19 @@ export function truckName(item: ReceiptQueueItem): string {
   return item.truck.resolved ?? item.truck.raw;
 }
 
-/** The dispatcher's local calendar day, `YYYY-MM-DD` — the same clock the row's time prints in. */
-export function localDay(iso: string): string {
-  const d = new Date(iso);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
+/** The day BVD printed, `YYYY-MM-DD` — the same clock the row's time prints in. */
+export function printedDay(iso: string): string {
+  return printedDayKey(iso);
 }
 
 /** `Wed Oct 21`. */
 export function formatQueueDay(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric" }).format(new Date(iso)).replace(",", "");
+  return printedWeekdayDate(iso);
 }
 
 /** `3:30 PM`. */
 export function formatQueueTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return printedTime(iso);
 }
 
 export function stationLabel(item: ReceiptQueueItem): string {
@@ -51,7 +49,6 @@ export function stationLabel(item: ReceiptQueueItem): string {
 
 /** What a typed search is matched against: driver, truck, station, invoice number, and the row's date as "Oct 21" and "10/21". */
 function haystack(row: QueueRow): string {
-  const d = new Date(row.occurredAt);
   return [
     driverName(row),
     row.driver.raw,
@@ -61,7 +58,7 @@ function haystack(row: QueueRow): string {
     stationLabel(row),
     row.invoiceNumber,
     formatQueueDay(row.occurredAt),
-    `${d.getMonth() + 1}/${d.getDate()}`,
+    printedMonthDay(row.occurredAt),
   ]
     .join(" ")
     .toLowerCase();
@@ -69,7 +66,7 @@ function haystack(row: QueueRow): string {
 
 export function matchesFilters(row: QueueRow, f: QueueFilters): boolean {
   if (f.driver !== "" && driverName(row) !== f.driver) return false;
-  if (f.day !== "" && localDay(row.occurredAt) !== f.day) return false;
+  if (f.day !== "" && printedDay(row.occurredAt) !== f.day) return false;
   if (f.flaggedOnly && !row.hasException) return false;
   const q = f.q.trim().toLowerCase();
   return q === "" || haystack(row).includes(q);

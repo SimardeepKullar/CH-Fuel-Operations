@@ -411,3 +411,20 @@ describe("TransactionsTable", () => {
     expect(document.querySelectorAll(".tx-row")[1]!.className).toContain("active");
   });
 });
+
+describe("TransactionsTable — printed times (T-81)", () => {
+  it("shows the date and time BVD printed, not shifted to the viewer's zone", () => {
+    render(
+      <TransactionsTable
+        {...baseProps([
+          caStop({ id: "before", occurredAt: "2026-09-08T23:50:28.000Z" }),
+          caStop({ id: "after", occurredAt: "2026-09-09T00:00:47.000Z" }),
+        ])}
+      />,
+    );
+    const cells = [...document.querySelectorAll(".tx-row .tx-datetime")].map(
+      (c) => `${c.querySelector(".tx-date")!.textContent} ${c.querySelector(".tx-time")!.textContent}`,
+    );
+    expect(cells.sort()).toEqual(["Sep 8 11:50 PM", "Sep 9 12:00 AM"]);
+  });
+});

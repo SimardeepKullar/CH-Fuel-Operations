@@ -27,7 +27,7 @@ const { productLabel } = await import("../../../lib/transactionFilterConstants")
 function item(id: string, o: Partial<ReceiptQueueItem> = {}): ReceiptQueueItem {
   return {
     id,
-    occurredAt: "2026-10-21T15:30:00",
+    occurredAt: "2026-10-21T15:30:00.000Z",
     driver: { resolved: "DRIVER A", raw: "DRIVER A", agrees: true },
     driverId: "driver-a",
     truck: { resolved: "201", raw: "201", agrees: true },
@@ -89,7 +89,7 @@ describe("Receipt Queue — table", () => {
 
   it("tags every row with the invoice it came from, and searches by invoice number", async () => {
     await renderPage([
-      item("a", { occurredAt: "2026-10-22T10:00:00" }),
+      item("a", { occurredAt: "2026-10-22T10:00:00.000Z" }),
       item("b", { currency: "CAD", qtyUnit: "L", invoiceNumber: "999217" }),
     ]);
     expect(screen.getAllByTestId("tx-invoice-tag").map((t) => t.textContent)).toEqual(["🇺🇸 999210", "🇨🇦 999217"]);
@@ -132,9 +132,26 @@ describe("Receipt Queue — table", () => {
   });
 
   it("searches a date typed as 10/21", async () => {
-    await renderPage([item("a"), item("b", { occurredAt: "2026-10-22T09:00:00" })]);
+    await renderPage([item("a"), item("b", { occurredAt: "2026-10-22T09:00:00.000Z" })]);
     fireEvent.change(screen.getByPlaceholderText(/driver, truck/i), { target: { value: "10/21" } });
     expect(screen.getAllByTestId("queue-row")).toHaveLength(1);
+  });
+
+  it("prints, groups, filters and searches a row by the day BVD printed, not the viewer's (T-81)", async () => {
+    await renderPage([
+      item("before", { occurredAt: "2026-09-08T23:50:28.000Z" }),
+      item("after", { occurredAt: "2026-09-09T00:00:47.000Z" }),
+    ]);
+    const cells = screen.getAllByTestId("queue-row").map((r) => `${r.querySelector(".tx-date")!.textContent} ${r.querySelector(".tx-time")!.textContent}`);
+    expect(cells).toEqual(["Wed Sep 9 12:00 AM", "Tue Sep 8 11:50 PM"]);
+    const day = screen.getByLabelText("Day") as HTMLSelectElement;
+    expect([...day.options].map((o) => o.value).filter((v) => v !== "")).toEqual(["2026-09-08", "2026-09-09"]);
+    fireEvent.change(day, { target: { value: "2026-09-09" } });
+    expect(screen.getAllByTestId("queue-row")).toHaveLength(1);
+    fireEvent.change(day, { target: { value: "" } });
+    fireEvent.change(screen.getByPlaceholderText(/driver, truck/i), { target: { value: "9/9" } });
+    expect(screen.getAllByTestId("queue-row")).toHaveLength(1);
+    expect(screen.getByTestId("queue-row").querySelector(".tx-time")!.textContent).toBe("12:00 AM");
   });
 
   it("shows the empty state when nothing is left", async () => {

@@ -34,16 +34,14 @@ import AnomalyFlag from "./AnomalyFlag";
 import BilledPrice from "./BilledPrice";
 import RawResolved from "./RawResolved";
 import StopExpansion from "./StopExpansion";
+import { printedDate, printedTime } from "../lib/wallClock";
 
 const RECEIPT_MARKS: Record<ReceiptStatus, string> = { confirmed: "✓", missing: "✗", pending: "?" };
 const RECEIPT_LABELS: Record<ReceiptStatus, string> = { confirmed: "Confirmed", missing: "Missing", pending: "Pending" };
 
+/** As BVD printed it, not in the viewer's zone (`wallClock.ts`, T-81). */
 function formatDateTime(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  return {
-    date: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(d),
-    time: new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(d),
-  };
+  return { date: printedDate(iso), time: printedTime(iso) };
 }
 
 /** True when the given event target is a form control that should keep its

@@ -20,7 +20,7 @@ import {
   formatQueueDay,
   formatQueueTime,
   hasFilters,
-  localDay,
+  printedDay,
   truckName,
   visibleRows,
   type QueueFilters,
@@ -99,7 +99,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
   const driverOptions = useMemo(() => [...new Set(rows.map(driverName))].sort((a, b) => a.localeCompare(b)), [rows]);
   const dayOptions = useMemo(() => {
     const byDay = new Map<string, string>();
-    for (const r of rows) byDay.set(localDay(r.occurredAt), formatQueueDay(r.occurredAt));
+    for (const r of rows) byDay.set(printedDay(r.occurredAt), formatQueueDay(r.occurredAt));
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [rows]);
 
