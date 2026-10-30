@@ -136,6 +136,18 @@ describe("parseInvoicePdf — edge-case fixtures (T-50)", () => {
     );
   });
 
+  it("edge-bvd-codes: reads an express section printed as \"BVD Codes\" under the renamed header, and its total row", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-bvd-codes"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.expressRows.map((r) => [r.unitRaw, r.driverNameRaw, r.total])).toEqual([
+      ["101", "DRIVER ONE", "93.27"],
+      [null, null, "298.00"],
+    ]);
+    expect(result.rejections).toEqual([]);
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.grandTotal.deltaCents).toBe(0);
+    expect(outcome.balanced).toBe(true);
+  });
+
   it("edge-page-break: reads every line of a card that runs across a page, under 1-, 2- and 3-word driver names", async () => {
     const result = await parseInvoicePdf(edgePdf("edge-page-break"), DEFAULT_INVOICE_PRODUCT_CODES);
     expect(result.rejections).toEqual([]);
@@ -407,5 +419,29 @@ describe.skipIf(!existsSync(REAL_CA_PDF))("parseInvoicePdf — real CA invoice 9
     const triples = new Set(result.lines.map((l) => `${l.siteNumber}|${l.stationNameRaw}|${l.stationCity}`));
     expect(triples.size).toBe(9);
     expect(result.lines.every((l) => l.stationNameRaw.startsWith("BVD ") && l.stationCity !== "")).toBe(true);
+  });
+});
+
+// The first real invoice printing its express section as "BVD Codes" (T-84).
+const REAL_BVD_CODES_PDF = fileURLToPath(
+  new URL("../../../data/bvd-invoices/BVD_invoice_1030434.pdf", import.meta.url),
+);
+
+describe.skipIf(!existsSync(REAL_BVD_CODES_PDF))("parseInvoicePdf — real invoice 1030434, \"BVD Codes\" (local fixture only)", () => {
+  it("reads all 3 express rows under the renamed section, $3.00 fee each", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_BVD_CODES_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    expect(result.expressRows.map((r) => [r.fee, r.total])).toEqual([
+      ["3.00", "93.27"],
+      ["3.00", "298.00"],
+      ["3.00", "293.00"],
+    ]);
+  });
+
+  it("reconciles to its printed grand total of 53,388.24 exactly", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_BVD_CODES_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.grandTotal).toEqual({ expectedCents: 5338824, parsedCents: 5338824, deltaCents: 0 });
+    expect(outcome.balanced).toBe(true);
   });
 });

@@ -51,6 +51,14 @@ const EXPRESS_COLUMNS = [
   "CDL", "TRIP #", "AMOUNT CASHED", "FEE", "TOTAL", "CUR", "Payee", "NOTES",
 ];
 
+/** The express table as later invoices print it: the section is "BVD Codes"
+ * and the first columns read "TYPE", "BVD CODE" where earlier ones read
+ * "EXP. CODE". Express rows carry a type word before the code, as printed. */
+const BVD_CODES_COLUMNS = [
+  "DATE", "TYPE", "BVD CODE", "AUTH CODE", "TRACTOR", "TRAILER", "DRIVER NAME/ID",
+  "CDL", "TRIP #", "AMOUNT CASHED", "FEE", "TOTAL", "CUR", "Payee", "NOTES",
+];
+
 const TOTALS_COLUMNS = [
   "PRODUCT", "QTY", "PRE TAX AMT", "HST", "GST", "PST", "QST", "DISC RATE",
   "DISC AMT", "FINAL AMOUNT", "CUR",
@@ -73,6 +81,8 @@ interface InvoiceSpec {
   totalsRows: string[][];
   /** The fuel table's printed column header. Only an edge case changes it. */
   fuelColumns: readonly string[];
+  /** Print the express section the way later invoices do ("BVD Codes"). */
+  bvdCodes?: boolean;
   /** How cell gaps extract. Absent: one narrow gap everywhere, so pdf-parse
    * sees spaces. Present: the page is drawn under a scaled transform, as
    * BVD's own PDF is — pdf.js then sizes its synthetic space in unscaled
@@ -453,6 +463,19 @@ export const EDGE_CASES = {
     ...edge(Object.entries(US_ROWS).map(([card, rows]) => ({ card, rows }))),
     fuelColumns: FUEL_COLUMNS.map((c) => (c === "Retail" ? "Billed" : c === "Billed" ? "Retail" : c)),
   },
+  /** The express section printed as "BVD Codes", with its renamed column
+   * header and a total row of the same name: rows must still be read, not
+   * skipped, or the grand total comes up short by exactly their sum. */
+  "edge-bvd-codes": {
+    ...edge(
+      [{ card: "1000001", rows: US_ROWS["1000001"] }],
+      [
+        ["2026-01-05 08:00:00", "9000001", "E1000001", "101", "", "DRIVER ONE", "", "", "90.27", "3", "93.27", "US", "lumper", "lumper"],
+        ["2026-01-05 09:00:00", "9000002", "E1000002", "", "", "", "", "", "295", "3", "298", "US", "lumper fees", "lumper fees"],
+      ],
+    ),
+    bvdCodes: true,
+  },
   /** One card whose rows run across a page break, under 1-, 2- and 3-word names. */
   "edge-page-break": edge([{ card: "1000001", rows: longCardRows() }]),
   /** Express rows with a blank driver, a blank tractor, both blank, and a
@@ -538,15 +561,23 @@ function entriesOf(spec: InvoiceSpec): Entry[] {
   }
 
   if (spec.expressRows.length > 0) {
-    add(["Express Codes"], { gapBefore: 6 });
-    add(EXPRESS_COLUMNS);
-    for (const r of spec.expressRows) add(r);
+    add([spec.bvdCodes ? "BVD Codes" : "Express Codes"], { gapBefore: 6 });
+    add(spec.bvdCodes ? BVD_CODES_COLUMNS : EXPRESS_COLUMNS);
+    for (const r of spec.expressRows) {
+      if (!spec.bvdCodes) {
+        add(r);
+        continue;
+      }
+      // DATE, "Express Code" type, BVD code, then the rest.
+      const [date, ...rest] = r;
+      add([date!, "Express Code", ...rest]);
+    }
     if (spec.expressSubtotal) add(spec.expressSubtotal);
   }
 
   add(["Grand Totals"], { gapBefore: 6 });
   add(TOTALS_COLUMNS);
-  for (const r of spec.totalsRows) add(r);
+  for (const r of spec.totalsRows) add(spec.bvdCodes && r[0] === "Express" ? ["BVD Codes", ...r.slice(1)] : r);
 
   add(["HST# 000000000RT0001"], { gapBefore: 6 });
   add(["QST# 0000000000TQ0001"]);
