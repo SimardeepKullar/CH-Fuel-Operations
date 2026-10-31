@@ -1075,6 +1075,14 @@ select.tx-filter-select {
   color: var(--color-accent-800);
   cursor: pointer;
 }
+input.tx-filter-date {
+  width: auto;
+  flex: none;
+  height: 30px;
+  padding: 0 8px;
+  font: 600 12px var(--font-body);
+  color: var(--color-accent-800);
+}
 .tx-anomaly-toggle {
   display: flex;
   align-items: center;

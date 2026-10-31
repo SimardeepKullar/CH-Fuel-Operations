@@ -228,6 +228,9 @@ export interface ListTransactionsParams {
   state?: string;
   product?: string;
   receiptStatus?: "pending" | "confirmed" | "missing";
+  /** Inclusive bounds on the printed time, UTC text (T-83): `YYYY-MM-DDT00:00:00Z` and `YYYY-MM-DDT23:59:59.999Z`. */
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 /** `GET /transactions` — A8.3's list (T-40). `?week=` is how the shell's

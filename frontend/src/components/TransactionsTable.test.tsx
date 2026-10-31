@@ -15,6 +15,8 @@ const EMPTY_FILTERS: TransactionFiltersState = {
   state: "",
   product: "",
   receiptStatus: "",
+  from: "",
+  to: "",
   anomalyOnly: false,
   sort: "",
 };
@@ -431,5 +433,16 @@ describe("TransactionsTable — printed times (T-81)", () => {
       "2026-09-08 23:50:28",
       "2026-09-09 00:00:47",
     ]);
+  });
+});
+
+describe("TransactionsTable date filter (T-83)", () => {
+  it("shows the From and To days from the filters and reports edits through setFilter", () => {
+    const props = { ...baseProps([stop()]), filters: { ...EMPTY_FILTERS, from: "2026-09-08", to: "2026-09-09" } };
+    render(<TransactionsTable {...props} />);
+    expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe("2026-09-08");
+    expect((screen.getByLabelText("To") as HTMLInputElement).value).toBe("2026-09-09");
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-09-10" } });
+    expect(props.setFilter).toHaveBeenCalledWith("to", "2026-09-10");
   });
 });

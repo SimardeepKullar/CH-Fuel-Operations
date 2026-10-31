@@ -476,6 +476,28 @@ export default function TransactionsTable({
               ))}
             </select>
           </span>
+          <label className="tx-filter">
+            <span className="tx-filter-label">From</span>
+            <input
+              type="date"
+              className="input tx-filter-date"
+              value={filters.from}
+              max={filters.to || undefined}
+              onChange={(e) => setFilter("from", e.target.value)}
+              aria-label="From"
+            />
+          </label>
+          <label className="tx-filter">
+            <span className="tx-filter-label">To</span>
+            <input
+              type="date"
+              className="input tx-filter-date"
+              value={filters.to}
+              min={filters.from || undefined}
+              onChange={(e) => setFilter("to", e.target.value)}
+              aria-label="To"
+            />
+          </label>
           <label className={`tx-anomaly-toggle${filters.anomalyOnly ? " active" : ""}`}>
             <input
               type="checkbox"

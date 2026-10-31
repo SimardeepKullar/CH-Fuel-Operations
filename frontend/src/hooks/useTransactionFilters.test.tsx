@@ -21,6 +21,10 @@ function Probe() {
       <span data-testid="sort">{filters.sort || "none"}</span>
       <button onClick={() => setFilter("sort", "asc")}>sort asc</button>
       <button onClick={() => setFilter("sort", "")}>sort default</button>
+      <span data-testid="from">{filters.from || "none"}</span>
+      <span data-testid="to">{filters.to || "none"}</span>
+      <button onClick={() => setFilter("from", "2026-09-08")}>set from</button>
+      <button onClick={() => setFilter("to", "")}>clear to</button>
       <span data-testid="q">{filters.q || "none"}</span>
       <button onClick={() => setFilter("driverId", "driver-1")}>set driver</button>
       <button onClick={() => setFilter("driverId", "")}>clear driver</button>
@@ -123,5 +127,39 @@ describe("useTransactionFilters (T-40)", () => {
     const url = new URL(replace.mock.calls[0]![0] as string, "http://localhost");
     expect(url.searchParams.has("sort")).toBe(false);
     expect(url.searchParams.get("period")).toBe("2026-09-03");
+  });
+
+  it("from and to read back from the URL, each defaulting to empty (T-83)", () => {
+    render(<Probe />);
+    expect(screen.getByTestId("from").textContent).toBe("none");
+    expect(screen.getByTestId("to").textContent).toBe("none");
+    cleanup();
+    searchParams = new URLSearchParams({ from: "2026-09-08" });
+    render(<Probe />);
+    expect(screen.getByTestId("from").textContent).toBe("2026-09-08");
+    expect(screen.getByTestId("to").textContent).toBe("none");
+  });
+
+  it("from is written to the URL and to is removed when emptied, keeping the other params (T-83)", () => {
+    searchParams = new URLSearchParams({ to: "2026-09-09", week: "2026-09-10" });
+    render(<Probe />);
+    act(() => screen.getByText("set from").click());
+    const written = new URL(replace.mock.calls[0]![0] as string, "http://localhost");
+    expect(written.searchParams.get("from")).toBe("2026-09-08");
+    expect(written.searchParams.get("to")).toBe("2026-09-09");
+    act(() => screen.getByText("clear to").click());
+    const cleared = new URL(replace.mock.calls[1]![0] as string, "http://localhost");
+    expect(cleared.searchParams.has("to")).toBe(false);
+    expect(cleared.searchParams.get("week")).toBe("2026-09-10");
+  });
+
+  it("clearFilters resets from and to but keeps the scope (T-83)", () => {
+    searchParams = new URLSearchParams({ from: "2026-09-08", to: "2026-09-09", week: "2026-09-10" });
+    render(<Probe />);
+    act(() => screen.getByText("clear all").click());
+    const url = new URL(replace.mock.calls[0]![0] as string, "http://localhost");
+    expect(url.searchParams.has("from")).toBe(false);
+    expect(url.searchParams.has("to")).toBe(false);
+    expect(url.searchParams.get("week")).toBe("2026-09-10");
   });
 });

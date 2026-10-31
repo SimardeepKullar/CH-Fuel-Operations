@@ -26,6 +26,20 @@ export interface PrintedAt {
   full: string;
 }
 
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The `dateFrom` / `dateTo` a `From` / `To` day pair sends to `GET /transactions`
+ * (T-83). A day is a printed day, so the bounds are UTC text — `T00:00:00Z` and
+ * `T23:59:59.999Z` — and never a local `Date`. An empty or malformed day sends nothing.
+ */
+export function printedDayBounds(from: string, to: string): { dateFrom?: string; dateTo?: string } {
+  return {
+    ...(DAY.test(from) ? { dateFrom: `${from}T00:00:00Z` } : {}),
+    ...(DAY.test(to) ? { dateTo: `${to}T23:59:59.999Z` } : {}),
+  };
+}
+
 export function printedAt(iso: string): PrintedAt {
   const month = Number(iso.slice(5, 7));
   const day = Number(iso.slice(8, 10));
