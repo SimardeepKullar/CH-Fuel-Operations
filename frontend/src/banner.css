@@ -49,6 +49,7 @@
 }
 .pb-to { font: 500 12px var(--font-body); color: #7b869e; }
 .pb-range { display: flex; align-items: center; gap: 6px; }
+.pb-date { width: 140px; }
 
 .ss {
   display: flex;

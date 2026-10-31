@@ -21,7 +21,7 @@ export const DEFAULT_RANGE_WEEKS = 4;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The URL keys the scope owns, so a caller can clear them before writing another scope. */
-export const SCOPE_PARAMS = ["scope", "w", "from", "to"] as const;
+export const SCOPE_PARAMS = ["scope", "w", "from", "to", "dayFrom", "dayTo"] as const;
 
 interface ParamReader {
   get(name: string): string | null;

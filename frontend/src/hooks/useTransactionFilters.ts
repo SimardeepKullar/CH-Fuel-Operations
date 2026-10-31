@@ -9,9 +9,6 @@ export interface TransactionFiltersState {
   state: string;
   product: string;
   receiptStatus: string;
-  /** Printed days, `YYYY-MM-DD`, inclusive (T-83). */
-  from: string;
-  to: string;
   /** Anomaly rule slugs, comma-separated; any one matches. */
   flags: string;
   anomalyOnly: boolean;
@@ -27,8 +24,6 @@ const EMPTY: TransactionFiltersState = {
   state: "",
   product: "",
   receiptStatus: "",
-  from: "",
-  to: "",
   flags: "",
   anomalyOnly: false,
   sort: "",
@@ -39,6 +34,8 @@ const FILTER_KEYS = Object.keys(EMPTY) as (keyof TransactionFiltersState)[];
 export interface UseTransactionFiltersResult {
   filters: TransactionFiltersState;
   setFilter: (key: keyof TransactionFiltersState, value: string | boolean) => void;
+  /** Several keys in one URL write: two `setFilter` calls in a row would each start from the same URL. */
+  setFilters: (patch: Partial<TransactionFiltersState>) => void;
   clearFilters: () => void;
 }
 
@@ -48,6 +45,8 @@ export interface UseTransactionFiltersResult {
  * is deliberately not one of these keys — that's the shell's week context's own
  * param (A7), read/written independently; both hooks preserve whatever
  * params the other owns by reading `searchParams` fresh on every write.
+ * The period and its dates are the scope's (`transactionsScope.ts`), so
+ * clearing the filters leaves them alone (T-87).
  */
 export function useTransactionFilters(): UseTransactionFiltersResult {
   const router = useRouter();
@@ -63,8 +62,6 @@ export function useTransactionFilters(): UseTransactionFiltersResult {
       state: searchParams.get("state") ?? "",
       product: searchParams.get("product") ?? "",
       receiptStatus: searchParams.get("receiptStatus") ?? "",
-      from: searchParams.get("from") ?? "",
-      to: searchParams.get("to") ?? "",
       flags: searchParams.get("flags") ?? "",
       anomalyOnly: searchParams.get("anomalyOnly") === "true",
       sort: searchParams.get("sort") === "asc" ? "asc" : "",
@@ -72,17 +69,24 @@ export function useTransactionFilters(): UseTransactionFiltersResult {
     [searchParams],
   );
 
-  const setFilter = useCallback(
-    (key: keyof TransactionFiltersState, value: string | boolean) => {
+  const setFilters = useCallback(
+    (patch: Partial<TransactionFiltersState>) => {
       const next = new URLSearchParams(searchParams.toString());
-      if (value === "" || value === false) {
-        next.delete(key);
-      } else {
-        next.set(key, String(value));
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === "" || value === false) {
+          next.delete(key);
+        } else {
+          next.set(key, String(value));
+        }
       }
       router.replace(`${pathname}?${next.toString()}`);
     },
     [router, pathname, searchParams],
+  );
+
+  const setFilter = useCallback(
+    (key: keyof TransactionFiltersState, value: string | boolean) => setFilters({ [key]: value }),
+    [setFilters],
   );
 
   const clearFilters = useCallback(() => {
@@ -91,5 +95,5 @@ export function useTransactionFilters(): UseTransactionFiltersResult {
     router.replace(`${pathname}?${next.toString()}`);
   }, [router, pathname, searchParams]);
 
-  return { filters, setFilter, clearFilters };
+  return { filters, setFilter, setFilters, clearFilters };
 }

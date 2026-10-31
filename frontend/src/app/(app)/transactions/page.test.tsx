@@ -106,54 +106,6 @@ describe("TransactionsPage (T-40)", () => {
     expect(tableCall![0]).toMatchObject({ driverId: "driver-1" });
   });
 
-  it("from and to in the URL are forwarded as UTC day bounds, under Toronto time (T-83)", async () => {
-    expect(new Date("2026-09-09T00:00:47Z").getDate()).toBe(8);
-    searchParams = new URLSearchParams({ week: "2026-09-10", from: "2026-09-08", to: "2026-09-09" });
-    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
-    listPeriods.mockResolvedValue({ weeks: [] });
-    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
-    listTrucks.mockResolvedValue({ rows: [] });
-    listTransactions.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
-
-    render(<TransactionsPage />);
-
-    await waitFor(() => expect(listTransactions.mock.calls.some((c) => (c[0] as { includeLines?: boolean }).includeLines)).toBe(true));
-    const tableCall = listTransactions.mock.calls.find((c) => (c[0] as { includeLines?: boolean }).includeLines);
-    expect(tableCall![0]).toMatchObject({ week: "2026-09-10", dateFrom: "2026-09-08T00:00:00Z", dateTo: "2026-09-09T23:59:59.999Z" });
-  });
-
-  it("with no from or to, no date bounds are sent (T-83)", async () => {
-    searchParams = new URLSearchParams({ week: "2026-09-10" });
-    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
-    listPeriods.mockResolvedValue({ weeks: [] });
-    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
-    listTrucks.mockResolvedValue({ rows: [] });
-    listTransactions.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
-
-    render(<TransactionsPage />);
-
-    await waitFor(() => expect(listTransactions.mock.calls.some((c) => (c[0] as { includeLines?: boolean }).includeLines)).toBe(true));
-    const tableCall = listTransactions.mock.calls.find((c) => (c[0] as { includeLines?: boolean }).includeLines);
-    expect(tableCall![0]).toMatchObject({ dateFrom: undefined, dateTo: undefined });
-  });
-
-  it("typing in the From and To inputs writes from and to to the URL (T-83)", async () => {
-    searchParams = new URLSearchParams({ week: "2026-09-10" });
-    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
-    listPeriods.mockResolvedValue({ weeks: [] });
-    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
-    listTrucks.mockResolvedValue({ rows: [] });
-    listTransactions.mockResolvedValue({ rows: [stop()], page: 1, pageSize: 200, total: 1 });
-
-    render(<TransactionsPage />);
-    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
-
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-09-08" } });
-    expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.get("from")).toBe("2026-09-08");
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-09-09" } });
-    expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.get("to")).toBe("2026-09-09");
-  });
-
   it("flags in the URL are forwarded to GET /transactions as a list", async () => {
     searchParams = new URLSearchParams({ week: "2026-09-10", flags: "sub_gallon,too_close" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
@@ -510,6 +462,54 @@ describe("TransactionsPage — the Overview's scope in the URL (T-74)", () => {
     await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "All time" }));
     expect(replace).toHaveBeenCalledWith("/transactions?scope=all");
+  });
+});
+
+describe("TransactionsPage — exact days under Range (T-87)", () => {
+  const twoWeeks = () => setupWeeks([CA_ONLY_WEEK, PAIRED_WEEK], "2026-09-16");
+
+  it("a range with no days pinned sends no day bounds: an Overview link covers its weeks whole", async () => {
+    searchParams = new URLSearchParams("scope=range&from=2026-09-09&to=2026-09-16");
+    twoWeeks();
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    expect(lastTableRequest()).toMatchObject({ weekFrom: "2026-09-09", weekTo: "2026-09-16" });
+    expect(lastTableRequest()).toMatchObject({ dateFrom: undefined, dateTo: undefined });
+  });
+
+  it("pinned days go out as UTC day bounds inside their weeks, and the banner reads them", async () => {
+    searchParams = new URLSearchParams("scope=range&from=2026-09-09&to=2026-09-09&dayFrom=2026-09-08&dayTo=2026-09-09");
+    twoWeeks();
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    expect(lastTableRequest()).toMatchObject({ weekFrom: "2026-09-09", weekTo: "2026-09-09", dateFrom: "2026-09-08T00:00:00Z", dateTo: "2026-09-09T23:59:59.999Z" });
+    expect(screen.getByText("Range · 1 week · Sep 8 – Sep 9")).toBeTruthy();
+  });
+
+  it("the pickers open on the range's first and last day, and an edit pins both days and the weeks they touch", async () => {
+    searchParams = new URLSearchParams("scope=range&from=2026-09-09&to=2026-09-16");
+    twoWeeks();
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe("2026-09-03");
+    expect((screen.getByLabelText("To") as HTMLInputElement).value).toBe("2026-09-10");
+
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-09-05" } });
+    const url = new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams;
+    expect(url.get("dayFrom")).toBe("2026-09-03");
+    expect(url.get("dayTo")).toBe("2026-09-05");
+    expect(url.get("from")).toBe("2026-09-09");
+    expect(url.get("to")).toBe("2026-09-16");
+  });
+
+  it("days in the URL do nothing outside Range, and leaving Range drops them", async () => {
+    searchParams = new URLSearchParams("scope=all&dayFrom=2026-09-08");
+    twoWeeks();
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    expect(lastTableRequest()).toMatchObject({ dateFrom: undefined });
+    fireEvent.click(screen.getByRole("button", { name: "Billing week ▾" }));
+    expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.has("dayFrom")).toBe(false);
   });
 });
 
