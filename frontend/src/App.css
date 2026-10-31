@@ -1220,7 +1220,7 @@ select.tx-filter-select {
 .tx-flags-menu { gap: 6px; min-width: 170px; padding: 8px 10px; }
 .tx-menu-option { display: flex; align-items: center; gap: 7px; font: 500 12px var(--font-body); cursor: pointer; }
 .tx-menu-rule { border-top: 1px solid #eef1f6; }
-.tx-more-menu { gap: 10px; width: 240px; padding: 12px; }
+.tx-more-menu { gap: 10px; width: 190px; padding: 12px; }
 .tx-more-field { display: flex; flex-direction: column; gap: 4px; }
 .tx-more-field .input { height: 30px; min-height: 30px; padding: 0 24px 0 9px; border-color: #cbd2e1; border-radius: 0; background-color: #fff; font: 500 12px var(--font-body); color: #121852; }
 .tx-more-label {

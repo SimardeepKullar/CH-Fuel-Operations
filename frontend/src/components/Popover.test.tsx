@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Popover from "./Popover";
 
 afterEach(cleanup);
@@ -54,5 +54,30 @@ describe("Popover (T-87)", () => {
     fireEvent.click(setup());
     fireEvent.blur(screen.getByLabelText("Card"), { relatedTarget: screen.getByText("elsewhere") });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("Popover placement (T-87)", () => {
+  function place(buttonLeft: number, buttonRight: number, viewport: number, panelWidth: number) {
+    Object.defineProperty(document.documentElement, "clientWidth", { configurable: true, value: viewport });
+    const offset = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(panelWidth);
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ left: buttonLeft, right: buttonRight, bottom: 100 } as DOMRect);
+    fireEvent.click(setup());
+    const left = screen.getByRole("dialog").style.left;
+    offset.mockRestore();
+    rect.mockRestore();
+    return left;
+  }
+
+  it("opens under the button's left edge when it fits", () => {
+    expect(place(100, 180, 1000, 190)).toBe("100px");
+  });
+
+  it("lines up with the button's right edge when it would pass the visible width", () => {
+    expect(place(1100, 1180, 1200, 190)).toBe("990px");
+  });
+
+  it("never starts off the left of the screen", () => {
+    expect(place(20, 100, 200, 190)).toBe("8px");
   });
 });

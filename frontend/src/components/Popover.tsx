@@ -48,8 +48,9 @@ export default function Popover({ trigger, triggerClassName, triggerLabel, panel
     const button = buttonRef.current?.getBoundingClientRect();
     const panelWidth = panelRef.current?.offsetWidth ?? 0;
     if (button === undefined) return;
-    const rightmost = window.innerWidth - panelWidth - EDGE_PX;
-    setPosition({ top: button.bottom + GAP_PX, left: Math.max(EDGE_PX, Math.min(button.left, rightmost)) });
+    // clientWidth, not innerWidth: innerWidth counts the scrollbar the panel would sit under.
+    const fits = button.left + panelWidth <= document.documentElement.clientWidth - EDGE_PX;
+    setPosition({ top: button.bottom + GAP_PX, left: Math.max(EDGE_PX, fits ? button.left : button.right - panelWidth) });
   }, []);
 
   useLayoutEffect(() => {
