@@ -1128,31 +1128,31 @@ select.tx-filter-select {
 .tx-legend-item { display: flex; align-items: center; gap: 7px; font: 400 11px var(--font-body); color: var(--color-muted); }
 
 /* The Transactions filter bar (T-87, docs/design/TransactionFilters.dc.html). */
-.tx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 16px; }
-.tx-bar-search { position: relative; flex: 1 1 340px; min-width: 0; display: block; color: #5a6377; }
-.tx-bar-search svg { position: absolute; left: 12px; top: 12px; }
+.tx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 13px; }
+.tx-bar-search { position: relative; flex: 1 1 280px; min-width: 0; display: block; color: #5a6377; }
+.tx-bar-search svg { position: absolute; left: 10px; top: 8px; width: 14px; height: 14px; }
 .tx-bar-search .input {
   width: 100%;
-  height: 40px;
-  padding: 0 12px 0 36px;
+  height: 30px;
+  padding: 0 10px 0 30px;
   border-color: #cbd2e1;
   border-radius: 0;
   background: #fff;
-  font: 400 15px var(--font-body);
+  font: 400 12.5px var(--font-body);
   color: #121852;
 }
 .tx-dd {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  max-width: 240px;
-  height: 40px;
-  padding: 0 12px;
+  gap: 7px;
+  max-width: 200px;
+  height: 30px;
+  padding: 0 9px;
   border: 1px solid #cbd2e1;
   background: #fff;
   color: #121852;
-  font: 400 15px var(--font-body);
+  font: 500 12px var(--font-body);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1161,28 +1161,28 @@ select.tx-filter-select {
 .tx-dd.on .tx-dd-value { font-weight: 700; }
 .tx-dd svg { flex: none; }
 .tx-dd-key {
-  font: 600 11px var(--font-heading);
-  letter-spacing: 0.14em;
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: #5a6377;
 }
 .tx-dd-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.tx-dd-select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; font-size: 15px; cursor: pointer; }
-.tx-dd-badge { padding: 2px 6px; background: #121852; color: #fff; font: 700 11px var(--font-body); }
-.tx-bar-count { margin-left: 8px; color: #5a6377; font-size: 14px; white-space: nowrap; }
+.tx-dd-select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; font-size: 12px; cursor: pointer; }
+.tx-dd-badge { padding: 1px 5px; background: #121852; color: #fff; font: 700 10px var(--font-body); }
+.tx-bar-count { margin-left: 6px; color: #5a6377; font-size: 11.5px; white-space: nowrap; }
 .tx-bar-count strong { color: #121852; }
 .tx-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 7px 13px;
   border-top: 1px solid #eef1f6;
   background: #fafbfd;
 }
 .tx-chips-label {
   margin-right: 4px;
-  font: 600 11px var(--font-heading);
+  font: 600 9.5px var(--font-heading);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #5a6377;
@@ -1192,16 +1192,16 @@ select.tx-filter-select {
   align-items: center;
   gap: 4px;
   max-width: 100%;
-  min-height: 30px;
-  padding: 0 4px 0 10px;
+  min-height: 24px;
+  padding: 0 2px 0 8px;
   border: 1px solid #121852;
   background: #fff;
   color: #121852;
-  font: 400 14px var(--font-body);
+  font: 400 12px var(--font-body);
 }
 .tx-chip strong { overflow-wrap: anywhere; }
-.tx-chip button { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border: 0; background: transparent; color: #5a6377; cursor: pointer; }
-.tx-chips-clear { height: 30px; padding: 0 4px; border: 0; background: transparent; color: #0874b0; font: 600 14px var(--font-body); cursor: pointer; }
+.tx-chip button { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border: 0; background: transparent; color: #5a6377; cursor: pointer; }
+.tx-chips-clear { height: 24px; padding: 0 4px; border: 0; background: transparent; color: #0874b0; font: 600 12px var(--font-body); cursor: pointer; }
 .popover { display: inline-flex; }
 .popover-panel {
   position: fixed;
@@ -1216,14 +1216,14 @@ select.tx-filter-select {
   text-transform: none;
   letter-spacing: normal;
 }
-.tx-flags-menu { gap: 8px; min-width: 190px; padding: 12px 14px; }
-.tx-menu-option { display: flex; align-items: center; gap: 8px; font: 400 14px var(--font-body); cursor: pointer; }
+.tx-flags-menu { gap: 6px; min-width: 170px; padding: 8px 10px; }
+.tx-menu-option { display: flex; align-items: center; gap: 7px; font: 500 12px var(--font-body); cursor: pointer; }
 .tx-menu-rule { border-top: 1px solid #eef1f6; }
-.tx-more-menu { gap: 14px; width: 300px; padding: 16px; }
-.tx-more-field { display: flex; flex-direction: column; gap: 6px; }
-.tx-more-field .input { height: 40px; border-color: #cbd2e1; border-radius: 0; background-color: #fff; font: 400 15px var(--font-body); color: #121852; }
+.tx-more-menu { gap: 10px; width: 240px; padding: 12px; }
+.tx-more-field { display: flex; flex-direction: column; gap: 4px; }
+.tx-more-field .input { height: 30px; padding: 0 24px 0 9px; border-color: #cbd2e1; border-radius: 0; background-color: #fff; font: 500 12px var(--font-body); color: #121852; }
 .tx-more-label {
-  font: 600 11px var(--font-heading);
+  font: 600 9.5px var(--font-heading);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #5a6377;
@@ -1244,9 +1244,9 @@ select.tx-filter-select {
   cursor: pointer;
 }
 .tx-info[aria-expanded="true"] { border-color: #121852; background: #121852; color: #fff; }
-.tx-unit-key { gap: 10px; width: 340px; padding: 14px 16px; font: 400 14px var(--font-body); }
+.tx-unit-key { gap: 8px; width: 300px; padding: 10px 12px; font: 400 12px var(--font-body); }
 .tx-unit-key-title {
-  font: 600 11px var(--font-heading);
+  font: 600 9.5px var(--font-heading);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #5a6377;
@@ -1254,7 +1254,6 @@ select.tx-filter-select {
 .tx-unit-key-item { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; }
 @media (max-width: 700px) {
   .tx-bar-search { flex-basis: 100%; }
-  .tx-bar-search .input::placeholder { font-size: 13px; }
   .tx-dd { max-width: 100%; }
   .tx-bar-count { margin-left: auto; }
 }
