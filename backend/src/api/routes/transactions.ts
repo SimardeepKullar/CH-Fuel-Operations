@@ -39,6 +39,12 @@ const querySchema = z.object({
   state: z.string().optional(),
   product: z.string().optional(),
   receiptStatus: z.enum(RECEIPT_STATUSES).optional(),
+  /** Comma-separated anomaly rule slugs; a stop matches if it carries any of them. */
+  flags: z
+    .string()
+    .transform((s) => s.split(",").filter((r) => r !== ""))
+    .pipe(z.array(z.string().regex(/^[a-z_]+$/)).max(20))
+    .optional(),
 })
   .refine((q) => q.week === undefined || (q.weekFrom === undefined && q.weekTo === undefined), {
     message: "week cannot be combined with weekFrom or weekTo",
@@ -74,6 +80,7 @@ function parseQueryParams(searchParams: URLSearchParams): z.infer<typeof querySc
     "state",
     "product",
     "receiptStatus",
+    "flags",
   ]) {
     const value = searchParams.get(key);
     if (value !== null) {
@@ -126,6 +133,7 @@ export async function handleListTransactions(pool: Pool, url: URL): Promise<Resp
     product: query.product,
     receiptStatus: query.receiptStatus,
     anomalyOnly: query.anomalyOnly,
+    flags: query.flags,
   };
   const sort: TransactionSort = { field: query.sortField, direction: query.sortDirection };
   const options: ListTransactionsOptions = {

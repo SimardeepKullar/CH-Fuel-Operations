@@ -228,6 +228,11 @@ export interface ListTransactionsParams {
   state?: string;
   product?: string;
   receiptStatus?: "pending" | "confirmed" | "missing";
+  /** Inclusive bounds on the printed time, UTC text (T-83): `YYYY-MM-DDT00:00:00Z` and `YYYY-MM-DDT23:59:59.999Z`. */
+  dateFrom?: string;
+  dateTo?: string;
+  /** Anomaly rule slugs, any of which a stop may carry; sent comma-separated. */
+  flags?: string[];
 }
 
 /** `GET /transactions` — A8.3's list (T-40). `?week=` is how the shell's
@@ -238,7 +243,7 @@ export interface ListTransactionsParams {
 export function listTransactions(params: ListTransactionsParams = {}): Promise<ListTransactionsResult> {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
+    if (value !== undefined && !(Array.isArray(value) && value.length === 0)) search.set(key, String(value));
   }
   const qs = search.toString();
   return request<ListTransactionsResult>(`/transactions${qs ? `?${qs}` : ""}`);

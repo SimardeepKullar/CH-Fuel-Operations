@@ -41,6 +41,12 @@ export interface TransactionFilters {
    * other anomaly.
    */
   anomalyOnly?: boolean;
+  /**
+   * Only stops carrying an undismissed anomaly of at least one of these rules
+   * (T-83 addendum): a multi-select, so the rules OR together and the filter
+   * ANDs with every other. Empty or absent applies nothing.
+   */
+  flags?: string[];
 }
 
 export interface TransactionFilterClause {
@@ -122,6 +128,12 @@ export function buildTransactionFilterClause(
   if (filters.anomalyOnly) {
     conditions.push(
       "EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL AND a.rule <> 'charges_no_fuel')",
+    );
+  }
+  if (filters.flags !== undefined && filters.flags.length > 0) {
+    add(
+      "EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL AND a.rule = ANY(?::text[]))",
+      filters.flags,
     );
   }
 

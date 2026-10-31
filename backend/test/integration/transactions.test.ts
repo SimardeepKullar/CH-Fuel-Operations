@@ -193,6 +193,31 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /transactions (integration
     expect(result.total).toBe(flaggedCount);
   });
 
+  it("flags matches stops carrying any listed rule, and its total counts only those (T-83)", async () => {
+    const { rows } = await scopedPool.query<{ rule: string }>(
+      "SELECT DISTINCT rule FROM anomalies WHERE subject_type = 'fuel_stop' AND dismissed_at IS NULL AND rule <> 'charges_no_fuel' ORDER BY rule LIMIT 2",
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    const rules = rows.map((r) => r.rule);
+    const { rows: countRows } = await scopedPool.query<{ count: string }>(
+      "SELECT count(distinct subject_id) FROM anomalies WHERE subject_type = 'fuel_stop' AND dismissed_at IS NULL AND rule = ANY($1::text[])",
+      [rules],
+    );
+    const result = await listTransactions(scopedPool, { flags: rules }, { field: "occurred_at", direction: "desc" }, { page: 1, pageSize: 200 });
+    expect(result.total).toBe(Number(countRows[0]!.count));
+    for (const row of result.rows) {
+      expect(row.flags.some((f) => rules.includes(f.rule))).toBe(true);
+    }
+  });
+
+  it("GET /transactions?flags= takes a comma-separated list and rejects a malformed rule (T-83)", async () => {
+    const app = createApp({ authRequired: false, pool: scopedPool });
+    const ok = await app.handle(new Request("http://localhost/api/v1/transactions?flags=sub_gallon,too_close"));
+    expect(ok.status).toBe(200);
+    const bad = await app.handle(new Request("http://localhost/api/v1/transactions?flags=x;drop"));
+    expect(bad.status).toBe(400);
+  });
+
   it("pagination is stable across pages: page 1 + page 2 partition the same fixed set with no overlap or gap", async () => {
     const pageSize = 10;
     const page1 = await listTransactions(

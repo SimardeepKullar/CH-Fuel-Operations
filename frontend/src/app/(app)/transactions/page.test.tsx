@@ -106,6 +106,69 @@ describe("TransactionsPage (T-40)", () => {
     expect(tableCall![0]).toMatchObject({ driverId: "driver-1" });
   });
 
+  it("from and to in the URL are forwarded as UTC day bounds, under Toronto time (T-83)", async () => {
+    expect(new Date("2026-09-09T00:00:47Z").getDate()).toBe(8);
+    searchParams = new URLSearchParams({ week: "2026-09-10", from: "2026-09-08", to: "2026-09-09" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [] });
+    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
+    listTrucks.mockResolvedValue({ rows: [] });
+    listTransactions.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
+
+    render(<TransactionsPage />);
+
+    await waitFor(() => expect(listTransactions.mock.calls.some((c) => (c[0] as { includeLines?: boolean }).includeLines)).toBe(true));
+    const tableCall = listTransactions.mock.calls.find((c) => (c[0] as { includeLines?: boolean }).includeLines);
+    expect(tableCall![0]).toMatchObject({ week: "2026-09-10", dateFrom: "2026-09-08T00:00:00Z", dateTo: "2026-09-09T23:59:59.999Z" });
+  });
+
+  it("with no from or to, no date bounds are sent (T-83)", async () => {
+    searchParams = new URLSearchParams({ week: "2026-09-10" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [] });
+    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
+    listTrucks.mockResolvedValue({ rows: [] });
+    listTransactions.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
+
+    render(<TransactionsPage />);
+
+    await waitFor(() => expect(listTransactions.mock.calls.some((c) => (c[0] as { includeLines?: boolean }).includeLines)).toBe(true));
+    const tableCall = listTransactions.mock.calls.find((c) => (c[0] as { includeLines?: boolean }).includeLines);
+    expect(tableCall![0]).toMatchObject({ dateFrom: undefined, dateTo: undefined });
+  });
+
+  it("typing in the From and To inputs writes from and to to the URL (T-83)", async () => {
+    searchParams = new URLSearchParams({ week: "2026-09-10" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [] });
+    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
+    listTrucks.mockResolvedValue({ rows: [] });
+    listTransactions.mockResolvedValue({ rows: [stop()], page: 1, pageSize: 200, total: 1 });
+
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-09-08" } });
+    expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.get("from")).toBe("2026-09-08");
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-09-09" } });
+    expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.get("to")).toBe("2026-09-09");
+  });
+
+  it("flags in the URL are forwarded to GET /transactions as a list", async () => {
+    searchParams = new URLSearchParams({ week: "2026-09-10", flags: "sub_gallon,too_close" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [] });
+    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
+    listTrucks.mockResolvedValue({ rows: [] });
+    listTransactions.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
+
+    render(<TransactionsPage />);
+
+    await waitFor(() => expect(listTransactions.mock.calls.some((c) => (c[0] as { includeLines?: boolean }).includeLines)).toBe(true));
+    const tableCall = listTransactions.mock.calls.find((c) => (c[0] as { includeLines?: boolean }).includeLines);
+    expect(tableCall![0]).toMatchObject({ flags: ["sub_gallon", "too_close"] });
+  });
+
   it("a search term in the URL narrows the rendered rows client-side, without re-fetching", async () => {
     searchParams = new URLSearchParams({ week: "2026-09-03", q: "jordan" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });

@@ -12,6 +12,11 @@ const RULE_LABELS: Record<string, string> = {
   not_on_roster: "Not on roster",
 };
 
+/** The rules a dispatcher can filter by: every one the screen renders (`charges_no_fuel` never shows, T-40H). */
+export const FILTERABLE_FLAGS: { value: string; label: string }[] = Object.entries(RULE_LABELS)
+  .filter(([rule]) => rule !== "charges_no_fuel")
+  .map(([value, label]) => ({ value, label }));
+
 /** One line per rule for a hover — what the rule found, in the dispatcher's terms. */
 const RULE_DESCRIPTIONS: Record<string, string> = {
   sub_gallon: "Fuel line is under the minimum quantity",

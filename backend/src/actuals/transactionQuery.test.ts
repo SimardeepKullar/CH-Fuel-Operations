@@ -101,6 +101,18 @@ describe("buildTransactionFilterClause", () => {
     expect(clause.params).toEqual([]);
   });
 
+  it("flags is an EXISTS over undismissed anomalies of any listed rule, one array param (T-83)", () => {
+    const clause = buildTransactionFilterClause({ driverId: "driver-1", flags: ["sub_gallon", "too_close"] });
+    expect(clause.whereSql).toBe(
+      "WHERE fs.driver_id = $1 AND EXISTS (SELECT 1 FROM anomalies a WHERE a.subject_type = 'fuel_stop' AND a.subject_id = fs.id AND a.dismissed_at IS NULL AND a.rule = ANY($2::text[]))",
+    );
+    expect(clause.params).toEqual(["driver-1", ["sub_gallon", "too_close"]]);
+  });
+
+  it("an empty flags list applies no condition (T-83)", () => {
+    expect(buildTransactionFilterClause({ flags: [] })).toEqual({ whereSql: "", params: [] });
+  });
+
   it("anomalyOnly: false produces no condition at all", () => {
     const clause = buildTransactionFilterClause({ anomalyOnly: false });
     expect(clause.whereSql).toBe("");

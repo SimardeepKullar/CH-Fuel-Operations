@@ -19,7 +19,7 @@ import ConversionToggle from "../../../components/ConversionToggle";
 import { useTransactionFilterOptions } from "../../../hooks/useTransactionFilterOptions";
 import { useTransactionFilters } from "../../../hooks/useTransactionFilters";
 import TransactionsTable from "../../../components/TransactionsTable";
-import { printedAt } from "../../../lib/wallClock";
+import { printedAt, printedDayBounds } from "../../../lib/wallClock";
 
 const RECEIPT_STATUSES = new Set(["pending", "confirmed", "missing"]);
 
@@ -117,6 +117,9 @@ export default function TransactionsPage() {
   const { filters, setFilter, clearFilters } = useTransactionFilters();
   const filterOptions = useTransactionFilterOptions(period, currency ?? null);
 
+  const flagRules = filters.flags === "" ? [] : filters.flags.split(",");
+  const { dateFrom, dateTo } = printedDayBounds(filters.from, filters.to);
+
   const [rows, setRows] = useState<TransactionListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -147,6 +150,9 @@ export default function TransactionsPage() {
       receiptStatus: RECEIPT_STATUSES.has(filters.receiptStatus)
         ? (filters.receiptStatus as "pending" | "confirmed" | "missing")
         : undefined,
+      dateFrom,
+      dateTo,
+      flags: flagRules.length > 0 ? flagRules : undefined,
       anomalyOnly: filters.anomalyOnly || undefined,
       // Newest first is the API's default, so only oldest first is asked for (T-40J).
       ...(filters.sort === "asc" ? { sortField: "occurred_at" as const, sortDirection: "asc" as const } : {}),
@@ -179,6 +185,9 @@ export default function TransactionsPage() {
     filters.state,
     filters.product,
     filters.receiptStatus,
+    dateFrom,
+    dateTo,
+    filters.flags,
     filters.anomalyOnly,
     filters.sort,
   ]);
