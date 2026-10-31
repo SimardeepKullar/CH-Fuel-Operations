@@ -14,9 +14,7 @@ export type ImportRejectionCode =
   | "LINE_IMBALANCE"
   /** A printed totals row's tax identity, or the grand-total row's pre-tax
    * or tax column against the product rows (T-61). */
-  | "TOTALS_TAX_IMBALANCE"
-  | "UNKNOWN_CARD"
-  | "UNKNOWN_TRUCK_UNIT";
+  | "TOTALS_TAX_IMBALANCE";
 
 export interface NormalizedRejection {
   lineNumber: number;
@@ -65,12 +63,16 @@ export interface ImportReport {
   productTotals: ReportProductTotal[];
   reconcile: ReconcileResult;
   parserRejectionCount: number;
+  /** Cards the roster doesn't carry, each once. Never a rejection (T-85): a
+   * backfilled week can hold a driver no longer with the company, so the stops
+   * import under a driverless card and carry the red `not_on_roster` flag. */
   unknownCardNumbers: string[];
+  /** Present express unit numbers the fleet doesn't carry, each once. Never a
+   * rejection (T-85): `truck_id` stays null and `unit_raw` stays as printed. */
   unknownTruckUnits: string[];
   /** Every reason this invoice would quarantine, ready to insert into
-   * `invoice_rejections` — parser rejections, reconcile imbalances, and
-   * card/truck lookup misses, all in one shape. Empty iff the invoice
-   * balances and every lookup resolved. */
+   * `invoice_rejections` — parser rejections and reconcile imbalances, in one
+   * shape. Empty iff the invoice parsed cleanly and balances. */
   rejections: NormalizedRejection[];
   /** Station text (e.g. "SAMPLE #1") that didn't resolve to a `stations`
    * row by store number (T-29). Named, not silently dropped — but never a
@@ -84,7 +86,7 @@ export interface ImportReport {
   /** Express codes of rows with no tractor/unit text at all (D20) —
    * `express_charges.truck_id` is left null rather than guessed. Never a
    * rejection, distinct from `unknownTruckUnits` (a present unit number
-   * this fleet doesn't recognise, which does quarantine). */
+   * this fleet doesn't recognise). */
   expressBlankUnits: string[];
 }
 
@@ -129,9 +131,9 @@ function imbalanceRejections(
 
 /**
  * Shapes everything `importInvoice` gathered into one report: the parser's
- * own rejections, this ticket's reconcile imbalances, and its card/truck
- * lookup misses — one list, ready to insert into `invoice_rejections`
- * verbatim on quarantine. Empty `rejections` is the promote signal.
+ * own rejections and the reconcile imbalances — one list, ready to insert into
+ * `invoice_rejections` verbatim on quarantine. Empty `rejections` is the
+ * promote signal. Card and truck lookup misses are named, never rejected (T-85).
  *
  * Pure — no database, no HTTP, no clock.
  */
@@ -142,22 +144,6 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
     ...input.parserRejections,
     ...imbalanceRejections(reconcileResult.amountImbalances, "AMOUNT_IMBALANCE"),
     ...imbalanceRejections(reconcileResult.gallonImbalances, "GALLONS_IMBALANCE"),
-    ...cardMisses.map((g) => ({
-      lineNumber: g.lines[0]?.lineNumber ?? 0,
-      authCode: g.baseAuthCode,
-      code: "UNKNOWN_CARD" as const,
-      message: `unknown card number: "${g.cardNumber}"`,
-    })),
-    // A blank unit never reaches here — resolveTruckUnitMisses (importInvoice.ts)
-    // filters those out before this list is built (D20).
-    ...truckUnitMisses.map(
-      (r): NormalizedRejection => ({
-        lineNumber: r.lineNumber,
-        authCode: r.expressCode,
-        code: "UNKNOWN_TRUCK_UNIT",
-        message: `unknown truck unit number: "${r.unitRaw}"`,
-      }),
-    ),
   ];
 
   for (const l of reconcileResult.lineImbalances) {
@@ -202,8 +188,10 @@ export function buildImportReport(input: BuildImportReportInput): ImportReport {
     })),
     reconcile: reconcileResult,
     parserRejectionCount: input.parserRejections.length,
-    unknownCardNumbers: cardMisses.map((g) => g.cardNumber),
-    unknownTruckUnits: truckUnitMisses.map((r) => r.unitRaw!),
+    unknownCardNumbers: [...new Set(cardMisses.map((g) => g.cardNumber))],
+    // A blank unit never reaches here — resolveTruckUnitMisses (importInvoice.ts)
+    // filters those out before this list is built (D20).
+    unknownTruckUnits: [...new Set(truckUnitMisses.map((r) => r.unitRaw!))],
     rejections,
     stationMisses: [...(input.stationMisses ?? [])],
     truckAssignmentMisses: [...(input.truckAssignmentMisses ?? [])],

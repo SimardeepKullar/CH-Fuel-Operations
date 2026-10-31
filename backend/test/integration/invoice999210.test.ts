@@ -191,27 +191,25 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
   it("anomaly count matches T-30's engine against the real file (measured, not A5's stale figure)", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
-    // 12, not 26 — T-40A retired the def_ratio rule, so its findings on this
-    // invoice no longer count. T-40F then narrowed sub_gallon to diesel
-    // (TA) only, dropping this invoice's one sub-gallon DEF line
-    // (0.46 gal) from 13 to 12.
-    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("12");
+    // 32, against the owner's current roster (T-78): stops on cards no longer
+    // on it are not_on_roster (T-85), and this week's stops by drivers since
+    // moved to another truck are unit_mismatch against today's assignment.
+    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("32");
+    expect(
+      (await scopedPool.query("SELECT count(*) FROM anomalies WHERE rule = 'not_on_roster'")).rows[0]!.count,
+    ).toBe("8");
   });
 
   it("every stop and every express charge has a resolved truck or a named exclusion — none guessed", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
-    // Every real card on this invoice resolves (0004 seeds all 27), and
-    // every real card's driver has a truck_assignments row, so no fuel stop
-    // is left with a null truck_id on this file.
+    // Every card still on the roster has a driver with a truck_assignments
+    // row, so the only null truck_id stops are the 8 on cards off it (T-85).
     expect(
       (await scopedPool.query("SELECT count(*) FROM fuel_stops WHERE truck_id IS NULL")).rows[0]!.count,
-    ).toBe("0");
+    ).toBe("8");
 
-    // A present unit number always resolves to a truck: unit_raw not null
-    // with truck_id null is the guessed/inconsistent state this invariant
-    // forbids, and it is structurally impossible to reach (an unresolved
-    // present unit quarantines the whole invoice before any row is written).
+    // This CSV prints no unit, so no express row can hold one with a null truck.
     expect(
       (
         await scopedPool.query(

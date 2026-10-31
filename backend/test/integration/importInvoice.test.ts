@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { importInvoice } from "../../src/invoice/importInvoice.js";
+import { parseInvoiceCsv } from "../../src/invoice/parseInvoiceCsv.js";
 import { runMigrations } from "../../src/db/migrate.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -98,6 +99,68 @@ describe.skipIf(!hasDatabase)("importInvoice (integration)", () => {
               (SELECT COALESCE(SUM(total), 0) FROM express_charges) AS total`,
     );
     expect(sum.rows[0].total).toBe("840.67");
+  });
+
+  it("imports a card and express unit off the roster, flagging each of the card's stops red (T-85)", async () => {
+    await scopedPool.query("DELETE FROM fuel_cards WHERE card_number = '1000001'");
+    await scopedPool.query("DELETE FROM trucks WHERE unit_number = '102'");
+
+    // The CSV has no tractor column, so one express row is given the unit a PDF would print.
+    const result = await importInvoice(
+      scopedPool,
+      BALANCED_CSV(),
+      { sourceFilename: "invoice_100001.csv" },
+      {
+        parse: async (...args) => {
+          const parsed = await parseInvoiceCsv(...args);
+          return {
+            ...parsed,
+            expressRows: parsed.expressRows.map((r, i) => (i === 0 ? { ...r, unitRaw: "102" } : r)),
+          };
+        },
+      },
+    );
+    expect(result.status).toBe("imported");
+    if (result.status !== "imported") {
+      return;
+    }
+    expect(result.report.unknownCardNumbers).toEqual(["1000001"]);
+    expect(result.report.unknownTruckUnits).toEqual(["102"]);
+    expect(result.report.rejections).toEqual([]);
+
+    const card = await scopedPool.query(
+      "SELECT driver_id, status FROM fuel_cards WHERE card_number = '1000001'",
+    );
+    expect(card.rows).toEqual([{ driver_id: null, status: "inactive" }]);
+
+    const express = await scopedPool.query(
+      "SELECT truck_id, unit_raw FROM express_charges WHERE unit_raw = '102'",
+    );
+    expect(express.rows).toEqual([{ truck_id: null, unit_raw: "102" }]);
+
+    const flagged = await scopedPool.query<{ severity: string; driver_name_raw: string; driver_id: string | null }>(
+      `SELECT a.severity, fs.driver_name_raw, fs.driver_id
+       FROM fuel_stops fs
+       JOIN fuel_cards fc ON fc.id = fs.card_id
+       JOIN anomalies a ON a.subject_id = fs.id AND a.rule = 'not_on_roster'
+       WHERE fc.card_number = '1000001'`,
+    );
+    expect(flagged.rows.length).toBeGreaterThan(0);
+    for (const row of flagged.rows) {
+      expect(row.severity).toBe("red");
+      expect(row.driver_name_raw).not.toBe("");
+      expect(row.driver_id).toBeNull();
+    }
+  });
+
+  it("a quarantined invoice writes no off-roster card", async () => {
+    await scopedPool.query("DELETE FROM fuel_cards WHERE card_number = '1000001'");
+
+    const result = await importInvoice(scopedPool, IMBALANCED_CSV(), { sourceFilename: "invoice_100002.csv" });
+    expect(result.status).toBe("quarantined");
+
+    const card = await scopedPool.query("SELECT count(*) FROM fuel_cards WHERE card_number = '1000001'");
+    expect(card.rows[0].count).toBe("0");
   });
 
   it("quarantines an imbalanced invoice: zero child rows, a rejection naming DF", async () => {
@@ -224,10 +287,8 @@ describe.skipIf(!hasDatabase)("importInvoice (integration)", () => {
   describe.skipIf(!hasRealFixture)("real invoice 999210 (local fixture only)", () => {
     it("imports ~60 real stops and balances Σ = 50929.71", async () => {
       // The real invoice's own driver roster (card numbers) isn't in this
-      // test's synthetic catalog, so every fuel stop's card is unresolved —
-      // this proves reconcile() balances on the real figures even though
-      // the invoice still quarantines on UNKNOWN_CARD, which is the correct
-      // outcome for a schema this test doesn't seed with 27 real cards.
+      // test's synthetic catalog, so every fuel stop's card is off the roster —
+      // this proves reconcile() balances on the real figures.
       const buffer = readFileSync(realFixturePath);
       const result = await importInvoice(scopedPool, buffer, { sourceFilename: "invoice_999210.csv" });
 

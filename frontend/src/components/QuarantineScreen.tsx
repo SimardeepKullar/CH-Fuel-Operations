@@ -21,8 +21,6 @@ const CODE_LABELS: Record<string, string> = {
   AMOUNT_IMBALANCE: "Amount imbalance",
   GALLONS_IMBALANCE: "Gallons imbalance",
   GRAND_TOTAL_IMBALANCE: "Grand total imbalance",
-  UNKNOWN_CARD: "Unknown card",
-  UNKNOWN_TRUCK_UNIT: "Unknown truck unit",
   SCHEMA_ERROR: "Schema error",
   NUMERIC_PARSE_ERROR: "Numeric parse error",
   UNMAPPED_PRODUCT: "Unmapped product code",
