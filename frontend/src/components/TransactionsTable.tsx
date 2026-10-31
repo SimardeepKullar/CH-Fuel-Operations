@@ -551,11 +551,11 @@ export default function TransactionsTable({
           <span className="tx-legend-label">Reading the columns</span>
           <span className="tx-legend-item">
             <RawResolved value={{ resolved: "072", raw: "072", agrees: true }} />
-            resolved from the card assignment
+            as entered at the pump
           </span>
           <span className="tx-legend-item">
             <RawResolved value={{ resolved: null, raw: "072", agrees: null }} />
-            as entered at the pump
+            resolved from the card assignment
           </span>
           <span className="tx-legend-item">
             <RawResolved value={{ resolved: "072", raw: "0", agrees: false }} />
