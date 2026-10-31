@@ -501,13 +501,13 @@ export default function TransactionsTable({
             />
           </label>
           <span className="tx-filter tx-multi">
+            <span className="tx-filter-label">Flags</span>
             <button
               type="button"
               className="input tx-filter-select tx-multi-toggle"
               aria-expanded={flagsOpen}
               onClick={() => setFlagsOpen((open) => !open)}
             >
-              <span className="tx-filter-label">Flags</span>{" "}
               {selectedFlags.length === 0 ? "All" : `${selectedFlags.length} selected`}
             </button>
             {flagsOpen && (
