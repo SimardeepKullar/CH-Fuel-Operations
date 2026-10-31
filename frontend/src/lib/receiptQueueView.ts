@@ -10,9 +10,11 @@ export interface QueueFilters {
   /** The printed `YYYY-MM-DD` (see `wallClock.ts`); "" is any day. */
   day: string;
   flaggedOnly: boolean;
+  /** A BVD invoice number; "" is every invoice. */
+  invoice: string;
 }
 
-export const NO_FILTERS: QueueFilters = { q: "", driver: "", day: "", flaggedOnly: false };
+export const NO_FILTERS: QueueFilters = { q: "", driver: "", day: "", flaggedOnly: false, invoice: "" };
 
 /** A row as the screen sees it: the fetched item with this session's decision laid over its status. */
 export interface QueueRow extends ReceiptQueueItem {
@@ -51,6 +53,7 @@ function haystack(row: QueueRow): string {
 }
 
 export function matchesFilters(row: QueueRow, f: QueueFilters): boolean {
+  if (f.invoice !== "" && row.invoiceNumber !== f.invoice) return false;
   if (f.driver !== "" && driverName(row) !== f.driver) return false;
   if (f.day !== "" && printedAt(row.occurredAt).dayKey !== f.day) return false;
   if (f.flaggedOnly && !row.hasException) return false;
@@ -59,7 +62,19 @@ export function matchesFilters(row: QueueRow, f: QueueFilters): boolean {
 }
 
 export function hasFilters(f: QueueFilters): boolean {
-  return f.q.trim() !== "" || f.driver !== "" || f.day !== "" || f.flaggedOnly;
+  return f.q.trim() !== "" || f.driver !== "" || f.day !== "" || f.flaggedOnly || f.invoice !== "";
+}
+
+/** The invoices the rows came from, each once, the one with the latest purchase first. */
+export function invoiceOptions(rows: readonly QueueRow[]): { number: string; currency: QueueRow["currency"] }[] {
+  const latest = new Map<string, QueueRow>();
+  for (const row of rows) {
+    const seen = latest.get(row.invoiceNumber);
+    if (seen === undefined || row.occurredAt > seen.occurredAt) latest.set(row.invoiceNumber, row);
+  }
+  return [...latest.values()]
+    .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0))
+    .map((r) => ({ number: r.invoiceNumber, currency: r.currency }));
 }
 
 /**

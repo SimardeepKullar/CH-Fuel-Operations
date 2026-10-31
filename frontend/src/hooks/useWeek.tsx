@@ -24,7 +24,7 @@ export interface WeekContextValue {
    * nothing is dimmed. */
   inViewIds: readonly string[] | null;
   setInViewIds: (ids: readonly string[] | null) => void;
-  /** Re-reads `GET /periods` — after an override moved an invoice. Navigation never calls this. */
+  /** Re-reads `GET /periods` — after an upload or an override moved an invoice. Navigation never calls this. */
   reloadPeriods: () => Promise<void>;
 }
 

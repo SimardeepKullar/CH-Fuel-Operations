@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ImportInvoiceResponse, InvoiceListItem } from "@ch/core/api/routes/invoices";
 import { ApiError, getInvoice, listInvoices, patchInvoiceWeek, uploadInvoice } from "../../../lib/api";
 import { useWeek } from "../../../hooks/useWeek";
+import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
 import Dropzone from "../../../components/Dropzone";
 import PageBanner from "../../../components/PageBanner";
 import { StripChip, SubStrip } from "../../../components/SubStrip";
@@ -65,6 +66,7 @@ export default function ImportPage() {
   const [historyRows, setHistoryRows] = useState<InvoiceListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const { reloadPeriods } = useWeek();
+  const { refresh: refreshCounts } = useStandingCountsValue();
 
   const refreshHistory = useCallback(() => {
     setHistoryLoading(true);
@@ -108,12 +110,16 @@ export default function ImportPage() {
             setView({ phase: "imported", response });
           }
           refreshHistory();
+          // The invoice is already written, so a failed re-read of the top bar's
+          // selector must not turn this result into an upload error.
+          reloadPeriods().catch(() => undefined);
+          refreshCounts?.();
         })
         .catch((err: unknown) => {
           setView({ phase: "error", message: messageOf(err) });
         });
     },
-    [refreshHistory],
+    [refreshHistory, reloadPeriods, refreshCounts],
   );
 
   const reopenQuarantined = useCallback((id: string) => {

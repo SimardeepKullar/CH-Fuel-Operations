@@ -36,6 +36,7 @@ const { ApiError } = await import("../../../lib/api");
 const { default: ImportPageInner } = await import("./page");
 const { WeekProvider } = await import("../../../hooks/useWeek");
 const { default: WeekSelector } = await import("../../../components/WeekSelector");
+const { StandingCountsProvider } = await import("../../../hooks/standingCountsContext");
 
 function ImportPage() {
   return (
@@ -171,6 +172,38 @@ describe("ImportPage (T-42)", () => {
 
     fireEvent.click(screen.getByTestId("confirm-button"));
     await waitFor(() => expect(screen.getByTestId("dropzone")).toBeTruthy());
+  });
+
+  it("an imported upload's new week reaches the top bar's selector without a reload", async () => {
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-09", openAnomalyCount: 0 });
+    listPeriods
+      .mockResolvedValueOnce({ weeks: [periodWeek("2026-09-09", [US_PERIOD])] })
+      .mockResolvedValue({ weeks: [periodWeek("2026-10-28", [US_PERIOD]), periodWeek("2026-09-09", [US_PERIOD])] });
+    listInvoices.mockResolvedValue(historyResult());
+    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", report: report() });
+
+    render(<ImportPage />);
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
+    fireEvent.drop(screen.getByTestId("dropzone"), { dataTransfer: { files: [makeFile("invoice_1030434.csv")] } });
+
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+    expect(getHealth).toHaveBeenCalledTimes(1);
+  });
+
+  it("an upload's result refreshes the sidebar's receipt count", async () => {
+    const refresh = vi.fn();
+    listInvoices.mockResolvedValue(historyResult());
+    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", report: report() });
+
+    render(
+      <StandingCountsProvider value={{ receipts: null, flags: null, refresh }}>
+        <ImportPage />
+      </StandingCountsProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("dropzone")).toBeTruthy());
+    fireEvent.drop(screen.getByTestId("dropzone"), { dataTransfer: { files: [makeFile("invoice_1030434.csv")] } });
+
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
   });
 
   it("a quarantined upload renders the full-screen QuarantineScreen, not a toast", async () => {

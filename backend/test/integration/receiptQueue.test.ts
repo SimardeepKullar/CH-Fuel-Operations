@@ -291,6 +291,14 @@ describe.skipIf(!hasDatabase)("receipt queue and receipt checks (integration)", 
     expect(allBody.items.map((i) => i.id)).toContain(ids.stopBConfirmed);
     expect(new Set(allBody.items.map((i) => i.invoiceNumber))).toEqual(new Set(["T35-TEST"]));
 
+    // The Receipt Queue screen's own read: no week, so every week's stops.
+    const everyWeek = await app.handle(new Request("http://localhost/api/v1/receipt-queue?include=all"), {
+      userId: ids.checker,
+    });
+    const everyWeekBody = (await everyWeek.json()) as { items: { id: string }[]; progress: { total: number } };
+    expect(everyWeekBody.items.map((i) => i.id)).toContain(ids.stopBConfirmed);
+    expect(everyWeekBody.items).toHaveLength(everyWeekBody.progress.total);
+
     const res = await app.handle(
       postReceiptCheck({ fuelStopIds: [ids.stopA1, ids.stopA2, ids.stopBConfirmed], outcome: "confirmed" }),
       { userId: ids.checker },
