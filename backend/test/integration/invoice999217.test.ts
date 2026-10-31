@@ -103,8 +103,9 @@ describe.skipIf(!hasDatabase || !hasRealFixture || !python)("invoice 999217 impo
     ).toBe("0");
   });
 
-  it("resolves every stop's card to a driver (T-62)", async () => {
-    expect(await one("SELECT count(*) FROM fuel_stops WHERE driver_id IS NULL")).toBe("0");
+  it("leaves only the stops on cards off the current roster with no driver (T-85)", async () => {
+    expect(await one("SELECT count(*) FROM fuel_stops WHERE driver_id IS NULL")).toBe("5");
+    expect(await one("SELECT count(*) FROM anomalies WHERE rule = 'not_on_roster'")).toBe("5");
   });
 
   it("prints grand total CAD 46,837.33 = pre-tax 41,356.89 + HST 5,376.44 + Scale 104.00", async () => {

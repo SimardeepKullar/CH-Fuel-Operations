@@ -30,9 +30,9 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     });
     await runMigrations(scopedPool, migrationsDir);
 
-    // The fixture's six cards. Only 3000002 (the unitMismatch case) needs a
-    // driver and a resolved truck assignment — every other card is left
-    // with no assignment on purpose, which the other four rules don't need.
+    // The fixture's six cards. Each has a driver, so none is off the roster
+    // (T-85). Only 3000002 (the unitMismatch case) needs a resolved truck
+    // assignment — the others have none, which the other rules don't need.
     await scopedPool.query(
       `INSERT INTO fuel_cards (card_number) VALUES
          ('3000001'), ('3000002'), ('3000003'), ('3000004'), ('3000005'), ('3000006')`,
@@ -42,6 +42,13 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     );
     const driverId = driverRows[0]!.id;
     await scopedPool.query("UPDATE fuel_cards SET driver_id = $1 WHERE card_number = '3000002'", [driverId]);
+    for (const card of ["3000001", "3000003", "3000004", "3000005", "3000006"]) {
+      await scopedPool.query(
+        `WITH d AS (INSERT INTO drivers (display_name) VALUES ($1) RETURNING id)
+         UPDATE fuel_cards SET driver_id = (SELECT id FROM d) WHERE card_number = $2`,
+        [`DRIVER ${card}`, card],
+      );
+    }
     const { rows: truckRows } = await scopedPool.query<{ id: string }>(
       "INSERT INTO trucks (unit_number) VALUES ('205') RETURNING id",
     );

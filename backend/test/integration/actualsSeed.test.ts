@@ -172,14 +172,18 @@ describe.skipIf(!hasDatabase)("0005_fleet_roster_seed.sql (integration)", () => 
   });
 });
 
-describe.skipIf(!hasDatabase || !hasRealRoster)("0005 real vs synthetic parity (integration, local real roster only)", () => {
-  it("both sets produce identical counts and identical unit numbers (T-62)", async () => {
-    const synthetic = await migratedSchema(migrationsDir, "test_roster_synthetic");
+describe.skipIf(!hasDatabase || !hasRealRoster)("0005 real roster shape (integration, local real roster only)", () => {
+  // The real roster is the owner's list and no longer mirrors the synthetic
+  // set's size (T-78 step 78.5): one driver per card, one open assignment each.
+  it("every driver has one card and exactly one current assignment", async () => {
     const real = await migratedSchema(realMigrationsDir, "test_roster_real");
     try {
-      expect(await rosterCounts(real.pool)).toEqual(await rosterCounts(synthetic.pool));
+      const counts = await rosterCounts(real.pool);
+      expect(counts.cards).toBe(counts.drivers);
+      expect(counts.cards_with_driver).toBe(counts.drivers);
+      expect(counts.assignments).toBe(counts.drivers);
+      expect(counts.current_assignments).toBe(counts.drivers);
     } finally {
-      await synthetic.drop();
       await real.drop();
     }
   });
@@ -206,7 +210,7 @@ describe.skipIf(!hasDatabase || !hasRealRoster || !hasRealCaInvoice)(
       }
     }
 
-    it("every one of its 34 cards resolves to a driver (T-62)", async () => {
+    it("31 of its 34 cards are on the current roster; the others left the fleet (T-85)", async () => {
       const cards = await cardNumbersOn999217();
       expect(cards).toHaveLength(34);
 
@@ -218,7 +222,7 @@ describe.skipIf(!hasDatabase || !hasRealRoster || !hasRealCaInvoice)(
           [cards],
         );
         // Compare counts, not lists: a failure must not print card numbers.
-        expect(rows.length).toBe(34);
+        expect(rows.length).toBe(31);
       } finally {
         await real.drop();
       }

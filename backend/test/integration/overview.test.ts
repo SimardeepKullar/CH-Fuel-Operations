@@ -111,13 +111,8 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
   it("receipt compliance and anomaly count reflect the database, not A5's pre-T-30/T-35 figures", async () => {
     const result = await getOverview(scopedPool, "2026-09-09");
     expect(result.us!.kpis.receiptCompliance).toEqual({ confirmed: 0, total: 66 });
-    // 12, not 84 — 0005's driver/truck pairing now comes from the real
-    // invoice instead of a guess, so the false-positive unit_mismatch
-    // findings the old pairing produced are gone (invoice999210.test.ts);
-    // T-40A retired the def_ratio rule, dropping the count from 26 to 13;
-    // and T-40F narrowed sub_gallon to diesel only, dropping this
-    // invoice's one sub-gallon DEF line from 13 to 12.
-    expect(result.us!.kpis.anomaliesFlagged).toBe(12);
+    // 32 against the owner's current roster; invoice999210.test.ts breaks it down.
+    expect(result.us!.kpis.anomaliesFlagged).toBe(32);
   });
 
   it("a period with no matching invoice returns a well-formed empty payload over HTTP, not an error", async () => {

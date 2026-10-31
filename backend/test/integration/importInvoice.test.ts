@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { importInvoice } from "../../src/invoice/importInvoice.js";
+import { parseInvoiceCsv } from "../../src/invoice/parseInvoiceCsv.js";
 import { runMigrations } from "../../src/db/migrate.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,7 +105,21 @@ describe.skipIf(!hasDatabase)("importInvoice (integration)", () => {
     await scopedPool.query("DELETE FROM fuel_cards WHERE card_number = '1000001'");
     await scopedPool.query("DELETE FROM trucks WHERE unit_number = '102'");
 
-    const result = await importInvoice(scopedPool, BALANCED_CSV(), { sourceFilename: "invoice_100001.csv" });
+    // The CSV has no tractor column, so one express row is given the unit a PDF would print.
+    const result = await importInvoice(
+      scopedPool,
+      BALANCED_CSV(),
+      { sourceFilename: "invoice_100001.csv" },
+      {
+        parse: async (...args) => {
+          const parsed = await parseInvoiceCsv(...args);
+          return {
+            ...parsed,
+            expressRows: parsed.expressRows.map((r, i) => (i === 0 ? { ...r, unitRaw: "102" } : r)),
+          };
+        },
+      },
+    );
     expect(result.status).toBe("imported");
     if (result.status !== "imported") {
       return;
@@ -117,6 +132,11 @@ describe.skipIf(!hasDatabase)("importInvoice (integration)", () => {
       "SELECT driver_id, status FROM fuel_cards WHERE card_number = '1000001'",
     );
     expect(card.rows).toEqual([{ driver_id: null, status: "inactive" }]);
+
+    const express = await scopedPool.query(
+      "SELECT truck_id, unit_raw FROM express_charges WHERE unit_raw = '102'",
+    );
+    expect(express.rows).toEqual([{ truck_id: null, unit_raw: "102" }]);
 
     const flagged = await scopedPool.query<{ severity: string; driver_name_raw: string; driver_id: string | null }>(
       `SELECT a.severity, fs.driver_name_raw, fs.driver_id
