@@ -229,6 +229,7 @@ Consistent treatment across table, detail and overview. **Two severity levels at
 
 | Rule | Example from 999210 | Severity |
 |---|---|---|
+| Card not on the fleet roster (`not_on_roster`, T-85) | A backfilled week with a driver no longer with the company; the stop imports and keeps the printed name | red |
 | Sub-1-gallon transaction | 0.04 gal, $0.20, LOVES #277 Prescott AR | red |
 | Entered unit ≠ driver's assigned truck | `0` entered on card 9000005, JORDAN's assigned truck 072 | amber |
 | No truck on file for the driver on the stop's date (T-78) | a CA driver with no truck in the roster | amber |

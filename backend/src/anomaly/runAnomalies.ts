@@ -2,6 +2,7 @@ import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
 import type { Pool, PoolClient } from "pg";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "../invoice/productCode.js";
 import { chargesNoFuel, type ChargesNoFuelConfig, type ChargesNoFuelStop } from "./rules/chargesNoFuel.js";
+import { notOnRoster, type NotOnRosterConfig, type NotOnRosterStop } from "./rules/notOnRoster.js";
 import {
   priceAbovePublished,
   publishedPriceKey,
@@ -22,6 +23,7 @@ const RULE_NAMES = [
   "too_close",
   "charges_no_fuel",
   "price_above_published",
+  "not_on_roster",
 ] as const;
 type RuleName = (typeof RULE_NAMES)[number];
 
@@ -46,6 +48,9 @@ interface StopRow {
   station_id: string | null;
   unit_raw: string;
   truck_unit_number: string | null;
+  driver_name_raw: string;
+  card_number: string;
+  card_driver_id: string | null;
 }
 
 interface LineRow {
@@ -89,8 +94,10 @@ export async function loadPriceAbovePublishedConfig(db: Db): Promise<PriceAboveP
 async function loadStops(db: Db, invoiceId: string): Promise<StopRow[]> {
   const { rows } = await db.query<StopRow>(
     `SELECT fs.id, fs.occurred_at, fs.card_id, fs.station_id, fs.unit_raw,
-            t.unit_number AS truck_unit_number
+            t.unit_number AS truck_unit_number, fs.driver_name_raw,
+            fc.card_number, fc.driver_id AS card_driver_id
      FROM fuel_stops fs
+     JOIN fuel_cards fc ON fc.id = fs.card_id
      LEFT JOIN trucks t ON t.id = fs.truck_id
      WHERE fs.invoice_id = $1
      ORDER BY fs.occurred_at`,
@@ -228,6 +235,17 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
   }));
   for (const finding of unitMismatch(unitMismatchStops, thresholds.get("unit_mismatch") as UnitMismatchConfig)) {
     findings.push({ rule: "unit_mismatch", finding });
+  }
+
+  const notOnRosterStops: NotOnRosterStop[] = stops.map((s) => ({
+    id: s.id,
+    cardNumber: s.card_number,
+    cardDriverId: s.card_driver_id,
+    driverNameRaw: s.driver_name_raw,
+    unitRaw: s.unit_raw,
+  }));
+  for (const finding of notOnRoster(notOnRosterStops, thresholds.get("not_on_roster") as NotOnRosterConfig)) {
+    findings.push({ rule: "not_on_roster", finding });
   }
 
   const tooCloseStops: TooCloseStop[] = stops.map((s) => ({

@@ -114,6 +114,21 @@ async function findImportedInWeek(
   return rows[0] ?? null;
 }
 
+/**
+ * T-85: a card the roster doesn't carry, kept so its stops have a `card_id`.
+ * No driver and `inactive`; the `not_on_roster` rule flags every stop on it.
+ * Runs at promote only, so a quarantined invoice writes no card.
+ */
+async function insertOffRosterCard(client: PoolClient, cardNumber: string): Promise<string> {
+  const { rows } = await client.query<{ id: string }>(
+    `INSERT INTO fuel_cards (card_number, status) VALUES ($1, 'inactive')
+     ON CONFLICT (card_number) DO UPDATE SET card_number = EXCLUDED.card_number
+     RETURNING id`,
+    [cardNumber],
+  );
+  return rows[0]!.id;
+}
+
 async function resolveCardMisses(
   pool: Pool,
   groups: readonly FuelStopGroup[],
@@ -139,7 +154,8 @@ async function resolveCardMisses(
  * a miss — `express_charges.truck_id`/`unit_raw` are nullable for exactly
  * this, the same way a blank driver name resolves to a null `driver_id`
  * without ever quarantining (`resolveExpressDriver`). Only a *present*
- * unit number this fleet doesn't recognise lands in `misses`.
+ * unit number this fleet doesn't recognise lands in `misses`, which leaves
+ * `truck_id` null and is named in the report (T-85).
  */
 async function resolveTruckUnitMisses(
   pool: Pool,
@@ -172,12 +188,12 @@ interface FuelStopResolution {
 
 /**
  * T-29: the truck/driver come from the card's assignment (never `unit_raw`),
- * the station from the entered site text (never BVD's `SITE` field). Neither
+ * the station from the entered site text (never BVD's `SITE` field). No
  * miss quarantines the invoice — a card with no assignment at the stop's
  * instant, or a station with no recognisable/known store number, leaves the
  * field null and is named in the report instead (CLAUDE.md: never a guess,
- * never silently dropped). Only groups whose card resolved are looked up
- * here; an unresolved card is already a quarantining rejection on its own.
+ * never silently dropped). A card off the roster (T-85) has no driver or truck
+ * to look up; its stop's station still resolves.
  */
 async function resolveFuelStopFields(
   pool: Pool,
@@ -194,14 +210,13 @@ async function resolveFuelStopFields(
 
   for (const group of groups) {
     const cardId = cardIds.get(group.cardNumber);
-    if (!cardId) {
-      continue;
-    }
-
-    const occurredAt = new Date(asUtcTimestamp(group.occurredAt));
-    const truck = await resolveTruckForStop(pool, cardId, occurredAt, group.unitRaw);
-    if (truck.truckId === null) {
-      truckAssignmentMisses.push(group.cardNumber);
+    let truck: { truckId: string | null; driverId: string | null } = { truckId: null, driverId: null };
+    if (cardId) {
+      const occurredAt = new Date(asUtcTimestamp(group.occurredAt));
+      truck = await resolveTruckForStop(pool, cardId, occurredAt, group.unitRaw);
+      if (truck.truckId === null) {
+        truckAssignmentMisses.push(group.cardNumber);
+      }
     }
 
     const stationId = await resolveStation(pool, group.siteNumber, group.stationNameRaw);
@@ -421,10 +436,11 @@ async function insertInvoiceRejections(
  * stop (T-28). `runAnomalies` (T-30) only ever runs on a promoted invoice —
  * a quarantined one has zero `fuel_stops` for it to run rules over.
  *
- * Any rejection at all — a parser rejection, a reconcile imbalance, or an
- * unknown card/truck — forces quarantine: an invoice row with rejections
- * has zero child rows in fuel_stops/express_charges, never a partial
- * promote (the schema's own invariant, migrations/0003_actuals_schema.sql).
+ * Any rejection at all — a parser rejection or a reconcile imbalance — forces
+ * quarantine: an invoice row with rejections has zero child rows in
+ * fuel_stops/express_charges, never a partial promote (the schema's own
+ * invariant, migrations/0003_actuals_schema.sql). An unknown card or truck is
+ * not a rejection (T-85): a backfilled week holds drivers who have since left.
  *
  * `fuel_stops.truck_id`/`driver_id` and `express_charges.driver_id` resolve
  * from the card's driver and that driver's truck assignment (T-29's
@@ -432,9 +448,8 @@ async function insertInvoiceRejections(
  * `driver_name_raw`, which are stored verbatim alongside them and never
  * overwritten. `express_charges` has no card to resolve a truck from, so
  * that one is a plain, unambiguous unit-number lookup done here directly —
- * except a genuinely blank unit (D20), which leaves `truck_id` null rather
- * than quarantining, the same way a blank driver name leaves `driver_id`
- * null.
+ * a blank unit (D20) or one the fleet no longer has (T-85) leaves `truck_id`
+ * null, the same way a blank driver name leaves `driver_id` null.
  *
  * No HTTP, no argv, no printing — the CLI in cli/importInvoice.ts (T-31) is
  * the only caller that touches stdout.
@@ -548,6 +563,9 @@ export async function importInvoice(
 
     if (promote) {
       await insertInvoiceTotals(client, invoiceId, parsed);
+      for (const cardNumber of report.unknownCardNumbers) {
+        cardIds.set(cardNumber, await insertOffRosterCard(client, cardNumber));
+      }
       for (const group of groups) {
         const cardId = cardIds.get(group.cardNumber);
         if (!cardId) {
@@ -561,14 +579,7 @@ export async function importInvoice(
       }
       for (let i = 0; i < parsed.expressRows.length; i++) {
         const row = parsed.expressRows[i]!;
-        let truckId: string | null = null;
-        if (row.unitRaw !== null) {
-          const resolved = truckIds.get(row.unitRaw);
-          if (!resolved) {
-            throw new Error(`invariant violated: no resolved truck for express row ${row.expressCode}`);
-          }
-          truckId = resolved;
-        }
+        const truckId = row.unitRaw === null ? null : (truckIds.get(row.unitRaw) ?? null);
         const driverResolution = expressDriverResolutions[i]!;
         await insertExpressCharge(client, invoiceId, row, truckId, driverResolution);
       }

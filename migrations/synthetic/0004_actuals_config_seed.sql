@@ -13,6 +13,9 @@ INSERT INTO anomaly_thresholds (rule, config) VALUES
   -- (T-40F).
   ('sub_gallon', '{"minGallons": "1.00", "productCodes": ["TA"]}'),
 
+  -- No tunable knob: a stop's card either has a driver or it doesn't (T-85).
+  ('not_on_roster', '{}'),
+
   -- No tunable knob yet — the entered unit either matches the resolved
   -- truck's unit_number or it doesn't (T-29's own agrees comparison).
   ('unit_mismatch', '{}'),

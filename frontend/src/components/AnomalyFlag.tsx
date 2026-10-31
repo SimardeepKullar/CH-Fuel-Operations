@@ -1,6 +1,6 @@
 import type { AnomalyFlag as AnomalyFlagData } from "@ch/core/actuals/transactions";
 
-/** The five rules `runAnomalies.ts` currently writes (A10's table). A rule
+/** The six rules `runAnomalies.ts` currently writes (A10's table). A rule
  * added later without a label here still renders — humanized from its
  * slug — rather than disappearing or throwing. */
 const RULE_LABELS: Record<string, string> = {
@@ -9,6 +9,7 @@ const RULE_LABELS: Record<string, string> = {
   too_close: "Too close",
   charges_no_fuel: "Scale",
   price_above_published: "Price high",
+  not_on_roster: "Not on roster",
 };
 
 /** One line per rule for a hover — what the rule found, in the dispatcher's terms. */
@@ -17,6 +18,7 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
   unit_mismatch: "Unit typed at the pump does not match the truck assigned to the card",
   too_close: "Another fill on the same card at the same station came shortly before",
   price_above_published: "Billed price is above BVD's published price",
+  not_on_roster: "This card has no driver on the fleet roster",
 };
 
 /** `Unit mismatch: Unit typed at the pump…` — the text a flag's hover shows. */
