@@ -2,6 +2,11 @@
  * Transactions' view of the Overview's scope (T-74). The URL carries the same
  * keys (`scope`, `w`, `from`, `to`) plus `currency` for one side; with no `scope`
  * at all the screen keeps what it always did — the shell's selected billing week.
+ *
+ * A range can also pin exact printed days (T-87). `from`/`to` stay billing week
+ * ends, because that is what an Overview link carries, and `dayFrom`/`dayTo` narrow
+ * inside them. The week keys always cover the days, so the request, the strip and
+ * the filter options keep reading whole weeks.
  */
 import type { PeriodInvoice, PeriodWeek } from "@ch/core/api/routes/periods";
 import { parseScope, type Scope } from "./overviewScope";
@@ -17,6 +22,38 @@ interface ParamReader {
 export function transactionsScope(params: ParamReader, weekEndsAscending: readonly string[], shellWeek: string | null): Scope {
   if (params.has("scope")) return parseScope(params, weekEndsAscending);
   return shellWeek === null ? { mode: "all" } : { mode: "week", week: shellWeek };
+}
+
+export interface ScopeDays {
+  from: string;
+  to: string;
+}
+
+const NO_DAYS: ScopeDays = { from: "", to: "" };
+
+/** The days pinned on a range. Any other scope has none, whatever the URL says. */
+export function scopeDays(params: ParamReader, scope: Scope): ScopeDays {
+  if (scope.mode !== "range") return NO_DAYS;
+  return { from: params.get("dayFrom") ?? "", to: params.get("dayTo") ?? "" };
+}
+
+/** A reversed pair is swapped, as `normaliseRange` does for weeks. An empty side stays open. */
+export function normaliseDays(from: string, to: string): ScopeDays {
+  return from !== "" && to !== "" && from > to ? { from: to, to: from } : { from, to };
+}
+
+interface WeekSpan {
+  weekEnd: string;
+  /** The first and last transaction's day. */
+  start: string;
+  end: string;
+}
+
+/** The range of billing weeks whose transactions touch `days`, or `null` when none does. `weeks` ascending. */
+export function rangeForDays(days: ScopeDays, weeks: readonly WeekSpan[]): Scope | null {
+  const touching = weeks.filter((w) => (days.to === "" || w.start <= days.to) && (days.from === "" || w.end >= days.from));
+  if (touching.length === 0) return null;
+  return { mode: "range", from: touching[0]!.weekEnd, to: touching[touching.length - 1]!.weekEnd };
 }
 
 /** The list endpoint's week filter for a scope: one week, a range, or nothing (all time). */

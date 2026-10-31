@@ -22,30 +22,46 @@ import {
 } from "../lib/formatMoney";
 import { formatFxEnteredAt } from "../lib/conversion";
 import InvoiceTag from "./InvoiceTag";
-import {
-  PRODUCT_OPTIONS,
-  RECEIPT_STATUS_OPTIONS,
-  productBadgeVariant,
-  productLabel,
-} from "../lib/transactionFilterConstants";
+import { productBadgeVariant, productLabel } from "../lib/transactionFilterConstants";
 import type { FilterOption } from "../hooks/useTransactionFilterOptions";
 import type { TransactionFiltersState } from "../hooks/useTransactionFilters";
-import AnomalyFlag, { FILTERABLE_FLAGS } from "./AnomalyFlag";
+import type { ChipPatch } from "../lib/transactionFilterChips";
+import AnomalyFlag from "./AnomalyFlag";
 import BilledPrice from "./BilledPrice";
+import Popover from "./Popover";
 import RawResolved from "./RawResolved";
 import StopExpansion from "./StopExpansion";
+import TransactionFilters from "./TransactionFilters";
 import { printedAt } from "../lib/wallClock";
 
 const RECEIPT_MARKS: Record<ReceiptStatus, string> = { confirmed: "✓", missing: "✗", pending: "?" };
 const RECEIPT_LABELS: Record<ReceiptStatus, string> = { confirmed: "Confirmed", missing: "Missing", pending: "Pending" };
 
-/** True when the given event target is a form control that should keep its
- * own keystrokes — the `/`-focuses-search shortcut must not fire while the
- * dispatcher is already typing into a filter or the search box itself. */
-function isTypingTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false;
-  const tag = el.tagName;
-  return tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || el.isContentEditable;
+/** The key to the Unit column, behind the `i` in its header (T-87). */
+function UnitKey() {
+  return (
+    <Popover
+      trigger="i"
+      triggerClassName="tx-info"
+      triggerLabel="How to read the unit column"
+      panelLabel="Reading the unit column"
+      panelClassName="tx-unit-key"
+    >
+      <span className="tx-unit-key-title">Reading the unit column</span>
+      <span className="tx-unit-key-item">
+        <RawResolved value={{ resolved: "072", raw: "072", agrees: true }} />
+        as entered at the pump
+      </span>
+      <span className="tx-unit-key-item">
+        <RawResolved value={{ resolved: null, raw: "072", agrees: null }} />
+        resolved from the card assignment
+      </span>
+      <span className="tx-unit-key-item">
+        <RawResolved value={{ resolved: "072", raw: "0", agrees: false }} />
+        the two disagree
+      </span>
+    </Popover>
+  );
 }
 
 const columnHelper = createColumnHelper<TransactionListItem>();
@@ -242,6 +258,7 @@ interface TransactionsTableProps {
   qtyUnit: InvoiceQtyUnit;
   filters: TransactionFiltersState;
   setFilter: (key: keyof TransactionFiltersState, value: string | boolean) => void;
+  setFilters: (patch: ChipPatch) => void;
   clearFilters: () => void;
   driverOptions: FilterOption[];
   truckOptions: FilterOption[];
@@ -268,6 +285,7 @@ export default function TransactionsTable({
   qtyUnit: requestedUnit,
   filters,
   setFilter,
+  setFilters,
   clearFilters,
   driverOptions,
   truckOptions,
@@ -275,10 +293,7 @@ export default function TransactionsTable({
   stateOptions,
 }: TransactionsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const selectedFlags = filters.flags === "" ? [] : filters.flags.split(",");
-  const [flagsOpen, setFlagsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
   useEffect(() => {
@@ -289,17 +304,6 @@ export default function TransactionsTable({
   useEffect(() => {
     setActiveIndex(0);
   }, [filters.sort]);
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "/" && !isTypingTarget(e.target)) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   const toggleRow = useCallback((id: string) => {
     setExpandedId((current) => (current === id ? null : id));
@@ -378,191 +382,18 @@ export default function TransactionsTable({
 
   return (
     <>
-      <div className="tx-toolbar">
-        <div className="tx-toolbar-row">
-          <input
-            ref={searchInputRef}
-            className="input tx-search"
-            value={filters.q}
-            onChange={(e) => setFilter("q", e.target.value)}
-            placeholder="Search driver, card, unit, station, auth code or date"
-            aria-label="Search transactions"
-          />
-          <span className="tx-filter">
-            <span className="tx-filter-label">Driver</span>
-            <select
-              className="input tx-filter-select"
-              value={filters.driverId}
-              onChange={(e) => setFilter("driverId", e.target.value)}
-            >
-              <option value="">All</option>
-              {driverOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <span className="tx-filter">
-            <span className="tx-filter-label">Truck</span>
-            <select
-              className="input tx-filter-select"
-              value={filters.truckId}
-              onChange={(e) => setFilter("truckId", e.target.value)}
-            >
-              <option value="">All</option>
-              {truckOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <span className="tx-filter">
-            <span className="tx-filter-label">Card</span>
-            <select
-              className="input tx-filter-select"
-              value={filters.cardId}
-              onChange={(e) => setFilter("cardId", e.target.value)}
-            >
-              <option value="">All</option>
-              {cardOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <span className="tx-filter">
-            <span className="tx-filter-label">State</span>
-            <select
-              className="input tx-filter-select"
-              value={filters.state}
-              onChange={(e) => setFilter("state", e.target.value)}
-            >
-              <option value="">All</option>
-              {stateOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <span className="tx-filter">
-            <span className="tx-filter-label">Product</span>
-            <select
-              className="input tx-filter-select"
-              value={filters.product}
-              onChange={(e) => setFilter("product", e.target.value)}
-            >
-              <option value="">All</option>
-              {PRODUCT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <span className="tx-filter">
-            <span className="tx-filter-label">Receipt</span>
-            <select
-              className="input tx-filter-select"
-              value={filters.receiptStatus}
-              onChange={(e) => setFilter("receiptStatus", e.target.value)}
-            >
-              <option value="">All</option>
-              {RECEIPT_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          <label className="tx-filter">
-            <span className="tx-filter-label">From</span>
-            <input
-              type="date"
-              className="input tx-filter-date"
-              value={filters.from}
-              max={filters.to || undefined}
-              onChange={(e) => setFilter("from", e.target.value)}
-              aria-label="From"
-            />
-          </label>
-          <label className="tx-filter">
-            <span className="tx-filter-label">To</span>
-            <input
-              type="date"
-              className="input tx-filter-date"
-              value={filters.to}
-              min={filters.from || undefined}
-              onChange={(e) => setFilter("to", e.target.value)}
-              aria-label="To"
-            />
-          </label>
-          <span className="tx-filter tx-multi">
-            <span className="tx-filter-label">Flags</span>
-            <button
-              type="button"
-              className="input tx-filter-select tx-multi-toggle"
-              aria-expanded={flagsOpen}
-              onClick={() => setFlagsOpen((open) => !open)}
-            >
-              {selectedFlags.length === 0 ? "All" : `${selectedFlags.length} selected`}
-            </button>
-            {flagsOpen && (
-            <div className="tx-multi-menu">
-              {FILTERABLE_FLAGS.map((flag) => (
-                <label key={flag.value} className="tx-multi-option">
-                  <input
-                    type="checkbox"
-                    checked={selectedFlags.includes(flag.value)}
-                    onChange={(e) =>
-                      setFilter(
-                        "flags",
-                        (e.target.checked ? [...selectedFlags, flag.value] : selectedFlags.filter((r) => r !== flag.value)).join(","),
-                      )
-                    }
-                  />
-                  {flag.label}
-                </label>
-              ))}
-            </div>
-            )}
-          </span>
-          <label className={`tx-anomaly-toggle${filters.anomalyOnly ? " active" : ""}`}>
-            <input
-              type="checkbox"
-              checked={filters.anomalyOnly}
-              onChange={(e) => setFilter("anomalyOnly", e.target.checked)}
-            />
-            <span className="tx-anomaly-toggle-label">Flagged only</span>
-          </label>
-          <span className="tx-toolbar-meta">
-            <span className="tx-count">
-              {rows.length} of {totalBeforeSearch}
-            </span>
-            <button className="tx-clear" onClick={clearFilters} type="button">
-              Clear
-            </button>
-          </span>
-        </div>
-        <div className="tx-legend">
-          <span className="tx-legend-label">Reading the columns</span>
-          <span className="tx-legend-item">
-            <RawResolved value={{ resolved: "072", raw: "072", agrees: true }} />
-            as entered at the pump
-          </span>
-          <span className="tx-legend-item">
-            <RawResolved value={{ resolved: null, raw: "072", agrees: null }} />
-            resolved from the card assignment
-          </span>
-          <span className="tx-legend-item">
-            <RawResolved value={{ resolved: "072", raw: "0", agrees: false }} />
-            the two disagree
-          </span>
-        </div>
-      </div>
+      <TransactionFilters
+        filters={filters}
+        setFilter={setFilter}
+        setFilters={setFilters}
+        clearFilters={clearFilters}
+        driverOptions={driverOptions}
+        truckOptions={truckOptions}
+        cardOptions={cardOptions}
+        stateOptions={stateOptions}
+        shown={rows.length}
+        total={totalBeforeSearch}
+      />
 
       <div className="tx-panel">
         <div className="tx-scroll">
@@ -588,6 +419,11 @@ export default function TransactionsTable({
                         {filters.sort === "asc" ? "↑" : "↓"}
                       </span>
                     </button>
+                  ) : header.id === "unit" ? (
+                    <span className="tx-head-with-info">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      <UnitKey />
+                    </span>
                   ) : (
                     flexRender(header.column.columnDef.header, header.getContext())
                   )}

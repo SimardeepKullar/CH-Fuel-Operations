@@ -77,3 +77,11 @@ describe("weekEndsInScope", () => {
     expect(weekEndsInScope({ mode: "week", week: "1999-01-01" }, WEEKS)).toEqual([]);
   });
 });
+
+describe("the day keys (T-87)", () => {
+  it("writing a scope clears a range's pinned days with its weeks", () => {
+    const params = new URLSearchParams("scope=range&from=2026-09-09&to=2026-09-16&dayFrom=2026-09-08&dayTo=2026-09-10&q=x");
+    writeScope(params, { mode: "all" });
+    expect(params.toString()).toBe("q=x&scope=all");
+  });
+});

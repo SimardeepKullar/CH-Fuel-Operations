@@ -29,7 +29,7 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
 /** `Unit mismatch: Unit typed at the pump…` — the text a flag's hover shows. */
 export function describeFlag(rule: string): string {
   const what = RULE_DESCRIPTIONS[rule];
-  return what === undefined ? labelFor(rule) : `${labelFor(rule)}: ${what}`;
+  return what === undefined ? flagLabel(rule) : `${flagLabel(rule)}: ${what}`;
 }
 
 /** The one-line meaning of a rule, or `null` for a rule added without one. */
@@ -37,7 +37,7 @@ export function flagDescription(rule: string): string | null {
   return RULE_DESCRIPTIONS[rule] ?? null;
 }
 
-function labelFor(rule: string): string {
+export function flagLabel(rule: string): string {
   return RULE_LABELS[rule] ?? rule.replace(/_/g, " ");
 }
 
@@ -52,7 +52,7 @@ interface AnomalyFlagProps {
 export default function AnomalyFlag({ flag }: AnomalyFlagProps) {
   return (
     <span className={`anomaly-flag anomaly-flag-${flag.severity}`} data-severity={flag.severity}>
-      {labelFor(flag.rule)}
+      {flagLabel(flag.rule)}
     </span>
   );
 }

@@ -10,7 +10,7 @@ import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
 import { INVOICE_PARAM, actualRange, formatDay } from "../../../lib/weeks";
 import { writeScope, weekEndsInScope, type Scope } from "../../../lib/overviewScope";
 import { rangeLabel, scopeReadout } from "../../../lib/overviewView";
-import { anchorWeek, resolveSide, scopeQuery, transactionsScope, type SideChoice } from "../../../lib/transactionsScope";
+import { anchorWeek, normaliseDays, rangeForDays, resolveSide, scopeDays, scopeQuery, transactionsScope, type SideChoice } from "../../../lib/transactionsScope";
 import PageBanner from "../../../components/PageBanner";
 import ScopeControl from "../../../components/ScopeControl";
 import TransactionsStrip from "../../../components/TransactionsStrip";
@@ -94,10 +94,35 @@ export default function TransactionsPage() {
     [periods],
   );
   const covered = scopeWeeks.filter((w) => inScopeEnds.has(w.weekEnd));
+  const days = scopeDays(searchParams, scope);
+  const firstDay = days.from || covered[0]?.start || "";
+  const lastDay = days.to || covered.at(-1)?.end || "";
+  const setDays = (from: string, to: string) => {
+    const next = normaliseDays(from, to);
+    const params = new URLSearchParams(searchParams.toString());
+    // Days outside every imported week keep the weeks in view, and so read as no rows.
+    const range = rangeForDays(next, scopeWeeks);
+    if (range !== null) writeScope(params, range);
+    if (next.from === "") params.delete("dayFrom");
+    else params.set("dayFrom", next.from);
+    if (next.to === "") params.delete("dayTo");
+    else params.set("dayTo", next.to);
+    params.delete(INVOICE_PARAM);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+  const pinned = days.from !== "" || days.to !== "";
   const readout =
     covered.length === 0
       ? undefined
-      : scopeReadout(scope, covered.length, covered.length === 1 ? covered[0]!.label : `${formatDay(covered[0]!.start)} – ${formatDay(covered.at(-1)!.end)}`);
+      : scopeReadout(
+          scope,
+          covered.length,
+          pinned
+            ? `${formatDay(firstDay)} – ${formatDay(lastDay)}`
+            : covered.length === 1
+              ? covered[0]!.label
+              : `${formatDay(covered[0]!.start)} – ${formatDay(covered.at(-1)!.end)}`,
+        );
 
   const [pick, setPick] = useState<{ key: string; choice: DisplayChoice } | null>(null);
   // Forget it on leaving, too, so coming back to an invoice shows it as it came in.
@@ -114,11 +139,11 @@ export default function TransactionsPage() {
   const { units, convertTo } = conversionParams(conversion);
 
   const request = scopeQuery(scope);
-  const { filters, setFilter, clearFilters } = useTransactionFilters();
+  const { filters, setFilter, setFilters, clearFilters } = useTransactionFilters();
   const filterOptions = useTransactionFilterOptions(period, currency ?? null);
 
   const flagRules = filters.flags === "" ? [] : filters.flags.split(",");
-  const { dateFrom, dateTo } = printedDayBounds(filters.from, filters.to);
+  const { dateFrom, dateTo } = printedDayBounds(days.from, days.to);
 
   const [rows, setRows] = useState<TransactionListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,7 +223,7 @@ export default function TransactionsPage() {
     <>
         <PageBanner
           title="Transactions"
-          controls={<ScopeControl scope={scope} weeks={scopeWeeks} onChange={setScope} />}
+          controls={<ScopeControl scope={scope} weeks={scopeWeeks} onChange={setScope} days={{ from: firstDay, to: lastDay, onChange: setDays }} />}
           readout={readout}
           meta={
             <span className="pb-standing" data-testid="standing-counts">
@@ -223,6 +248,7 @@ export default function TransactionsPage() {
           qtyUnit={shown === null ? "gal" : choiceUnit(shown)}
           filters={filters}
           setFilter={setFilter}
+          setFilters={setFilters}
           clearFilters={clearFilters}
           driverOptions={filterOptions.drivers}
           truckOptions={filterOptions.trucks}

@@ -1075,44 +1075,6 @@ select.tx-filter-select {
   color: var(--color-accent-800);
   cursor: pointer;
 }
-input.tx-filter-date {
-  width: auto;
-  flex: none;
-  height: 30px;
-  padding: 0 8px;
-  font: 600 12px var(--font-body);
-  color: rgba(0, 0, 0, 0.75);
-}
-.tx-multi { position: relative; }
-button.tx-filter-select.tx-multi-toggle {
-  width: auto;
-  min-width: 96px;
-  height: 30px;
-  padding: 0 24px 0 9px;
-  font: 600 12px var(--font-body);
-  color: rgba(0, 0, 0, 0.75);
-  text-align: left;
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23333' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 9px center;
-}
-.tx-multi-menu {
-  position: absolute;
-  top: 34px;
-  left: 0;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 170px;
-  padding: 8px 10px;
-  background: #fff;
-  border: 1px solid #d6dae3;
-  border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(20, 28, 45, 0.12);
-}
-.tx-multi-option { display: flex; align-items: center; gap: 7px; font: 500 12px var(--font-body); cursor: pointer; }
 .tx-anomaly-toggle {
   display: flex;
   align-items: center;
@@ -1164,6 +1126,139 @@ button.tx-filter-select.tx-multi-toggle {
   color: #a4abb9;
 }
 .tx-legend-item { display: flex; align-items: center; gap: 7px; font: 400 11px var(--font-body); color: var(--color-muted); }
+
+/* The Transactions filter bar (T-87, docs/design/TransactionFilters.dc.html). */
+.tx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 13px; }
+.tx-bar-search { position: relative; flex: 1 1 280px; min-width: 0; display: block; color: #5a6377; }
+.tx-bar-search svg { position: absolute; left: 10px; top: 8px; width: 14px; height: 14px; }
+.tx-bar-search .input {
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 10px 0 30px;
+  border-color: #cbd2e1;
+  border-radius: 0;
+  background: #fff;
+  font: 400 12.5px var(--font-body);
+  color: #121852;
+}
+.tx-dd {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 200px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid #cbd2e1;
+  background: #fff;
+  color: #121852;
+  font: 500 12px var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tx-dd:focus-visible, .tx-dd:focus-within { outline: 2px solid var(--color-accent); outline-offset: 0; }
+.tx-dd.on { border-color: #121852; background: #eef1fa; box-shadow: inset 0 0 0 1px #121852; }
+.tx-dd.on .tx-dd-value { font-weight: 700; }
+.tx-dd svg { flex: none; }
+.tx-dd-key {
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #5a6377;
+}
+.tx-dd-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tx-dd-select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; font-size: 12px; cursor: pointer; }
+.tx-dd-badge { padding: 1px 5px; background: #121852; color: #fff; font: 700 10px var(--font-body); }
+/* A fixed slot, so a longer count (200 of 200) does not take width from the search box. */
+.tx-bar-count { margin-left: 6px; min-width: 84px; text-align: right; font-variant-numeric: tabular-nums; color: #5a6377; font-size: 11.5px; white-space: nowrap; }
+.tx-bar-count strong { color: #121852; }
+.tx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-top: 1px solid #eef1f6;
+  background: #fafbfd;
+}
+.tx-chips-label {
+  margin-right: 4px;
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5a6377;
+}
+.tx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 0 2px 0 8px;
+  border: 1px solid #121852;
+  background: #fff;
+  color: #121852;
+  font: 400 12px var(--font-body);
+}
+.tx-chip strong { overflow-wrap: anywhere; }
+.tx-chip button { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border: 0; background: transparent; color: #5a6377; cursor: pointer; }
+.tx-chips-clear { height: 24px; padding: 0 4px; border: 0; background: transparent; color: #0874b0; font: 600 12px var(--font-body); cursor: pointer; }
+.popover { display: inline-flex; }
+.popover-panel {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100vw - 16px);
+  border: 1px solid #cbd2e1;
+  background: #fff;
+  color: #121852;
+  box-shadow: 0 8px 24px rgba(18, 24, 82, 0.14);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.tx-flags-menu { gap: 6px; min-width: 170px; padding: 8px 10px; }
+.tx-menu-option { display: flex; align-items: center; gap: 7px; font: 500 12px var(--font-body); cursor: pointer; }
+.tx-menu-rule { border-top: 1px solid #eef1f6; }
+.tx-more-menu { gap: 10px; width: 190px; padding: 12px; }
+.tx-more-field { display: flex; flex-direction: column; gap: 4px; }
+.tx-more-field .input { height: 30px; min-height: 30px; padding: 0 24px 0 9px; border-color: #cbd2e1; border-radius: 0; background-color: #fff; font: 500 12px var(--font-body); color: #121852; }
+.tx-more-label {
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5a6377;
+}
+.tx-head-with-info { display: inline-flex; align-items: center; gap: 6px; }
+.tx-info {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #8c95c2;
+  border-radius: 50%;
+  background: #fff;
+  color: #5a6377;
+  font: 700 11px var(--font-body);
+  text-transform: none;
+  cursor: pointer;
+}
+.tx-info[aria-expanded="true"] { border-color: #121852; background: #121852; color: #fff; }
+.tx-unit-key { gap: 8px; width: 300px; padding: 10px 12px; font: 400 12px var(--font-body); }
+.tx-unit-key-title {
+  font: 600 9.5px var(--font-heading);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5a6377;
+}
+.tx-unit-key-item { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center; }
+@media (max-width: 700px) {
+  .tx-bar-search { flex-basis: 100%; }
+  .tx-dd { max-width: 100%; }
+  .tx-bar-count { margin-left: auto; }
+}
 
 .tx-panel { position: relative; background: var(--color-surface); border: 1px solid var(--color-border); }
 .tx-scroll { overflow-x: auto; }

@@ -9,11 +9,20 @@ export interface ScopeWeek {
   label: string;
 }
 
+/** Exact days for Range, in place of its week dropdowns. */
+export interface ScopeDayPicker {
+  from: string;
+  to: string;
+  onChange: (from: string, to: string) => void;
+}
+
 interface ScopeControlProps {
   scope: Scope;
   /** Every billing week, ascending. */
   weeks: readonly ScopeWeek[];
   onChange: (scope: Scope) => void;
+  /** Transactions picks days (T-87); the Overview reads whole weeks and leaves this out. */
+  days?: ScopeDayPicker;
 }
 
 const OPTIONS = [
@@ -23,7 +32,7 @@ const OPTIONS = [
 ] as const;
 
 /** `All time` | `Billing week ▾` | `Range ▾`, with the week or range pickers inline (T-71). */
-export default function ScopeControl({ scope, weeks, onChange }: ScopeControlProps) {
+export default function ScopeControl({ scope, weeks, onChange, days }: ScopeControlProps) {
   const ends = weeks.map((w) => w.weekEnd);
   return (
     <>
@@ -37,7 +46,28 @@ export default function ScopeControl({ scope, weeks, onChange }: ScopeControlPro
           ))}
         </select>
       )}
-      {scope.mode === "range" && (
+      {scope.mode === "range" && days !== undefined && (
+        <div className="pb-range">
+          <input
+            type="date"
+            className="pb-select pb-date"
+            aria-label="From"
+            value={days.from}
+            max={days.to || undefined}
+            onChange={(e) => days.onChange(e.target.value, days.to)}
+          />
+          <span className="pb-to">to</span>
+          <input
+            type="date"
+            className="pb-select pb-date"
+            aria-label="To"
+            value={days.to}
+            min={days.from || undefined}
+            onChange={(e) => days.onChange(days.from, e.target.value)}
+          />
+        </div>
+      )}
+      {scope.mode === "range" && days === undefined && (
         <div className="pb-range">
           <select className="pb-select" aria-label="From week" value={scope.from} onChange={(e) => onChange(normaliseRange(e.target.value, scope.to))}>
             {weeks.map((w) => (

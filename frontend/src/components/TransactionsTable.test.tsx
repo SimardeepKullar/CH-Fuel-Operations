@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import TransactionsTable from "./TransactionsTable";
@@ -15,8 +15,6 @@ const EMPTY_FILTERS: TransactionFiltersState = {
   state: "",
   product: "",
   receiptStatus: "",
-  from: "",
-  to: "",
   flags: "",
   anomalyOnly: false,
   sort: "",
@@ -60,6 +58,7 @@ function baseProps(rows: TransactionListItem[]) {
     qtyUnit: "gal" as const,
     filters: EMPTY_FILTERS,
     setFilter: vi.fn(),
+    setFilters: vi.fn(),
     clearFilters: vi.fn(),
     driverOptions: [],
     truckOptions: [],
@@ -134,7 +133,7 @@ describe("TransactionsTable", () => {
 
   it("pressing / focuses the search box, even when nothing inside the table has focus", () => {
     render(<TransactionsTable {...baseProps([stop()])} />);
-    const search = screen.getByPlaceholderText("Search driver, card, unit, station, auth code or date") as HTMLInputElement;
+    const search = screen.getByPlaceholderText("Search driver, card, unit, station, auth code…") as HTMLInputElement;
     expect(document.activeElement).not.toBe(search);
 
     fireEvent.keyDown(window, { key: "/" });
@@ -151,10 +150,9 @@ describe("TransactionsTable", () => {
         stateOptions={[{ value: "TX", label: "TX" }]}
       />,
     );
-    const stateSelect = screen.getByDisplayValue("TX") as HTMLSelectElement;
-    expect(stateSelect.value).toBe("TX");
-    const anomalyCheckbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    expect(anomalyCheckbox.checked).toBe(true);
+    expect(screen.getByRole("button", { name: /Flags/ }).textContent).toContain("Flagged");
+    fireEvent.click(screen.getByRole("button", { name: /More/ }));
+    expect((screen.getByLabelText("State / province") as HTMLSelectElement).value).toBe("TX");
   });
 
   it("an empty result set (after filters) shows the named empty state, not a blank table", () => {
@@ -437,27 +435,24 @@ describe("TransactionsTable — printed times (T-81)", () => {
   });
 });
 
-describe("TransactionsTable date filter (T-83)", () => {
-  it("shows the From and To days from the filters and reports edits through setFilter", () => {
-    const props = { ...baseProps([stop()]), filters: { ...EMPTY_FILTERS, from: "2026-09-08", to: "2026-09-09" } };
-    render(<TransactionsTable {...props} />);
-    expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe("2026-09-08");
-    expect((screen.getByLabelText("To") as HTMLInputElement).value).toBe("2026-09-09");
-    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-09-10" } });
-    expect(props.setFilter).toHaveBeenCalledWith("to", "2026-09-10");
-  });
-});
+describe("TransactionsTable — the unit key (T-87)", () => {
+  it("is closed until the i in the Unit header opens it, with the three explanations", () => {
+    render(<TransactionsTable {...baseProps([stop()])} />);
+    expect(screen.queryByText("as entered at the pump")).toBeNull();
+    const info = screen.getByRole("button", { name: "How to read the unit column" });
+    expect(info.getAttribute("aria-expanded")).toBe("false");
 
-describe("TransactionsTable flag filter", () => {
-  it("lists the visible rules, ticking adds to the selection and unticking removes it", () => {
-    const props = { ...baseProps([stop()]), filters: { ...EMPTY_FILTERS, flags: "sub_gallon" } };
-    render(<TransactionsTable {...props} />);
-    fireEvent.click(document.querySelector(".tx-multi-toggle")!);
-    expect(screen.queryByLabelText("Scale")).toBeNull();
-    expect((screen.getByLabelText("Sub-gal") as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(screen.getByLabelText("Too close"));
-    expect(props.setFilter).toHaveBeenCalledWith("flags", "sub_gallon,too_close");
-    fireEvent.click(screen.getByLabelText("Sub-gal"));
-    expect(props.setFilter).toHaveBeenCalledWith("flags", "");
+    fireEvent.click(info);
+
+    expect(info.getAttribute("aria-expanded")).toBe("true");
+    const key = within(screen.getByRole("dialog", { name: "Reading the unit column" }));
+    expect(key.getByText("as entered at the pump")).toBeTruthy();
+    expect(key.getByText("resolved from the card assignment")).toBeTruthy();
+    expect(key.getByText("the two disagree")).toBeTruthy();
+  });
+
+  it("does not sit in the toolbar any more", () => {
+    render(<TransactionsTable {...baseProps([stop()])} />);
+    expect(screen.queryByText("Reading the columns")).toBeNull();
   });
 });
