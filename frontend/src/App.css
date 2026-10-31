@@ -1026,8 +1026,13 @@ select.input { width: 100%; }
 .anomaly-flag {
   display: inline-flex;
   align-items: center;
-  padding: 2px 0.375rem;
+  /* Trim the line box to the capitals, so equal padding centres the word at any root size; the right
+     side gives back the gap letter-spacing leaves after the last letter. Without text-box support
+     (Firefox) the pill keeps the font's own spacing. */
+  padding: 0.25rem calc(0.375rem - 0.08em) 0.25rem 0.375rem;
+  text-box: trim-both cap alphabetic;
   font: 600 0.59375rem var(--font-heading);
+  line-height: 1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1344,8 +1349,13 @@ select.tx-filter-select {
 .product-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 0.375rem;
+  /* Trim the line box to the capitals, so equal padding centres the word at any root size; the right
+     side gives back the gap letter-spacing leaves after the last letter. Without text-box support
+     (Firefox) the pill keeps the font's own spacing. */
+  padding: 0.25rem calc(0.375rem - 0.08em) 0.25rem 0.375rem;
+  text-box: trim-both cap alphabetic;
   font: 600 0.59375rem var(--font-heading);
+  line-height: 1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
