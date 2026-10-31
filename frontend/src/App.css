@@ -1170,7 +1170,8 @@ select.tx-filter-select {
 .tx-dd-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tx-dd-select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; font-size: 12px; cursor: pointer; }
 .tx-dd-badge { padding: 1px 5px; background: #121852; color: #fff; font: 700 10px var(--font-body); }
-.tx-bar-count { margin-left: 6px; color: #5a6377; font-size: 11.5px; white-space: nowrap; }
+/* A fixed slot, so a longer count (200 of 200) does not take width from the search box. */
+.tx-bar-count { margin-left: 6px; min-width: 84px; text-align: right; font-variant-numeric: tabular-nums; color: #5a6377; font-size: 11.5px; white-space: nowrap; }
 .tx-bar-count strong { color: #121852; }
 .tx-chips {
   display: flex;
