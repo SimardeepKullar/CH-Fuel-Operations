@@ -2,23 +2,23 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { ReceiptOutcome } from "@ch/core/db/types";
-import { ApiError, confirmReceiptStops, getReceiptWeek, postReceiptCheck } from "../../../lib/api";
+import { ApiError, confirmReceiptStops, getAllReceipts, postReceiptCheck } from "../../../lib/api";
 import { useApiResource } from "../../../hooks/useApiResource";
 import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
-import { useWeek } from "../../../hooks/useWeek";
 import PageBanner from "../../../components/PageBanner";
 import RawResolved from "../../../components/RawResolved";
 import InvoiceTag from "../../../components/InvoiceTag";
 import AnomalyFlag, { describeFlag, flagDescription } from "../../../components/AnomalyFlag";
 import SegmentedControl from "../../../components/SegmentedControl";
 import { formatMoney, formatQty2dp } from "../../../lib/formatMoney";
-import { actualRange, formatDay } from "../../../lib/weeks";
+import { SIDE_LABELS } from "../../../lib/weeks";
 import { printedAt } from "../../../lib/wallClock";
 import { productBadgeVariant, productLabel } from "../../../lib/transactionFilterConstants";
 import {
   NO_FILTERS,
   driverName,
   hasFilters,
+  invoiceOptions,
   truckName,
   visibleRows,
   type QueueFilters,
@@ -40,35 +40,14 @@ interface Failure {
 }
 
 /**
- * A8.5's Receipt Queue (T-43): every fuel purchase of the selected billing week, one row each, with
- * Yes / No for "was a receipt uploaded in Samsara?". A decision is optimistic: the row, the counts
- * and the progress bar move at once, and a failed write puts the row back and says so.
+ * A8.5's Receipt Queue (T-43): every fuel purchase of every billing week, one row each, with Yes / No
+ * for "was a receipt uploaded in Samsara?". It is a standing worklist (D17), so To check always equals
+ * the sidebar's badge, and an Invoice filter narrows it rather than the week selector. A decision is
+ * optimistic: the row, the counts and the progress bar move at once, and a failed write puts the row
+ * back and says so.
  */
 export default function ReceiptQueuePage() {
-  const { week, weekEntry, loading } = useWeek();
-  if (week === null) {
-    return (
-      <>
-        <PageBanner title="Receipt Queue" />
-        <div className="tx-page">
-          <section className="tx-panel" aria-label="Fuel purchases" aria-busy={loading}>
-            <div className="rq-empty">{loading ? "Loading fuel purchases…" : "No invoices are imported yet."}</div>
-          </section>
-        </div>
-      </>
-    );
-  }
-  const ranges = weekEntry === null ? [] : weekEntry.invoices.map(actualRange);
-  const label =
-    ranges.length === 0
-      ? null
-      : `${formatDay(ranges.map((r) => r.start).sort()[0]!)} – ${formatDay(ranges.map((r) => r.end).sort().at(-1)!)}`;
-  return <Queue key={week} week={week} rangeLabel={label} />;
-}
-
-function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }) {
-  const fetcher = useCallback(() => getReceiptWeek(week), [week]);
-  const { data, loading, error, refetch } = useApiResource(fetcher);
+  const { data, loading, error, refetch } = useApiResource(getAllReceipts);
   const { refresh: refreshCounts } = useStandingCountsValue();
 
   const [view, setView] = useState<QueueView>("check");
@@ -95,6 +74,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
   const shown = useMemo(() => visibleRows(rows, view, filters, kept), [rows, view, filters, kept]);
 
   const driverOptions = useMemo(() => [...new Set(rows.map(driverName))].sort((a, b) => a.localeCompare(b)), [rows]);
+  const invoices = useMemo(() => invoiceOptions(rows), [rows]);
   const dayOptions = useMemo(() => {
     const byDay = new Map<string, string>();
     for (const r of rows) byDay.set(printedAt(r.occurredAt).dayKey, printedAt(r.occurredAt).date);
@@ -143,7 +123,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
   const undecided = shown.filter((r) => r.status !== "confirmed");
   const batchMissing = undecided.filter((r) => r.status === "missing").length;
   const dayLabel = filters.day === "" ? "" : (dayOptions.find(([k]) => k === filters.day)?.[1] ?? "");
-  const who = [filters.driver, dayLabel].filter(Boolean).join(" on ");
+  const who = [filters.driver, dayLabel, filters.invoice === "" ? "" : `invoice ${filters.invoice}`].filter(Boolean).join(" on ");
   const batchScoped = filters.driver !== "" || filters.day !== "";
   const n = undecided.length;
 
@@ -183,7 +163,8 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
     { value: "confirmed", label: `Confirmed ${ready ? confirmed : "—"}` },
     { value: "all", label: `All ${ready ? total : "—"}` },
   ];
-  const nothingLeft = ready && shown.length === 0 && view === "check" && !hasFilters(filters);
+  const nothingImported = ready && total === 0;
+  const nothingLeft = ready && !nothingImported && shown.length === 0 && view === "check" && !hasFilters(filters);
 
   return (
     <>
@@ -204,7 +185,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
             </span>
           </span>
         }
-        meta={rangeLabel === null ? "Receipts checked in Samsara" : `Invoices ${rangeLabel} · receipts checked in Samsara`}
+        meta="Receipts checked in Samsara"
       />
       <div className="tx-page">
         <div className="tx-toolbar" role="search" aria-label="Filters">
@@ -217,6 +198,22 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
               aria-label="Search fuel purchases"
               onChange={(e) => changeFilters({ q: e.target.value })}
             />
+            <span className="tx-filter">
+              <span className="tx-filter-label">Invoice</span>
+              <select
+                className="input tx-filter-select"
+                aria-label="Invoice"
+                value={filters.invoice}
+                onChange={(e) => changeFilters({ invoice: e.target.value })}
+              >
+                <option value="">All</option>
+                {invoices.map((i) => (
+                  <option key={i.number} value={i.number}>
+                    {SIDE_LABELS[i.currency]} {i.number}
+                  </option>
+                ))}
+              </select>
+            </span>
             <span className="tx-filter">
               <span className="tx-filter-label">Driver</span>
               <select
@@ -501,7 +498,7 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
               </svg>
               <h2>Nothing left to check</h2>
               <p>
-                {confirmed} of {total} confirmed{rangeLabel === null ? "" : ` for ${rangeLabel}`}.
+                {confirmed} of {total} confirmed.
               </p>
               <button type="button" className="rq-btn" onClick={() => changeView("all")}>
                 View all {total}
@@ -509,7 +506,9 @@ function Queue({ week, rangeLabel }: { week: string; rangeLabel: string | null }
             </div>
           )}
 
-          {ready && shown.length === 0 && !nothingLeft && (
+          {nothingImported && <div className="rq-empty">No invoices are imported yet.</div>}
+
+          {ready && shown.length === 0 && !nothingLeft && !nothingImported && (
             <div className="rq-empty">
               <strong>No fuel purchases match these filters.</strong>
               <button type="button" className="rq-btn" onClick={() => changeFilters(NO_FILTERS)}>

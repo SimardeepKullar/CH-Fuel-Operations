@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReceiptQueueItem, ReceiptQueueResult } from "@ch/core/actuals/receipts";
 
-const getReceiptWeek = vi.fn();
+const getAllReceipts = vi.fn();
 const postReceiptCheck = vi.fn();
 const confirmReceiptStops = vi.fn();
 
@@ -11,14 +11,11 @@ vi.mock("../../../lib/api", async () => {
   const actual = await vi.importActual<typeof import("../../../lib/api")>("../../../lib/api");
   return {
     ...actual,
-    getReceiptWeek: (...a: unknown[]) => getReceiptWeek(...a),
+    getAllReceipts: (...a: unknown[]) => getAllReceipts(...a),
     postReceiptCheck: (...a: unknown[]) => postReceiptCheck(...a),
     confirmReceiptStops: (...a: unknown[]) => confirmReceiptStops(...a),
   };
 });
-vi.mock("../../../hooks/useWeek", () => ({
-  useWeek: () => ({ week: "2026-10-26", weekEntry: null, loading: false }),
-}));
 
 const { default: ReceiptQueuePage } = await import("./page");
 const { StandingCountsProvider } = await import("../../../hooks/standingCountsContext");
@@ -47,7 +44,7 @@ function item(id: string, o: Partial<ReceiptQueueItem> = {}): ReceiptQueueItem {
 
 async function renderPage(items: ReceiptQueueItem[]) {
   const result: ReceiptQueueResult = { items, progress: { done: 0, total: items.length } };
-  getReceiptWeek.mockResolvedValue(result);
+  getAllReceipts.mockResolvedValue(result);
   render(
     <StandingCountsProvider value={{ receipts: result.progress, flags: null, refresh: () => {} }}>
       <ReceiptQueuePage />
@@ -58,7 +55,7 @@ async function renderPage(items: ReceiptQueueItem[]) {
 }
 
 beforeEach(() => {
-  getReceiptWeek.mockReset();
+  getAllReceipts.mockReset();
   postReceiptCheck.mockReset();
   confirmReceiptStops.mockReset();
   postReceiptCheck.mockResolvedValue({});
@@ -96,6 +93,44 @@ describe("Receipt Queue — table", () => {
     fireEvent.change(screen.getByLabelText("Search fuel purchases"), { target: { value: "999217" } });
     expect(screen.getAllByTestId("queue-row")).toHaveLength(1);
     expect(within(screen.getByTestId("queue-row")).getByTestId("tx-invoice-tag").textContent).toBe("🇨🇦 999217");
+  });
+
+  it("lists every week, narrowed by an Invoice filter labelled by side, newest invoice first", async () => {
+    await renderPage([
+      item("sep", { occurredAt: "2026-09-05T10:00:00.000Z" }),
+      item("oct-ca", { occurredAt: "2026-10-27T10:00:00.000Z", currency: "CAD", qtyUnit: "L", invoiceNumber: "1030440" }),
+      item("oct-us", { occurredAt: "2026-10-26T10:00:00.000Z", invoiceNumber: "1030434" }),
+    ]);
+    expect(getAllReceipts).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByTestId("queue-row")).toHaveLength(3);
+    expect(screen.getByText("To check 3")).toBeTruthy();
+
+    const invoice = screen.getByLabelText("Invoice") as HTMLSelectElement;
+    expect([...invoice.options].map((o) => o.textContent)).toEqual(["All", "CA 1030440", "US 1030434", "US 999210"]);
+    fireEvent.change(invoice, { target: { value: "1030440" } });
+    expect(within(screen.getByTestId("queue-row")).getByTestId("tx-invoice-tag").textContent).toBe("🇨🇦 1030440");
+    expect(screen.getByText("1 of 3")).toBeTruthy();
+  });
+
+  it("names the invoice filter in a batch confirm, which writes only what is shown", async () => {
+    await renderPage([item("a"), item("b", { invoiceNumber: "1030434" })]);
+    fireEvent.change(screen.getByLabelText("Invoice"), { target: { value: "1030434" } });
+    expect(screen.queryByText(/^Confirm all/)).toBeNull();
+    fireEvent.change(screen.getByLabelText("Driver"), { target: { value: "DRIVER A" } });
+    fireEvent.click(screen.getByText("Confirm all 1 shown for DRIVER A on invoice 1030434"));
+    fireEvent.click(screen.getByText("Confirm 1"));
+    await waitFor(() => expect(confirmReceiptStops).toHaveBeenCalledWith(["b"]));
+  });
+
+  it("says so when no invoice has been imported", async () => {
+    getAllReceipts.mockResolvedValue({ items: [], progress: { done: 0, total: 0 } });
+    render(
+      <StandingCountsProvider value={{ receipts: null, flags: null, refresh: () => {} }}>
+        <ReceiptQueuePage />
+      </StandingCountsProvider>,
+    );
+    expect(await screen.findByText("No invoices are imported yet.")).toBeTruthy();
+    expect(screen.queryByTestId("queue-clear")).toBeNull();
   });
 
   it("shows unmatched driver text as raw with the tooltip", async () => {

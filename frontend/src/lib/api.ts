@@ -187,10 +187,10 @@ export function getReceiptQueue(): Promise<ReceiptQueueResult> {
   return request<ReceiptQueueResult>("/receipt-queue");
 }
 
-/** `GET /receipt-queue?week=&include=all` — the Receipt Queue screen's source: every fuel stop of one
+/** `GET /receipt-queue?include=all` — the Receipt Queue screen's source: every fuel stop of every
  * billing week, confirmed ones included, each carrying its own `receiptStatus`. */
-export function getReceiptWeek(week: string): Promise<ReceiptQueueResult> {
-  return request<ReceiptQueueResult>(`/receipt-queue?week=${encodeURIComponent(week)}&include=all`);
+export function getAllReceipts(): Promise<ReceiptQueueResult> {
+  return request<ReceiptQueueResult>("/receipt-queue?include=all");
 }
 
 /** `POST /receipt-checks` with `fuelStopIds` — confirms exactly the rows the dispatcher's filters show. */
