@@ -2,11 +2,15 @@
 
 * , *::before, *::after { box-sizing: border-box; }
 
+/* The one knob for how big the UI is (T-88): every size in the stylesheets is in rem, so this scales
+   the whole app. A percentage, not px, so the browser's own font-size setting still counts. */
+html { font-size: 100%; }
+
 body {
   margin: 0;
   background: #f4f6fa;
   color: #16205c;
   font-family: "Barlow", system-ui, sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.55;
 }
