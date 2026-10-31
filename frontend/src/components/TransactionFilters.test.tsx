@@ -94,30 +94,30 @@ describe("TransactionFilters — active state (T-87)", () => {
 });
 
 describe("TransactionFilters — the merged Flags control (T-87)", () => {
-  it("lists All, Any flag and each visible rule, without Scale", () => {
+  it("lists All, Flagged and each visible rule, without Scale", () => {
     setup();
     fireEvent.click(button(/Flags/));
     expect((screen.getByLabelText("All") as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByLabelText("Any flag")).toBeTruthy();
+    expect(screen.getByLabelText("Flagged")).toBeTruthy();
     expect(screen.getByLabelText("Sub-gal")).toBeTruthy();
     expect(screen.queryByLabelText("Scale")).toBeNull();
   });
 
-  it("Any flag is the old Flagged only, and drops any picked rules", () => {
+  it("Flagged is the old Flagged only, and drops any picked rules", () => {
     const props = setup({ flags: "sub_gallon" });
     fireEvent.click(button(/Flags/));
-    fireEvent.click(screen.getByLabelText("Any flag"));
+    fireEvent.click(screen.getByLabelText("Flagged"));
     expect(props.setFilters).toHaveBeenCalledWith({ flags: "", anomalyOnly: true });
   });
 
-  it("an anomalyOnly link from the Overview reads as Any flag", () => {
+  it("an anomalyOnly link from the Overview reads as Flagged", () => {
     setup({ anomalyOnly: true });
-    expect(button(/Flags/).textContent).toContain("Any flag");
+    expect(button(/Flags/).textContent).toContain("Flagged");
     fireEvent.click(button(/Flags/));
-    expect((screen.getByLabelText("Any flag") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Flagged") as HTMLInputElement).checked).toBe(true);
   });
 
-  it("ticking a rule adds to the selection and turns Any flag off; unticking removes it", () => {
+  it("ticking a rule adds to the selection and turns Flagged off; unticking removes it", () => {
     const props = setup({ flags: "sub_gallon", anomalyOnly: true });
     fireEvent.click(button(/Flags/));
     fireEvent.click(screen.getByLabelText("Too close"));
@@ -161,9 +161,9 @@ describe("TransactionFilters — chips (T-87)", () => {
     ]);
   });
 
-  it("Any flag has a chip", () => {
+  it("Flagged has a chip", () => {
     setup({ anomalyOnly: true });
-    expect(document.querySelector(".tx-chip")!.textContent).toBe("Flags: Any flag");
+    expect(document.querySelector(".tx-chip")!.textContent).toBe("Flags: Flagged");
   });
 
   it("× clears that filter alone", () => {

@@ -31,12 +31,12 @@ export function optionLabel(options: FilterOption[], value: string): string | nu
   return options.find((o) => o.value === value)?.label ?? null;
 }
 
-/** `All`, `Any flag`, the one rule picked, or `2 flags`. */
+/** `All`, `Flagged`, the one rule picked, or `2 flags`. */
 export function flagsValueLabel(filters: Pick<TransactionFiltersState, "flags" | "anomalyOnly">): string {
   const rules = filters.flags === "" ? [] : filters.flags.split(",");
   if (rules.length === 1) return flagLabel(rules[0]!);
   if (rules.length > 1) return `${rules.length} flags`;
-  return filters.anomalyOnly ? "Any flag" : "All";
+  return filters.anomalyOnly ? "Flagged" : "All";
 }
 
 /** One chip per active filter, and one per flag, in the bar's order. A value whose
@@ -51,7 +51,7 @@ export function activeFilterChips(filters: TransactionFiltersState, options: Chi
   if (filters.truckId !== "") add("truckId", "Truck", optionLabel(options.trucks, filters.truckId) ?? "Selected", { truckId: "" });
   if (filters.product !== "") add("product", "Product", optionLabel(PRODUCT_OPTIONS, filters.product) ?? filters.product, { product: "" });
   if (filters.receiptStatus !== "") add("receiptStatus", "Receipt", optionLabel(RECEIPT_STATUS_OPTIONS, filters.receiptStatus) ?? filters.receiptStatus, { receiptStatus: "" });
-  if (filters.anomalyOnly) add("anomalyOnly", "Flags", "Any flag", { anomalyOnly: false });
+  if (filters.anomalyOnly) add("anomalyOnly", "Flags", "Flagged", { anomalyOnly: false });
 
   const rules = filters.flags === "" ? [] : filters.flags.split(",");
   for (const rule of rules) {

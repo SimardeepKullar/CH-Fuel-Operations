@@ -146,7 +146,7 @@ export default function TransactionFilters({
               checked={filters.anomalyOnly && selectedFlags.length === 0}
               onChange={() => setFilters({ flags: "", anomalyOnly: true })}
             />
-            Any flag
+            Flagged
           </label>
           <span className="tx-menu-rule" />
           {FILTERABLE_FLAGS.map((flag) => (

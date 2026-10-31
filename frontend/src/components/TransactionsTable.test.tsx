@@ -150,7 +150,7 @@ describe("TransactionsTable", () => {
         stateOptions={[{ value: "TX", label: "TX" }]}
       />,
     );
-    expect(screen.getByRole("button", { name: /Flags/ }).textContent).toContain("Any flag");
+    expect(screen.getByRole("button", { name: /Flags/ }).textContent).toContain("Flagged");
     fireEvent.click(screen.getByRole("button", { name: /More/ }));
     expect((screen.getByLabelText("State / province") as HTMLSelectElement).value).toBe("TX");
   });
