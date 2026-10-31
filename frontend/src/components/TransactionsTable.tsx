@@ -30,7 +30,7 @@ import {
 } from "../lib/transactionFilterConstants";
 import type { FilterOption } from "../hooks/useTransactionFilterOptions";
 import type { TransactionFiltersState } from "../hooks/useTransactionFilters";
-import AnomalyFlag from "./AnomalyFlag";
+import AnomalyFlag, { FILTERABLE_FLAGS } from "./AnomalyFlag";
 import BilledPrice from "./BilledPrice";
 import RawResolved from "./RawResolved";
 import StopExpansion from "./StopExpansion";
@@ -275,6 +275,8 @@ export default function TransactionsTable({
   stateOptions,
 }: TransactionsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const selectedFlags = filters.flags === "" ? [] : filters.flags.split(",");
+  const [flagsOpen, setFlagsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
@@ -498,6 +500,36 @@ export default function TransactionsTable({
               aria-label="To"
             />
           </label>
+          <span className="tx-filter tx-multi">
+            <button
+              type="button"
+              className="input tx-filter-select tx-multi-toggle"
+              aria-expanded={flagsOpen}
+              onClick={() => setFlagsOpen((open) => !open)}
+            >
+              <span className="tx-filter-label">Flags</span>{" "}
+              {selectedFlags.length === 0 ? "All" : `${selectedFlags.length} selected`}
+            </button>
+            {flagsOpen && (
+            <div className="tx-multi-menu">
+              {FILTERABLE_FLAGS.map((flag) => (
+                <label key={flag.value} className="tx-multi-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedFlags.includes(flag.value)}
+                    onChange={(e) =>
+                      setFilter(
+                        "flags",
+                        (e.target.checked ? [...selectedFlags, flag.value] : selectedFlags.filter((r) => r !== flag.value)).join(","),
+                      )
+                    }
+                  />
+                  {flag.label}
+                </label>
+              ))}
+            </div>
+            )}
+          </span>
           <label className={`tx-anomaly-toggle${filters.anomalyOnly ? " active" : ""}`}>
             <input
               type="checkbox"

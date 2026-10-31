@@ -1083,6 +1083,24 @@ input.tx-filter-date {
   font: 600 12px var(--font-body);
   color: var(--color-accent-800);
 }
+.tx-multi { position: relative; }
+.tx-multi-toggle { display: inline-flex; align-items: center; height: 30px; cursor: pointer; gap: 4px; text-align: left; }
+.tx-multi-menu {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 170px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #d6dae3;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(20, 28, 45, 0.12);
+}
+.tx-multi-option { display: flex; align-items: center; gap: 7px; font: 500 12px var(--font-body); cursor: pointer; }
 .tx-anomaly-toggle {
   display: flex;
   align-items: center;

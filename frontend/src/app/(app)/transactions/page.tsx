@@ -117,6 +117,7 @@ export default function TransactionsPage() {
   const { filters, setFilter, clearFilters } = useTransactionFilters();
   const filterOptions = useTransactionFilterOptions(period, currency ?? null);
 
+  const flagRules = filters.flags === "" ? [] : filters.flags.split(",");
   const { dateFrom, dateTo } = printedDayBounds(filters.from, filters.to);
 
   const [rows, setRows] = useState<TransactionListItem[]>([]);
@@ -151,6 +152,7 @@ export default function TransactionsPage() {
         : undefined,
       dateFrom,
       dateTo,
+      flags: flagRules.length > 0 ? flagRules : undefined,
       anomalyOnly: filters.anomalyOnly || undefined,
       // Newest first is the API's default, so only oldest first is asked for (T-40J).
       ...(filters.sort === "asc" ? { sortField: "occurred_at" as const, sortDirection: "asc" as const } : {}),
@@ -185,6 +187,7 @@ export default function TransactionsPage() {
     filters.receiptStatus,
     dateFrom,
     dateTo,
+    filters.flags,
     filters.anomalyOnly,
     filters.sort,
   ]);

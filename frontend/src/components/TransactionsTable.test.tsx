@@ -17,6 +17,7 @@ const EMPTY_FILTERS: TransactionFiltersState = {
   receiptStatus: "",
   from: "",
   to: "",
+  flags: "",
   anomalyOnly: false,
   sort: "",
 };
@@ -444,5 +445,19 @@ describe("TransactionsTable date filter (T-83)", () => {
     expect((screen.getByLabelText("To") as HTMLInputElement).value).toBe("2026-09-09");
     fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-09-10" } });
     expect(props.setFilter).toHaveBeenCalledWith("to", "2026-09-10");
+  });
+});
+
+describe("TransactionsTable flag filter", () => {
+  it("lists the visible rules, ticking adds to the selection and unticking removes it", () => {
+    const props = { ...baseProps([stop()]), filters: { ...EMPTY_FILTERS, flags: "sub_gallon" } };
+    render(<TransactionsTable {...props} />);
+    fireEvent.click(document.querySelector(".tx-multi-toggle")!);
+    expect(screen.queryByLabelText("Scale")).toBeNull();
+    expect((screen.getByLabelText("Sub-gal") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText("Too close"));
+    expect(props.setFilter).toHaveBeenCalledWith("flags", "sub_gallon,too_close");
+    fireEvent.click(screen.getByLabelText("Sub-gal"));
+    expect(props.setFilter).toHaveBeenCalledWith("flags", "");
   });
 });

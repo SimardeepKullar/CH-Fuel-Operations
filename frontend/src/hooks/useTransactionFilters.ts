@@ -12,6 +12,8 @@ export interface TransactionFiltersState {
   /** Printed days, `YYYY-MM-DD`, inclusive (T-83). */
   from: string;
   to: string;
+  /** Anomaly rule slugs, comma-separated; any one matches. */
+  flags: string;
   anomalyOnly: boolean;
   /** `asc` = oldest first (T-40J); empty is the default, newest first, and stays out of the URL. */
   sort: "" | "asc";
@@ -27,6 +29,7 @@ const EMPTY: TransactionFiltersState = {
   receiptStatus: "",
   from: "",
   to: "",
+  flags: "",
   anomalyOnly: false,
   sort: "",
 };
@@ -62,6 +65,7 @@ export function useTransactionFilters(): UseTransactionFiltersResult {
       receiptStatus: searchParams.get("receiptStatus") ?? "",
       from: searchParams.get("from") ?? "",
       to: searchParams.get("to") ?? "",
+      flags: searchParams.get("flags") ?? "",
       anomalyOnly: searchParams.get("anomalyOnly") === "true",
       sort: searchParams.get("sort") === "asc" ? "asc" : "",
     }),

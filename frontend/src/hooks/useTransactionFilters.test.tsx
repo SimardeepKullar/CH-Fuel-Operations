@@ -25,6 +25,7 @@ function Probe() {
       <span data-testid="to">{filters.to || "none"}</span>
       <button onClick={() => setFilter("from", "2026-09-08")}>set from</button>
       <button onClick={() => setFilter("to", "")}>clear to</button>
+      <span data-testid="flags">{filters.flags || "none"}</span>
       <span data-testid="q">{filters.q || "none"}</span>
       <button onClick={() => setFilter("driverId", "driver-1")}>set driver</button>
       <button onClick={() => setFilter("driverId", "")}>clear driver</button>
@@ -160,6 +161,16 @@ describe("useTransactionFilters (T-40)", () => {
     const url = new URL(replace.mock.calls[0]![0] as string, "http://localhost");
     expect(url.searchParams.has("from")).toBe(false);
     expect(url.searchParams.has("to")).toBe(false);
+    expect(url.searchParams.get("week")).toBe("2026-09-10");
+  });
+
+  it("flags read back from and clear with the other filters", () => {
+    searchParams = new URLSearchParams({ flags: "sub_gallon,too_close", week: "2026-09-10" });
+    render(<Probe />);
+    expect(screen.getByTestId("flags").textContent).toBe("sub_gallon,too_close");
+    act(() => screen.getByText("clear all").click());
+    const url = new URL(replace.mock.calls[0]![0] as string, "http://localhost");
+    expect(url.searchParams.has("flags")).toBe(false);
     expect(url.searchParams.get("week")).toBe("2026-09-10");
   });
 });

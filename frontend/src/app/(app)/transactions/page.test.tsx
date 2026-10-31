@@ -154,6 +154,21 @@ describe("TransactionsPage (T-40)", () => {
     expect(new URL(replace.mock.calls.at(-1)![0] as string, "http://localhost").searchParams.get("to")).toBe("2026-09-09");
   });
 
+  it("flags in the URL are forwarded to GET /transactions as a list", async () => {
+    searchParams = new URLSearchParams({ week: "2026-09-10", flags: "sub_gallon,too_close" });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-10", openAnomalyCount: 0 });
+    listPeriods.mockResolvedValue({ weeks: [] });
+    listDrivers.mockResolvedValue({ week: "2026-09-10", invoiceId: "inv-1", rows: [], unresolved: {}, fleet: {} });
+    listTrucks.mockResolvedValue({ rows: [] });
+    listTransactions.mockResolvedValue({ rows: [], page: 1, pageSize: 200, total: 0 });
+
+    render(<TransactionsPage />);
+
+    await waitFor(() => expect(listTransactions.mock.calls.some((c) => (c[0] as { includeLines?: boolean }).includeLines)).toBe(true));
+    const tableCall = listTransactions.mock.calls.find((c) => (c[0] as { includeLines?: boolean }).includeLines);
+    expect(tableCall![0]).toMatchObject({ flags: ["sub_gallon", "too_close"] });
+  });
+
   it("a search term in the URL narrows the rendered rows client-side, without re-fetching", async () => {
     searchParams = new URLSearchParams({ week: "2026-09-03", q: "jordan" });
     getHealth.mockResolvedValue({ latestInvoicePeriod: "2026-09-03", openAnomalyCount: 0 });
