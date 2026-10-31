@@ -1134,6 +1134,7 @@ select.tx-filter-select {
 .tx-bar-search .input {
   width: 100%;
   height: 30px;
+  min-height: 30px;
   padding: 0 10px 0 30px;
   border-color: #cbd2e1;
   border-radius: 0;
@@ -1221,7 +1222,7 @@ select.tx-filter-select {
 .tx-menu-rule { border-top: 1px solid #eef1f6; }
 .tx-more-menu { gap: 10px; width: 240px; padding: 12px; }
 .tx-more-field { display: flex; flex-direction: column; gap: 4px; }
-.tx-more-field .input { height: 30px; padding: 0 24px 0 9px; border-color: #cbd2e1; border-radius: 0; background-color: #fff; font: 500 12px var(--font-body); color: #121852; }
+.tx-more-field .input { height: 30px; min-height: 30px; padding: 0 24px 0 9px; border-color: #cbd2e1; border-radius: 0; background-color: #fff; font: 500 12px var(--font-body); color: #121852; }
 .tx-more-label {
   font: 600 9.5px var(--font-heading);
   letter-spacing: 0.14em;
