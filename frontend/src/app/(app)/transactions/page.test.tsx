@@ -285,6 +285,16 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(listDrivers).toHaveBeenLastCalledWith("2026-09-09", "CAD");
   });
 
+  it("the units group sits in the filter bar, and the separate row below the invoice strip is gone (T-82)", async () => {
+    setupWeeks([PAIRED_WEEK]);
+    render(<TransactionsPage />);
+
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    const group = screen.getByRole("group", { name: "Show amounts in" });
+    expect(group.closest(".tx-bar")).not.toBeNull();
+    expect(document.querySelector(".tx-side-bar")).toBeNull();
+  });
+
   it("clicking a chip navigates to that invoice on Transactions", async () => {
     setupWeeks([PAIRED_WEEK]);
     render(<TransactionsPage />);
