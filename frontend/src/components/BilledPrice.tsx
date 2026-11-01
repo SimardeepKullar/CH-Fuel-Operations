@@ -21,7 +21,7 @@ interface BilledPriceProps {
 const valueStyle: CSSProperties = {
   fontFamily: "var(--font-heading)",
   fontWeight: 700,
-  fontSize: "14.5px",
+  fontSize: "17px",
   letterSpacing: "0.01em",
   color: "var(--color-accent-800)",
   fontVariantNumeric: "tabular-nums",
