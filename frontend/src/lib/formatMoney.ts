@@ -55,6 +55,11 @@ export function formatPricePerUnit(price: number, currency: InvoiceCurrency): st
   return `${sign}${CURRENCY_PREFIX[currency]}${Math.abs(price).toFixed(4)}`;
 }
 
+/** `"US$833.68"` -> `"$833.68"` — for a table whose header already names the one currency (Transactions, T-80). */
+export function dropCountry(text: string): string {
+  return text.replace(/^(-?)(?:US|CA)\$/, "$1$");
+}
+
 /** A quantity at 2dp in whichever unit it is in — gallons or litres. */
 export function formatQty2dp(qty: number): string {
   return qty.toFixed(2);

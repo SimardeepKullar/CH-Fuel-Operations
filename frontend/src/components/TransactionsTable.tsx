@@ -12,7 +12,8 @@ import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "@ch/core/db
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import Link from "next/link";
 import {
-    formatMoney,
+    dropCountry,
+  formatMoney,
   formatMoneyOrPending,
   formatPricePerUnit,
   formatQty2dp,
@@ -86,6 +87,8 @@ function buildColumns(
   unit: InvoiceQtyUnit | null,
   showInvoice: boolean,
 ): ColumnDef<TransactionListItem, any>[] {
+  // One currency in view: the header names it, so the cells print a bare `$`.
+  const money = (text: string) => (currency === null ? text : dropCountry(text));
   return [
     // Rendered specially in the row loop below (it needs the live `expandedId`
     // state, not just the row's own data) — this definition exists so the
@@ -163,6 +166,7 @@ function buildColumns(
           billedPerUnit={row.original.billedPerUnit}
           currency={row.original.currency}
           ratePending={row.original.ratePending === true}
+          bareDollar={currency !== null}
         />
       ),
     }),
@@ -185,7 +189,7 @@ function buildColumns(
     }),
     columnHelper.accessor("total", {
       header: currency === null ? "Total" : `Total ${currency}`,
-      cell: ({ row }) => <span className="tx-total">{formatMoneyOrPending(row.original.total, row.original.currency)}</span>,
+      cell: ({ row }) => <span className="tx-total">{money(formatMoneyOrPending(row.original.total, row.original.currency))}</span>,
     }),
     columnHelper.display({
       id: "receipt",
@@ -501,10 +505,10 @@ export default function TransactionsTable({
                 </span>
                 <span className="tx-foot-cell">{totals.qty === null ? "—" : formatQty2dp(totals.qty)}</span>
                 <span className="tx-foot-cell tx-foot-billed">
-                  {totals.avgBilled === null || currency === null ? "—" : formatPricePerUnit(totals.avgBilled, currency)}
+                  {totals.avgBilled === null || currency === null ? "—" : dropCountry(formatPricePerUnit(totals.avgBilled, currency))}
                 </span>
                 <span className="tx-foot-cell">{totals.defQty === null ? "—" : formatQty2dp(totals.defQty)}</span>
-                <span className="tx-foot-cell">{totals.total === null || currency === null ? "—" : formatMoney(totals.total, currency)}</span>
+                <span className="tx-foot-cell">{totals.total === null || currency === null ? "—" : dropCountry(formatMoney(totals.total, currency))}</span>
                 <span />
                 <span />
                 <span />

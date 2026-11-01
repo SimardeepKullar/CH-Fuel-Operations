@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { InvoiceCurrency } from "@ch/core/db/types";
-import { RATE_PENDING, formatPricePerUnit } from "../lib/formatMoney";
+import { RATE_PENDING, dropCountry, formatPricePerUnit } from "../lib/formatMoney";
 
 interface BilledPriceProps {
   /** Per gallon or per litre, whichever the row is in; the column header names
@@ -11,6 +11,8 @@ interface BilledPriceProps {
   currency: InvoiceCurrency;
   /** The row asked for a conversion whose rate is not entered (T-66): "rate pending", not "—". */
   ratePending?: boolean;
+  /** Print `$` rather than `US$`/`CA$` — the column header already names the currency. */
+  bareDollar?: boolean;
 }
 
 // Inline, not a CSS class: T-40 step 40.1 asserts the size
@@ -31,11 +33,11 @@ const valueStyle: CSSProperties = {
  * A9.1: billed price per unit, the dominant numeral in its row (4dp). The
  * retail price and the discount under it are not shown (T-80).
  */
-export default function BilledPrice({ billedPerUnit, currency, ratePending = false }: BilledPriceProps) {
+export default function BilledPrice({ billedPerUnit, currency, ratePending = false, bareDollar = false }: BilledPriceProps) {
   return (
     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
       <span data-testid="billed-price-value" style={valueStyle}>
-        {billedPerUnit === null ? (ratePending ? RATE_PENDING : "—") : formatPricePerUnit(billedPerUnit, currency)}
+        {billedPerUnit === null ? (ratePending ? RATE_PENDING : "—") : (bareDollar ? dropCountry : (text: string) => text)(formatPricePerUnit(billedPerUnit, currency))}
       </span>
     </span>
   );

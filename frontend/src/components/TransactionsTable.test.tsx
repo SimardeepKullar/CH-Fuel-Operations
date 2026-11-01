@@ -246,7 +246,7 @@ describe("TransactionsTable", () => {
     expect(flags.textContent).toContain("Sub-gal");
   });
 
-  it("a US week reads Diesel gal, DEF gal and USD headers with US$ cells and footer", () => {
+  it("a US week reads Diesel gal, DEF gal and USD headers with bare $ cells and footer (the header names the currency)", () => {
     render(<TransactionsTable {...baseProps([stop()])} />);
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Diesel gal");
@@ -254,12 +254,12 @@ describe("TransactionsTable", () => {
     expect(head).toContain("DEF gal");
     expect(head).not.toContain("Retail");
     expect(head).toContain("Total USD");
-    expect(document.querySelector(".tx-total")!.textContent).toBe("US$238.26");
-    expect(document.querySelector(".tx-foot-row")!.textContent).toContain("US$238.26");
+    expect(document.querySelector(".tx-total")!.textContent).toBe("$238.26");
+    expect(document.querySelector(".tx-foot-row")!.textContent).toContain("$238.26");
     expect(document.querySelector(".tx-caption")!.textContent).toContain("All amounts USD.");
   });
 
-  it("a CA week reads Diesel L and CAD headers with CA$ cells — never a bare dollar sign", () => {
+  it("a CA week reads Diesel L and CAD headers with bare $ cells under a CAD header", () => {
     render(<TransactionsTable {...baseProps([caStop()])} currency="CAD" qtyUnit="L" />);
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Diesel L");
@@ -267,11 +267,11 @@ describe("TransactionsTable", () => {
     expect(head).toContain("DEF L");
     expect(head).not.toContain("Retail");
     expect(head).toContain("Total CAD");
-    expect(document.querySelector(".tx-total")!.textContent).toBe("CA$215.22");
-    expect(screen.getByTestId("billed-price-value").textContent).toBe("CA$1.9046");
+    expect(document.querySelector(".tx-total")!.textContent).toBe("$215.22");
+    expect(screen.getByTestId("billed-price-value").textContent).toBe("$1.9046");
     const body = document.querySelector(".tx-row")!.textContent!;
     expect(body).toContain("100.00");
-    expect(body).not.toMatch(/(^|[^A-Z])\$\d/);
+    expect(body).not.toMatch(/CA\$|US\$/);
     expect(document.querySelector(".tx-caption")!.textContent).toContain("All amounts CAD.");
   });
 
@@ -287,7 +287,7 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable {...baseProps([both])} />);
     const cells = [...document.querySelectorAll(".tx-row .tx-gal")].map((c) => c.textContent);
     expect(cells).toEqual(["148.64", "13.28"]);
-    expect(document.querySelector(".tx-total")!.textContent).toBe("US$874.70");
+    expect(document.querySelector(".tx-total")!.textContent).toBe("$874.70");
   });
 
   it("a DEF-only stop shows — under the diesel columns, its DEF quantity and a DEF badge; a diesel-only stop shows — under DEF", () => {
@@ -312,7 +312,7 @@ describe("TransactionsTable", () => {
     const foot = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
     expect(foot[0]).toBe("40.00");
     expect(foot[2]).toBe("13.28");
-    expect(foot[3]).toBe("US$295.44");
+    expect(foot[3]).toBe("$295.44");
   });
 
   it("footer totals sum litres and CAD for a CA side", () => {
@@ -320,8 +320,8 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable {...baseProps(rows)} currency="CAD" qtyUnit="L" />);
     const foot = document.querySelector(".tx-foot-row")!.textContent!;
     expect(foot).toContain("150.00");
-    expect(foot).toContain("CA$322.83");
-    expect(foot).toContain("CA$1.9046");
+    expect(foot).toContain("$322.83");
+    expect(foot).toContain("$1.9046");
   });
 
   it("headers follow the rows when the caller's requested side disagrees", () => {
@@ -355,7 +355,7 @@ describe("TransactionsTable", () => {
     const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
     expect(cells[0]).toBe("66.42");
     expect(cells[2]).toBe("3.00");
-    expect(cells[3]).toBe("US$395.22");
+    expect(cells[3]).toBe("$395.22");
     expect(cells[1]).not.toBe("—");
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Diesel billed USD/gal");

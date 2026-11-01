@@ -1416,7 +1416,7 @@ select.tx-filter-select {
 }
 .stop-expansion-line { padding: 0.4375rem 0; border-bottom: 1px solid var(--color-divider); }
 .stop-expansion-line-label { font: 600 0.75rem var(--font-body); color: var(--color-accent-800); }
-.stop-expansion-line-billed { font: 700 0.8125rem var(--font-heading); color: var(--color-accent-800); }
+.stop-expansion-line-billed { font: 700 1rem var(--font-heading); color: var(--color-accent-800); }
 .stop-expansion-total { padding: 0.625rem 0 0; }
 .stop-expansion-total-label {
   font: 600 0.625rem var(--font-heading);
