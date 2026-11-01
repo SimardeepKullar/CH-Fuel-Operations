@@ -99,12 +99,15 @@ describe("StopExpansion", () => {
     expect(screen.getByText("Invoice 999210")).toBeTruthy();
   });
 
-  it("a CA stop shows litres, CAD headers and Pre-tax, HST, GST, PST, QST and Final separately", () => {
+  it("a CA stop shows litres, CAD headers and Pre-tax, HST and Final, with no GST, PST or QST while all three are zero", () => {
     render(<StopExpansion stop={CA_STOP} />);
     const head = document.querySelector(".stop-expansion-lines-head")!.textContent!;
-    for (const label of ["Litres", "Billed CAD/L", "Pre-tax CAD", "HST CAD", "GST CAD", "PST CAD", "QST CAD", "Final CAD"]) {
+    for (const label of ["Litres", "Billed CAD/L", "Pre-tax CAD", "HST CAD", "Final CAD"]) {
       expect(head).toContain(label);
     }
+    for (const label of ["GST", "PST", "QST"]) expect(head).not.toContain(label);
+    for (const id of ["stop-gst", "stop-pst", "stop-qst"]) expect(screen.queryByTestId(id)).toBeNull();
+    expect(document.querySelector(".stop-expansion-lines-head")!.children).toHaveLength(7);
     const line = document.querySelector(".stop-expansion-line")!.textContent!;
     expect(line).toContain("100.00");
     expect(line).toContain("CA$2.1522");
@@ -114,6 +117,20 @@ describe("StopExpansion", () => {
     expect(screen.getByTestId("stop-pretax").textContent).toBe("CA$190.46");
     expect(screen.getByTestId("stop-hst").textContent).toBe("CA$24.76");
     expect(screen.getByTestId("stop-total").textContent).toBe("CA$215.22");
+  });
+
+  it("a CA stop with a non-zero GST, PST or QST shows all three, so Pre-tax + taxes still adds up to Final", () => {
+    const stop: TransactionListItem = {
+      ...CA_STOP,
+      lines: [{ ...CA_STOP.lines![0]!, preTaxAmount: 100, hst: 0, gst: 5, pst: 7, qst: 0, amount: 112 }],
+      total: 112,
+    };
+    render(<StopExpansion stop={stop} />);
+    const head = document.querySelector(".stop-expansion-lines-head")!.textContent!;
+    for (const label of ["GST CAD", "PST CAD", "QST CAD"]) expect(head).toContain(label);
+    expect(document.querySelector(".stop-expansion-lines-head")!.children).toHaveLength(10);
+    expect(screen.getByTestId("stop-gst").textContent).toBe("CA$5.00");
+    expect(screen.getByTestId("stop-pst").textContent).toBe("CA$7.00");
   });
 
   it("a CA stop's Pre-tax total is an em dash when a line printed no Pre Tax AMT, not a sum that leaves it out", () => {

@@ -59,7 +59,10 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
   const unit = lines[0]?.qtyUnit ?? stop.qtyUnit;
   const perUnit = unit === "L" ? "/L" : "/gal";
   const showTax = stop.invoiceCurrency === "CAD";
-  const rowClass = showTax ? " stop-expansion-line-row-tax" : "";
+  // GST, PST and QST are zero on nearly every Canadian line, so they get columns only on a stop where
+  // one is not: the HST view is Pre-tax + HST = Final, and a non-zero other tax must stay visible for that to add up.
+  const showOtherTax = showTax && lines.some((line) => [line.gst, line.pst, line.qst].some((tax) => (tax ?? 0) !== 0));
+  const rowClass = showOtherTax ? " stop-expansion-line-row-tax" : showTax ? " stop-expansion-line-row-hst" : "";
   // A line BVD printed no Pre Tax AMT for (Scale, Manual, Express) makes the
   // column's sum meaningless — "—", not a total that leaves that line out.
   const preTaxKnown = lines.length > 0 && lines.every((line) => line.preTaxAmount !== null);
@@ -79,9 +82,13 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
             <>
               <span className="num">{`Pre-tax ${currency}`}</span>
               <span className="num">{`HST ${currency}`}</span>
-              <span className="num">{`GST ${currency}`}</span>
-              <span className="num">{`PST ${currency}`}</span>
-              <span className="num">{`QST ${currency}`}</span>
+              {showOtherTax && (
+                <>
+                  <span className="num">{`GST ${currency}`}</span>
+                  <span className="num">{`PST ${currency}`}</span>
+                  <span className="num">{`QST ${currency}`}</span>
+                </>
+              )}
               <span className="num">{`Final ${currency}`}</span>
             </>
           ) : (
@@ -100,9 +107,13 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
                   {line.preTaxAmount === null && !pending ? "—" : formatMoneyOrPending(line.preTaxAmount, line.currency)}
                 </span>
                 <span className="num">{formatMoneyOrPending(line.hst, line.currency)}</span>
-                <span className="num">{formatMoneyOrPending(line.gst, line.currency)}</span>
-                <span className="num">{formatMoneyOrPending(line.pst, line.currency)}</span>
-                <span className="num">{formatMoneyOrPending(line.qst, line.currency)}</span>
+                {showOtherTax && (
+                  <>
+                    <span className="num">{formatMoneyOrPending(line.gst, line.currency)}</span>
+                    <span className="num">{formatMoneyOrPending(line.pst, line.currency)}</span>
+                    <span className="num">{formatMoneyOrPending(line.qst, line.currency)}</span>
+                  </>
+                )}
                 <span className="num">{formatMoneyOrPending(line.amount, line.currency)}</span>
               </>
             ) : (
@@ -123,15 +134,19 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
               <span className="num muted" data-testid="stop-hst">
                 {taxTotal((line) => line.hst)}
               </span>
-              <span className="num muted" data-testid="stop-gst">
-                {taxTotal((line) => line.gst)}
-              </span>
-              <span className="num muted" data-testid="stop-pst">
-                {taxTotal((line) => line.pst)}
-              </span>
-              <span className="num muted" data-testid="stop-qst">
-                {taxTotal((line) => line.qst)}
-              </span>
+              {showOtherTax && (
+                <>
+                  <span className="num muted" data-testid="stop-gst">
+                    {taxTotal((line) => line.gst)}
+                  </span>
+                  <span className="num muted" data-testid="stop-pst">
+                    {taxTotal((line) => line.pst)}
+                  </span>
+                  <span className="num muted" data-testid="stop-qst">
+                    {taxTotal((line) => line.qst)}
+                  </span>
+                </>
+              )}
             </>
           )}
           <span className="num stop-expansion-total-value" data-testid="stop-total">
