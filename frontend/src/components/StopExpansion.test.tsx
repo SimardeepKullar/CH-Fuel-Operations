@@ -102,7 +102,7 @@ describe("StopExpansion", () => {
   it("a CA stop shows litres, CAD headers and Pre-tax, HST, GST, PST, QST and Final separately", () => {
     render(<StopExpansion stop={CA_STOP} />);
     const head = document.querySelector(".stop-expansion-lines-head")!.textContent!;
-    for (const label of ["Litres", "Retail CAD/L", "Billed CAD/L", "Pre-tax CAD", "HST CAD", "GST CAD", "PST CAD", "QST CAD", "Final CAD"]) {
+    for (const label of ["Litres", "Billed CAD/L", "Pre-tax CAD", "HST CAD", "GST CAD", "PST CAD", "QST CAD", "Final CAD"]) {
       expect(head).toContain(label);
     }
     const line = document.querySelector(".stop-expansion-line")!.textContent!;

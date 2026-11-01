@@ -74,7 +74,6 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
           <span>Cd</span>
           <span>Product</span>
           <span className="num">{QTY_UNIT_NAMES[unit]}</span>
-          <span className="num">{`Retail ${currency}${perUnit}`}</span>
           <span className="num">{`Billed ${currency}${perUnit}`}</span>
           {showTax ? (
             <>
@@ -94,7 +93,6 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
             <span className="mono">{line.productCode}</span>
             <span className="stop-expansion-line-label">{productLabel(line.productCode)}</span>
             <span className="num">{formatQty2dp(line.qty)}</span>
-            <span className="num muted">{formatPriceOrPending(line.retailPerUnit, line.currency)}</span>
             <span className="num stop-expansion-line-billed">{formatPriceOrPending(line.billedPerUnit, line.currency)}</span>
             {showTax ? (
               <>
@@ -116,7 +114,6 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
           <span />
           <span className="stop-expansion-total-label">Stop total</span>
           <span className="num muted">{stop.qty === null ? "—" : formatQty2dp(stop.qty)}</span>
-          <span />
           <span />
           {showTax && (
             <>

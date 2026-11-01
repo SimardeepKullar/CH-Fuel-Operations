@@ -164,17 +164,6 @@ function buildColumns(
         />
       ),
     }),
-    columnHelper.display({
-      id: "retail",
-      header: perUnitHeader("Retail", currency, unit),
-      cell: ({ row }) => (
-        <span className="muted">
-          {row.original.retailPerUnit === null && row.original.ratePending !== true
-            ? "—"
-            : formatPriceOrPending(row.original.retailPerUnit, row.original.currency)}
-        </span>
-      ),
-    }),
     columnHelper.accessor("total", {
       header: currency === null ? "Total" : `Total ${currency}`,
       cell: ({ row }) => <span className="tx-total">{formatMoneyOrPending(row.original.total, row.original.currency)}</span>,
@@ -358,7 +347,6 @@ export default function TransactionsTable({
     let qty = 0;
     let hasQty = false;
     let weightedBilled = 0;
-    let weightedRetail = 0;
     for (const row of rows) {
       // A rate-pending row has no prices, but its quantity is not money and still adds up.
       const priced = row.billedPerUnit !== null && row.retailPerUnit !== null;
@@ -367,7 +355,6 @@ export default function TransactionsTable({
         qty += row.qty;
         if (priced) {
           weightedBilled += row.qty * row.billedPerUnit!;
-          weightedRetail += row.qty * row.retailPerUnit!;
         }
       }
     }
@@ -375,7 +362,6 @@ export default function TransactionsTable({
     return {
       qty: unit !== null && hasQty ? qty : null,
       avgBilled: priced ? weightedBilled / qty : null,
-      avgRetail: priced ? weightedRetail / qty : null,
       total: currency !== null && !ratePending ? sumMoney(rows.map((row) => row.total ?? 0)) : null,
     };
   }, [rows, currency, unit, ratePending]);
@@ -402,7 +388,7 @@ export default function TransactionsTable({
               {table.getHeaderGroups()[0]!.headers.map((header) => (
                 <span
                   key={header.id}
-                  className={`tx-head-cell${["gallons", "billed", "retail", "total"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
+                  className={`tx-head-cell${["gallons", "billed", "total"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
                   {...(header.id === "occurredAt"
                     ? { role: "columnheader", "aria-sort": filters.sort === "asc" ? ("ascending" as const) : ("descending" as const) }
                     : {})}
@@ -468,7 +454,7 @@ export default function TransactionsTable({
                         ) : (
                           <span
                             key={cell.id}
-                            className={`tx-cell${["gallons", "billed", "retail", "total"].includes(cell.column.id) ? " num" : ""}`}
+                            className={`tx-cell${["gallons", "billed", "total"].includes(cell.column.id) ? " num" : ""}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </span>
@@ -489,9 +475,6 @@ export default function TransactionsTable({
                 <span className="tx-foot-cell">{totals.qty === null ? "—" : formatQty2dp(totals.qty)}</span>
                 <span className="tx-foot-cell tx-foot-billed">
                   {totals.avgBilled === null || currency === null ? "—" : formatPricePerUnit(totals.avgBilled, currency)}
-                </span>
-                <span className="tx-foot-cell muted">
-                  {totals.avgRetail === null || currency === null ? "—" : formatPricePerUnit(totals.avgRetail, currency)}
                 </span>
                 <span className="tx-foot-cell">{totals.total === null || currency === null ? "—" : formatMoney(totals.total, currency)}</span>
                 <span />

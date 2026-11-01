@@ -251,7 +251,7 @@ describe("TransactionsTable", () => {
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Gallons");
     expect(head).toContain("Billed USD/gal");
-    expect(head).toContain("Retail USD/gal");
+    expect(head).not.toContain("Retail");
     expect(head).toContain("Total USD");
     expect(document.querySelector(".tx-total")!.textContent).toBe("US$238.26");
     expect(document.querySelector(".tx-foot-row")!.textContent).toContain("US$238.26");
@@ -263,7 +263,7 @@ describe("TransactionsTable", () => {
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Litres");
     expect(head).toContain("Billed CAD/L");
-    expect(head).toContain("Retail CAD/L");
+    expect(head).not.toContain("Retail");
     expect(head).toContain("Total CAD");
     expect(document.querySelector(".tx-total")!.textContent).toBe("CA$215.22");
     expect(screen.getByTestId("billed-price-value").textContent).toBe("CA$1.9046");
@@ -291,7 +291,7 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable {...baseProps([stop(), caStop()])} />);
     const foot = document.querySelector(".tx-foot-row")!;
     const cells = [...foot.querySelectorAll(".tx-foot-cell")].map((c) => c.textContent);
-    expect(cells).toEqual(["—", "—", "—", "—"]);
+    expect(cells).toEqual(["—", "—", "—"]);
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Quantity");
     expect(head).toContain("Billed per unit");
@@ -311,7 +311,7 @@ describe("TransactionsTable", () => {
 
     const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
     expect(cells[0]).toBe("66.42");
-    expect(cells[3]).toBe("US$395.22");
+    expect(cells[2]).toBe("US$395.22");
     expect(cells[1]).not.toBe("—");
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Billed USD/gal");
@@ -332,7 +332,7 @@ describe("TransactionsTable", () => {
     expect(caRowText).toContain("rate pending");
     expect(caRowText).not.toContain("1.00");
     const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
-    expect(cells).toEqual(["66.42", "—", "—", "—"]);
+    expect(cells).toEqual(["66.42", "—", "—"]);
     expect(screen.getByTestId("conversion-pending").textContent).toContain("rate pending — enter the exchange rate on the Overview");
     expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?scope=week&w=2026-09-09");
     expect(screen.queryByTestId("fx-rate-line")).toBeNull();
