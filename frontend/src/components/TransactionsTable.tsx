@@ -14,7 +14,6 @@ import Link from "next/link";
 import {
     formatMoney,
   formatMoneyOrPending,
-  formatPriceOrPending,
   formatPricePerUnit,
   formatQty2dp,
   sumMoney,
