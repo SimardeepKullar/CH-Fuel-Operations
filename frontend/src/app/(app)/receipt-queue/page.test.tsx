@@ -76,6 +76,12 @@ describe("Receipt Queue — table", () => {
     expect(text).toContain("80.00 L");
   });
 
+  it("heads the quantity column Diesel — the figure is the diesel line's", async () => {
+    await renderPage([item("a")]);
+    expect(screen.getByRole("columnheader", { name: "Diesel" })).toBeTruthy();
+    expect(screen.queryByRole("columnheader", { name: "Quantity" })).toBeNull();
+  });
+
   it("names the products each row bought, one badge per product", async () => {
     await renderPage([item("a", { products: ["DF", "TA"] }), item("b", { products: ["TA"] })]);
     const [first, second] = screen.getAllByTestId("queue-products");

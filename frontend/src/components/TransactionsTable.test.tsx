@@ -246,11 +246,12 @@ describe("TransactionsTable", () => {
     expect(flags.textContent).toContain("Sub-gal");
   });
 
-  it("a US week reads Gallons and USD headers with US$ cells and footer", () => {
+  it("a US week reads Diesel gal, DEF gal and USD headers with US$ cells and footer", () => {
     render(<TransactionsTable {...baseProps([stop()])} />);
     const head = document.querySelector(".tx-head-row")!.textContent!;
-    expect(head).toContain("Gallons");
-    expect(head).toContain("Billed USD/gal");
+    expect(head).toContain("Diesel gal");
+    expect(head).toContain("Diesel billed USD/gal");
+    expect(head).toContain("DEF gal");
     expect(head).not.toContain("Retail");
     expect(head).toContain("Total USD");
     expect(document.querySelector(".tx-total")!.textContent).toBe("US$238.26");
@@ -258,11 +259,12 @@ describe("TransactionsTable", () => {
     expect(document.querySelector(".tx-caption")!.textContent).toContain("All amounts USD.");
   });
 
-  it("a CA week reads Litres and CAD headers with CA$ cells — never a bare dollar sign", () => {
+  it("a CA week reads Diesel L and CAD headers with CA$ cells — never a bare dollar sign", () => {
     render(<TransactionsTable {...baseProps([caStop()])} currency="CAD" qtyUnit="L" />);
     const head = document.querySelector(".tx-head-row")!.textContent!;
-    expect(head).toContain("Litres");
-    expect(head).toContain("Billed CAD/L");
+    expect(head).toContain("Diesel L");
+    expect(head).toContain("Diesel billed CAD/L");
+    expect(head).toContain("DEF L");
     expect(head).not.toContain("Retail");
     expect(head).toContain("Total CAD");
     expect(document.querySelector(".tx-total")!.textContent).toBe("CA$215.22");
@@ -271,6 +273,46 @@ describe("TransactionsTable", () => {
     expect(body).toContain("100.00");
     expect(body).not.toMatch(/(^|[^A-Z])\$\d/);
     expect(document.querySelector(".tx-caption")!.textContent).toContain("All amounts CAD.");
+  });
+
+  it("a diesel + DEF stop shows each quantity in its own cell and leaves the total whole", () => {
+    const both = stop({
+      qty: 148.64,
+      total: 874.7,
+      lines: [
+        { productCode: "TA", qty: 148.64, retailPerUnit: 5.8, billedPerUnit: 5.5, amount: 817.52, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
+        { productCode: "DF", qty: 13.28, retailPerUnit: 4.5, billedPerUnit: 4.3, amount: 57.18, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" },
+      ],
+    });
+    render(<TransactionsTable {...baseProps([both])} />);
+    const cells = [...document.querySelectorAll(".tx-row .tx-gal")].map((c) => c.textContent);
+    expect(cells).toEqual(["148.64", "13.28"]);
+    expect(document.querySelector(".tx-total")!.textContent).toBe("US$874.70");
+  });
+
+  it("a DEF-only stop shows — under the diesel columns, its DEF quantity and a DEF badge; a diesel-only stop shows — under DEF", () => {
+    const defOnly = stop({
+      id: "def-only",
+      qty: null,
+      billedPerUnit: null,
+      retailPerUnit: null,
+      total: 57.18,
+      lines: [{ productCode: "DF", qty: 13.28, retailPerUnit: 4.5, billedPerUnit: 4.3, amount: 57.18, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" }],
+    });
+    const dieselOnly = stop({
+      id: "diesel-only",
+      lines: [{ productCode: "TA", qty: 40, retailPerUnit: 5.799, billedPerUnit: 5.499, amount: 219.96, preTaxAmount: null, hst: 0, gst: 0, pst: 0, qst: 0, qtyUnit: "gal", currency: "USD" }],
+    });
+    render(<TransactionsTable {...baseProps([defOnly, dieselOnly])} />);
+    const rows = [...document.querySelectorAll(".tx-row")];
+    expect([...rows[0]!.querySelectorAll(".tx-gal")].map((c) => c.textContent)).toEqual(["—", "13.28"]);
+    expect(rows[0]!.querySelector(".product-badge-def")).not.toBeNull();
+    expect([...rows[1]!.querySelectorAll(".tx-gal")].map((c) => c.textContent)).toEqual(["40.00", "—"]);
+    // Diesel and DEF totals stay separate; the total is the sum of stop totals.
+    const foot = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
+    expect(foot[0]).toBe("40.00");
+    expect(foot[2]).toBe("13.28");
+    expect(foot[3]).toBe("US$295.44");
   });
 
   it("footer totals sum litres and CAD for a CA side", () => {
@@ -291,10 +333,11 @@ describe("TransactionsTable", () => {
     render(<TransactionsTable {...baseProps([stop(), caStop()])} />);
     const foot = document.querySelector(".tx-foot-row")!;
     const cells = [...foot.querySelectorAll(".tx-foot-cell")].map((c) => c.textContent);
-    expect(cells).toEqual(["—", "—", "—"]);
+    expect(cells).toEqual(["—", "—", "—", "—"]);
     const head = document.querySelector(".tx-head-row")!.textContent!;
-    expect(head).toContain("Quantity");
-    expect(head).toContain("Billed per unit");
+    expect(head).toContain("Diesel qty");
+    expect(head).toContain("Diesel billed per unit");
+    expect(head).toContain("DEF qty");
     expect(head).toContain("Total");
     expect(head).not.toContain("Total USD");
     const rowsText = [...document.querySelectorAll(".tx-row")].map((r) => r.textContent!);
@@ -311,10 +354,12 @@ describe("TransactionsTable", () => {
 
     const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
     expect(cells[0]).toBe("66.42");
-    expect(cells[2]).toBe("US$395.22");
+    expect(cells[2]).toBe("3.00");
+    expect(cells[3]).toBe("US$395.22");
     expect(cells[1]).not.toBe("—");
     const head = document.querySelector(".tx-head-row")!.textContent!;
-    expect(head).toContain("Billed USD/gal");
+    expect(head).toContain("Diesel billed USD/gal");
+    expect(head).toContain("DEF gal");
     expect(head).toContain("Total USD");
     expect(document.querySelector(".tx-caption")!.textContent).toContain("All amounts USD.");
     expect(screen.getByTestId("fx-rate-line").textContent).toContain("Converted at 1.3712 CAD per USD, entered Oct 6, 2026");
@@ -332,7 +377,7 @@ describe("TransactionsTable", () => {
     expect(caRowText).toContain("rate pending");
     expect(caRowText).not.toContain("1.00");
     const cells = [...document.querySelectorAll(".tx-foot-row .tx-foot-cell")].map((c) => c.textContent);
-    expect(cells).toEqual(["66.42", "—", "—"]);
+    expect(cells).toEqual(["66.42", "—", "3.00", "—"]);
     expect(screen.getByTestId("conversion-pending").textContent).toContain("rate pending — enter the exchange rate on the Overview");
     expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?scope=week&w=2026-09-09");
     expect(screen.queryByTestId("fx-rate-line")).toBeNull();

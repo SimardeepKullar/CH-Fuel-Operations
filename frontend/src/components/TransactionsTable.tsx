@@ -12,8 +12,7 @@ import type { InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "@ch/core/db
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
 import Link from "next/link";
 import {
-  QTY_UNIT_NAMES,
-  formatMoney,
+    formatMoney,
   formatMoneyOrPending,
   formatPriceOrPending,
   formatPricePerUnit,
@@ -22,7 +21,7 @@ import {
 } from "../lib/formatMoney";
 import { formatFxEnteredAt } from "../lib/conversion";
 import InvoiceTag from "./InvoiceTag";
-import { productBadgeVariant, productLabel } from "../lib/transactionFilterConstants";
+import { defQty, productBadgeVariant, productLabel } from "../lib/transactionFilterConstants";
 import type { FilterOption } from "../hooks/useTransactionFilterOptions";
 import type { TransactionFiltersState } from "../hooks/useTransactionFilters";
 import type { ChipPatch } from "../lib/transactionFilterChips";
@@ -72,6 +71,11 @@ const columnHelper = createColumnHelper<TransactionListItem>();
 function perUnitHeader(prefix: string, currency: InvoiceCurrency | null, unit: InvoiceQtyUnit | null): string {
   if (currency !== null) return `${prefix} ${currency}${unit === null ? " per unit" : `/${unit}`}`;
   return `${prefix} per ${unit ?? "unit"}`;
+}
+
+/** A quantity header's unit: `gal`, `L`, or `qty` when the rows mix units. */
+function qtyHeader(prefix: string, unit: InvoiceQtyUnit | null): string {
+  return `${prefix} ${unit ?? "qty"}`;
 }
 
 /** The columns for the rows' currency and unit — `null` where the rows hold more
@@ -141,7 +145,7 @@ function buildColumns(
     }),
     columnHelper.display({
       id: "gallons",
-      header: unit === null ? "Quantity" : QTY_UNIT_NAMES[unit],
+      header: qtyHeader("Diesel", unit),
       cell: ({ row }) => (
         <span className="tx-gal">
             {row.original.qty === null
@@ -154,7 +158,7 @@ function buildColumns(
     }),
     columnHelper.display({
       id: "billed",
-      header: perUnitHeader("Billed", currency, unit),
+      header: perUnitHeader("Diesel billed", currency, unit),
       cell: ({ row }) => (
         <BilledPrice
           billedPerUnit={row.original.billedPerUnit}
@@ -163,6 +167,23 @@ function buildColumns(
           ratePending={row.original.ratePending === true}
         />
       ),
+    }),
+    columnHelper.display({
+      id: "def",
+      header: qtyHeader("DEF", unit),
+      // Lines convert with the stop (one `qtyConverter`), so this is in the same unit as the diesel cell.
+      cell: ({ row }) => {
+        const qty = defQty(row.original.lines);
+        return (
+          <span className="tx-gal">
+            {qty === null
+              ? "—"
+              : unit === null
+                ? `${formatQty2dp(qty)} ${row.original.qtyUnit}`
+                : formatQty2dp(qty)}
+          </span>
+        );
+      },
     }),
     columnHelper.accessor("total", {
       header: currency === null ? "Total" : `Total ${currency}`,
@@ -347,7 +368,14 @@ export default function TransactionsTable({
     let qty = 0;
     let hasQty = false;
     let weightedBilled = 0;
+    let defTotal = 0;
+    let hasDef = false;
     for (const row of rows) {
+      const def = defQty(row.lines);
+      if (def !== null) {
+        hasDef = true;
+        defTotal += def;
+      }
       // A rate-pending row has no prices, but its quantity is not money and still adds up.
       const priced = row.billedPerUnit !== null && row.retailPerUnit !== null;
       if (row.qty !== null && (priced || row.ratePending === true)) {
@@ -361,6 +389,7 @@ export default function TransactionsTable({
     const priced = currency !== null && unit !== null && hasQty && qty > 0 && !ratePending;
     return {
       qty: unit !== null && hasQty ? qty : null,
+      defQty: unit !== null && hasDef ? defTotal : null,
       avgBilled: priced ? weightedBilled / qty : null,
       total: currency !== null && !ratePending ? sumMoney(rows.map((row) => row.total ?? 0)) : null,
     };
@@ -388,7 +417,7 @@ export default function TransactionsTable({
               {table.getHeaderGroups()[0]!.headers.map((header) => (
                 <span
                   key={header.id}
-                  className={`tx-head-cell${["gallons", "billed", "total"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
+                  className={`tx-head-cell${["gallons", "billed", "def", "total"].includes(header.id) ? " num" : ""}${header.id === "billed" ? " tx-head-billed" : ""}`}
                   {...(header.id === "occurredAt"
                     ? { role: "columnheader", "aria-sort": filters.sort === "asc" ? ("ascending" as const) : ("descending" as const) }
                     : {})}
@@ -454,7 +483,7 @@ export default function TransactionsTable({
                         ) : (
                           <span
                             key={cell.id}
-                            className={`tx-cell${["gallons", "billed", "total"].includes(cell.column.id) ? " num" : ""}`}
+                            className={`tx-cell${["gallons", "billed", "def", "total"].includes(cell.column.id) ? " num" : ""}`}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </span>
@@ -476,6 +505,7 @@ export default function TransactionsTable({
                 <span className="tx-foot-cell tx-foot-billed">
                   {totals.avgBilled === null || currency === null ? "—" : formatPricePerUnit(totals.avgBilled, currency)}
                 </span>
+                <span className="tx-foot-cell">{totals.defQty === null ? "—" : formatQty2dp(totals.defQty)}</span>
                 <span className="tx-foot-cell">{totals.total === null || currency === null ? "—" : formatMoney(totals.total, currency)}</span>
                 <span />
                 <span />

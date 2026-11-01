@@ -1267,10 +1267,10 @@ select.tx-filter-select {
 
 .tx-panel { position: relative; background: var(--color-surface); border: 1px solid var(--color-border); }
 .tx-scroll { overflow-x: auto; }
-.tx-scroll-inner { min-width: 74.375rem; }
+.tx-scroll-inner { min-width: 79.125rem; }
 .tx-row-grid {
   display: grid;
-  grid-template-columns: 1.75rem 6.25rem 6rem 9.375rem 6rem 10.625rem 4.75rem 6rem 6rem 3.25rem 6.25rem 8.125rem;
+  grid-template-columns: 1.75rem 6.25rem 6rem 9.375rem 6rem 10.625rem 4.75rem 6rem 4.75rem 6rem 3.25rem 6.25rem 8.125rem;
 }
 .tx-head-row {
   align-items: end;

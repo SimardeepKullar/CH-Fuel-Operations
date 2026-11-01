@@ -80,12 +80,11 @@ describe("StopExpansion", () => {
     expect(screen.getByText("Unresolved").textContent).toBe("Unresolved");
   });
 
-  it("gallons render em-dash, never 0, when the stop carries no TA line", () => {
-    const stop: TransactionListItem = { ...A900000001, qty: null, lines: [] };
-    render(<StopExpansion stop={stop} />);
+  it("the Stop total row carries no quantity — it sits under a column listing every product", () => {
+    render(<StopExpansion stop={A900000001} />);
     const total = screen.getByTestId("stop-total").closest(".stop-expansion-total")!;
-    expect(total.textContent).toContain("—");
-    expect(total.textContent).not.toContain("0.00 gal");
+    expect(total.textContent).toBe(`Stop total${screen.getByTestId("stop-total").textContent}`);
+    expect(total.textContent).not.toMatch(/\d+\.\d\d gal/);
   });
 
   it("stacked forces a single-column layout (900px requirement) rather than a two-column overlap", () => {

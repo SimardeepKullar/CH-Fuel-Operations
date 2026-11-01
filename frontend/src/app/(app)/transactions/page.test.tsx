@@ -279,7 +279,7 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(chipStates()).toEqual({ USD: "not-in-view", CAD: "in-view", all: "not-in-view" });
     expect(pressed()).toBe("CAD/L");
     const head = document.querySelector(".tx-head-row")!.textContent!;
-    expect(head).toContain("Litres");
+    expect(head).toContain("Diesel L");
     expect(head).toContain("Total CAD");
     expect(document.querySelector(".tx-total")!.textContent).toBe("CA$215.22");
     expect(listDrivers).toHaveBeenLastCalledWith("2026-09-09", "CAD");
@@ -320,7 +320,7 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
 
     await waitFor(() => expect(lastTableRequest()).toMatchObject({ currency: "CAD", units: "imperial", convertTo: "USD" }));
     await waitFor(() => expect(document.querySelector(".tx-total")!.textContent).toBe("US$156.96"));
-    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Billed USD/gal");
+    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Diesel billed USD/gal");
     expect(screen.getByTestId("fx-rate-line").textContent).toContain("Converted at 1.3712 CAD per USD, entered Oct 6, 2026");
     expect(screen.queryByTestId("conversion-pending")).toBeNull();
     expect(pressed()).toBe("USD/gal");

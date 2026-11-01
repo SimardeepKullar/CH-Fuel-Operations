@@ -124,7 +124,7 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
         <div className={`stop-expansion-line-row stop-expansion-total${rowClass}`}>
           <span />
           <span className="stop-expansion-total-label">Stop total</span>
-          <span className="num muted">{stop.qty === null ? "—" : formatQty2dp(stop.qty)}</span>
+          <span />
           <span />
           {showTax && (
             <>
