@@ -94,7 +94,7 @@ describe("TransactionsTable", () => {
     expect(document.querySelectorAll(".tx-scroll").length).toBe(1);
   });
 
-  it("expanding A900000001 shows both product lines and an unmissable stop total of US$238.26", () => {
+  it("expanding A900000001 shows both product lines and an unmissable stop total of $238.26", () => {
     render(<TransactionsTable {...baseProps([stop()])} />);
     expect(screen.queryByTestId("stop-expansion")).toBeNull();
 
@@ -102,7 +102,7 @@ describe("TransactionsTable", () => {
 
     expect(screen.getByText("TA")).toBeTruthy();
     expect(screen.getByText("DF")).toBeTruthy();
-    expect(screen.getByTestId("stop-total").textContent).toBe("US$238.26");
+    expect(screen.getByTestId("stop-total").textContent).toBe("$238.26");
   });
 
   it("clicking an expanded row's own toggle collapses it again", () => {

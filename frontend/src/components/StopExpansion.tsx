@@ -1,5 +1,17 @@
 import type { TransactionListItem } from "@ch/core/actuals/transactions";
-import { QTY_UNIT_NAMES, RATE_PENDING, formatMoneyOrPending, formatPriceOrPending, formatQty2dp, sumMoney } from "../lib/formatMoney";
+import {
+  QTY_UNIT_NAMES,
+  RATE_PENDING,
+  dropCountry,
+  formatMoneyOrPending as formatMoneyWithCountry,
+  formatPriceOrPending as formatPriceWithCountry,
+  formatQty2dp,
+  sumMoney,
+} from "../lib/formatMoney";
+
+// A stop is one currency and its column headers name it, so money prints a bare `$` (T-80).
+const formatMoneyOrPending: typeof formatMoneyWithCountry = (amount, currency) => dropCountry(formatMoneyWithCountry(amount, currency));
+const formatPriceOrPending: typeof formatPriceWithCountry = (price, currency) => dropCountry(formatPriceWithCountry(price, currency));
 import { productLabel } from "../lib/transactionFilterConstants";
 import RawResolved from "./RawResolved";
 
