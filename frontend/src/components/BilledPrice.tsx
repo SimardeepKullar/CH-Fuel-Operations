@@ -1,17 +1,18 @@
 import type { CSSProperties } from "react";
 import type { InvoiceCurrency } from "@ch/core/db/types";
-import { RATE_PENDING, formatPricePerUnit } from "../lib/formatMoney";
+import { RATE_PENDING, dropCountry, formatPricePerUnit } from "../lib/formatMoney";
 
 interface BilledPriceProps {
   /** Per gallon or per litre, whichever the row is in; the column header names
    * the unit. `null` when the stop carries no TA line (e.g. a scale-only
    * charge) — rendered as "—", never 0 or "$0.00" (CLAUDE.md). */
   billedPerUnit: number | null;
-  retailPerUnit: number | null;
   /** The row's own currency — a CA row is not dollars of the US kind (D28). */
   currency: InvoiceCurrency;
   /** The row asked for a conversion whose rate is not entered (T-66): "rate pending", not "—". */
   ratePending?: boolean;
+  /** Print `$` rather than `US$`/`CA$` — the column header already names the currency. */
+  bareDollar?: boolean;
 }
 
 // Inline, not a CSS class: T-40 step 40.1 asserts the size
@@ -22,35 +23,21 @@ interface BilledPriceProps {
 const valueStyle: CSSProperties = {
   fontFamily: "var(--font-heading)",
   fontWeight: 700,
-  fontSize: "14.5px",
+  fontSize: "1rem",
   letterSpacing: "0.01em",
   color: "var(--color-accent-800)",
   fontVariantNumeric: "tabular-nums",
 };
 
-const discountStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontWeight: 400,
-  fontSize: "10px",
-  color: "var(--color-muted)",
-  fontVariantNumeric: "tabular-nums",
-};
-
 /**
- * A9.1: billed price per unit is the dominant numeral in its row (4dp); retail is
- * small and muted (rendered by the caller — this component only owns the
- * billed+discount pairing); discount is a subline, never coloured as a win.
+ * A9.1: billed price per unit, the dominant numeral in its row (4dp). The
+ * retail price and the discount under it are not shown (T-80).
  */
-export default function BilledPrice({ billedPerUnit, retailPerUnit, currency, ratePending = false }: BilledPriceProps) {
-  const discountPerUnit = billedPerUnit === null || retailPerUnit === null ? null : retailPerUnit - billedPerUnit;
-
+export default function BilledPrice({ billedPerUnit, currency, ratePending = false, bareDollar = false }: BilledPriceProps) {
   return (
     <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
       <span data-testid="billed-price-value" style={valueStyle}>
-        {billedPerUnit === null ? (ratePending ? RATE_PENDING : "—") : formatPricePerUnit(billedPerUnit, currency)}
-      </span>
-      <span data-testid="billed-price-discount" style={discountStyle}>
-        disc {discountPerUnit === null ? "—" : formatPricePerUnit(discountPerUnit, currency)}
+        {billedPerUnit === null ? (ratePending ? RATE_PENDING : "—") : (bareDollar ? dropCountry : (text: string) => text)(formatPricePerUnit(billedPerUnit, currency))}
       </span>
     </span>
   );

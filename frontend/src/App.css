@@ -1267,10 +1267,10 @@ select.tx-filter-select {
 
 .tx-panel { position: relative; background: var(--color-surface); border: 1px solid var(--color-border); }
 .tx-scroll { overflow-x: auto; }
-.tx-scroll-inner { min-width: 79.125rem; }
+.tx-scroll-inner { min-width: 77.5rem; }
 .tx-row-grid {
   display: grid;
-  grid-template-columns: 1.75rem 6.25rem 6rem 9.375rem 6rem 10.625rem 4.75rem 6rem 4.75rem 6rem 3.25rem 6.25rem 8.125rem;
+  grid-template-columns: 1.75rem 6.25rem 6rem 9.375rem 6rem 9.5rem 4.75rem 6rem 4.5rem 6rem 3.25rem 6.25rem 7.875rem;
 }
 .tx-head-row {
   align-items: end;
@@ -1400,10 +1400,11 @@ select.tx-filter-select {
 .stop-expansion-lines { padding: 0.8125rem 0.875rem 0.875rem 2.875rem; }
 .stop-expansion-line-row {
   display: grid;
-  grid-template-columns: 2.125rem minmax(3.75rem, 1fr) 5.375rem 5.375rem 5.375rem 6.25rem;
+  grid-template-columns: 2.125rem minmax(3.75rem, 1fr) 5.375rem 5.375rem 6.25rem;
   align-items: center;
 }
-.stop-expansion-line-row-tax { grid-template-columns: 2.125rem minmax(3.75rem, 1fr) 4.75rem 5.75rem 5.75rem 5.75rem 5.125rem 5.125rem 5.125rem 5.125rem 6.25rem; column-gap: 0.375rem; }
+.stop-expansion-line-row-tax { grid-template-columns: 2.125rem minmax(3.75rem, 1fr) 4.75rem 5.75rem 5.75rem 5.125rem 5.125rem 5.125rem 5.125rem 6.25rem; column-gap: 0.375rem; }
+.stop-expansion-line-row-hst { grid-template-columns: 2.125rem minmax(3.75rem, 1fr) 4.75rem 5.75rem 5.75rem 5.125rem 6.25rem; column-gap: 0.375rem; }
 .stop-expansion-lines { overflow-x: auto; }
 .stop-expansion-lines-head {
   font: 600 0.59375rem var(--font-heading);
@@ -1415,7 +1416,7 @@ select.tx-filter-select {
 }
 .stop-expansion-line { padding: 0.4375rem 0; border-bottom: 1px solid var(--color-divider); }
 .stop-expansion-line-label { font: 600 0.75rem var(--font-body); color: var(--color-accent-800); }
-.stop-expansion-line-billed { font: 700 0.8125rem var(--font-heading); color: var(--color-accent-800); }
+.stop-expansion-line-billed { font: 700 1rem var(--font-heading); color: var(--color-accent-800); }
 .stop-expansion-total { padding: 0.625rem 0 0; }
 .stop-expansion-total-label {
   font: 600 0.625rem var(--font-heading);

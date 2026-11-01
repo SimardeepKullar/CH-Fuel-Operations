@@ -382,7 +382,7 @@ export default function ReceiptQueuePage() {
                     <th scope="col">Station</th>
                     <th scope="col">Products</th>
                     <th scope="col" className="rq-r">
-                      Quantity
+                      Diesel
                     </th>
                     <th scope="col" className="rq-r">
                       Total

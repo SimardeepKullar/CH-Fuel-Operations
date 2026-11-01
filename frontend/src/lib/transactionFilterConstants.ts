@@ -58,3 +58,14 @@ export function productBadgeVariant(code: string): string {
   const type = DEFAULT_INVOICE_PRODUCT_CODES.get(code);
   return type ? PRODUCT_BADGE_VARIANTS[type] : "neutral";
 }
+
+/** Whether a product line's raw code is DEF (T-80). Unknown codes are not. */
+export function isDefProduct(code: string): boolean {
+  return DEFAULT_INVOICE_PRODUCT_CODES.get(code) === "def";
+}
+
+/** A stop's DEF quantity, summed over its DEF lines, in the stop's own unit — `null` when it has none. */
+export function defQty(lines: ReadonlyArray<{ productCode: string; qty: number }> | undefined): number | null {
+  const def = (lines ?? []).filter((line) => isDefProduct(line.productCode));
+  return def.length === 0 ? null : def.reduce((sum, line) => sum + line.qty, 0);
+}

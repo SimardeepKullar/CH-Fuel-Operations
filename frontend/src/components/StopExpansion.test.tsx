@@ -52,11 +52,11 @@ const CA_STOP: TransactionListItem = {
 };
 
 describe("StopExpansion", () => {
-  it("shows every product line and an unmissable stop total of US$238.26 for A900000001", () => {
+  it("shows every product line and an unmissable stop total of $238.26 for A900000001", () => {
     render(<StopExpansion stop={A900000001} />);
     expect(screen.getByText("TA")).toBeTruthy();
     expect(screen.getByText("DF")).toBeTruthy();
-    expect(screen.getByTestId("stop-total").textContent).toBe("US$238.26");
+    expect(screen.getByTestId("stop-total").textContent).toBe("$238.26");
   });
 
   it("the stop total is the stored total, not a client re-sum of the lines", () => {
@@ -64,7 +64,7 @@ describe("StopExpansion", () => {
     // trusts the stored figure rather than adding lines itself.
     const stop: TransactionListItem = { ...A900000001, total: 999.99 };
     render(<StopExpansion stop={stop} />);
-    expect(screen.getByTestId("stop-total").textContent).toBe("US$999.99");
+    expect(screen.getByTestId("stop-total").textContent).toBe("$999.99");
   });
 
   it("raw driver and unit text are rendered through RawResolved (rawOnly), not a second hand-rolled span", () => {
@@ -80,12 +80,11 @@ describe("StopExpansion", () => {
     expect(screen.getByText("Unresolved").textContent).toBe("Unresolved");
   });
 
-  it("gallons render em-dash, never 0, when the stop carries no TA line", () => {
-    const stop: TransactionListItem = { ...A900000001, qty: null, lines: [] };
-    render(<StopExpansion stop={stop} />);
+  it("the Stop total row carries no quantity — it sits under a column listing every product", () => {
+    render(<StopExpansion stop={A900000001} />);
     const total = screen.getByTestId("stop-total").closest(".stop-expansion-total")!;
-    expect(total.textContent).toContain("—");
-    expect(total.textContent).not.toContain("0.00 gal");
+    expect(total.textContent).toBe(`Stop total${screen.getByTestId("stop-total").textContent}`);
+    expect(total.textContent).not.toMatch(/\d+\.\d\d gal/);
   });
 
   it("stacked forces a single-column layout (900px requirement) rather than a two-column overlap", () => {
@@ -99,21 +98,38 @@ describe("StopExpansion", () => {
     expect(screen.getByText("Invoice 999210")).toBeTruthy();
   });
 
-  it("a CA stop shows litres, CAD headers and Pre-tax, HST, GST, PST, QST and Final separately", () => {
+  it("a CA stop shows litres, CAD headers and Pre-tax, HST and Final, with no GST, PST or QST while all three are zero", () => {
     render(<StopExpansion stop={CA_STOP} />);
     const head = document.querySelector(".stop-expansion-lines-head")!.textContent!;
-    for (const label of ["Litres", "Retail CAD/L", "Billed CAD/L", "Pre-tax CAD", "HST CAD", "GST CAD", "PST CAD", "QST CAD", "Final CAD"]) {
+    for (const label of ["Litres", "Billed CAD/L", "Pre-tax CAD", "HST CAD", "Final CAD"]) {
       expect(head).toContain(label);
     }
+    for (const label of ["GST", "PST", "QST"]) expect(head).not.toContain(label);
+    for (const id of ["stop-gst", "stop-pst", "stop-qst"]) expect(screen.queryByTestId(id)).toBeNull();
+    expect(document.querySelector(".stop-expansion-lines-head")!.children).toHaveLength(7);
     const line = document.querySelector(".stop-expansion-line")!.textContent!;
     expect(line).toContain("100.00");
-    expect(line).toContain("CA$2.1522");
-    expect(line).toContain("CA$190.46");
-    expect(line).toContain("CA$24.76");
-    expect(line).toContain("CA$215.22");
-    expect(screen.getByTestId("stop-pretax").textContent).toBe("CA$190.46");
-    expect(screen.getByTestId("stop-hst").textContent).toBe("CA$24.76");
-    expect(screen.getByTestId("stop-total").textContent).toBe("CA$215.22");
+    expect(line).toContain("$2.1522");
+    expect(line).toContain("$190.46");
+    expect(line).toContain("$24.76");
+    expect(line).toContain("$215.22");
+    expect(screen.getByTestId("stop-pretax").textContent).toBe("$190.46");
+    expect(screen.getByTestId("stop-hst").textContent).toBe("$24.76");
+    expect(screen.getByTestId("stop-total").textContent).toBe("$215.22");
+  });
+
+  it("a CA stop with a non-zero GST, PST or QST shows all three, so Pre-tax + taxes still adds up to Final", () => {
+    const stop: TransactionListItem = {
+      ...CA_STOP,
+      lines: [{ ...CA_STOP.lines![0]!, preTaxAmount: 100, hst: 0, gst: 5, pst: 7, qst: 0, amount: 112 }],
+      total: 112,
+    };
+    render(<StopExpansion stop={stop} />);
+    const head = document.querySelector(".stop-expansion-lines-head")!.textContent!;
+    for (const label of ["GST CAD", "PST CAD", "QST CAD"]) expect(head).toContain(label);
+    expect(document.querySelector(".stop-expansion-lines-head")!.children).toHaveLength(10);
+    expect(screen.getByTestId("stop-gst").textContent).toBe("$5.00");
+    expect(screen.getByTestId("stop-pst").textContent).toBe("$7.00");
   });
 
   it("a CA stop's Pre-tax total is an em dash when a line printed no Pre Tax AMT, not a sum that leaves it out", () => {
