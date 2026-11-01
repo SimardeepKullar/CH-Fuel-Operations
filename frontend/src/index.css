@@ -2,11 +2,18 @@
 
 * , *::before, *::after { box-sizing: border-box; }
 
+/* The one knob for how big the UI is (T-88): every size in the stylesheets is in rem, so this scales
+   the whole app. It is 100% up to a 1280px-wide window and grows to 125% at 1900px, then holds, so a
+   large monitor reads at the size the dispatcher was used to and a laptop, tablet or phone is unchanged
+   (and a layout is never tighter, in rem, than it was at 1280px). rem, not px, so the browser's own
+   font-size setting still counts. Media queries stay in px: below 1280px nothing is scaled. */
+html { font-size: clamp(1rem, calc(1rem + (100vw - 80rem) * 0.00645), 1.25rem); }
+
 body {
   margin: 0;
   background: #f4f6fa;
   color: #16205c;
   font-family: "Barlow", system-ui, sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.55;
 }
