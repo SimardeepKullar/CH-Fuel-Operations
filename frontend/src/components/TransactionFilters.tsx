@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FilterOption } from "../hooks/useTransactionFilterOptions";
 import type { TransactionFiltersState } from "../hooks/useTransactionFilters";
 import { activeFilterChips, flagsValueLabel, optionLabel, type ChipPatch } from "../lib/transactionFilterChips";
@@ -65,6 +65,9 @@ interface TransactionFiltersProps {
   shown: number;
   /** Rows before the search narrows them. */
   total: number;
+  /** The page's units toggle (T-82): rendered after More, before the count. The
+   * page owns the conversion state; this bar only gives it a place. */
+  unitsControl?: ReactNode;
 }
 
 /** The Transactions filter bar (T-87): one row of filters, then a chip per active
@@ -80,6 +83,7 @@ export default function TransactionFilters({
   stateOptions,
   shown,
   total,
+  unitsControl,
 }: TransactionFiltersProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [flagsOpen, setFlagsOpen] = useState(false);
@@ -205,6 +209,13 @@ export default function TransactionFilters({
             </select>
           </label>
         </Popover>
+        {unitsControl && (
+          <div className="tx-units">
+            <span className="tx-units-rule" aria-hidden="true" />
+            <span className="tx-units-key">Units</span>
+            {unitsControl}
+          </div>
+        )}
         <span className="tx-bar-count">
           <strong>{shown}</strong> of {total}
         </span>
