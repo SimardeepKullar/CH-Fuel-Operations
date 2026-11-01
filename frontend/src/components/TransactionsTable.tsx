@@ -161,7 +161,6 @@ function buildColumns(
       cell: ({ row }) => (
         <BilledPrice
           billedPerUnit={row.original.billedPerUnit}
-          retailPerUnit={row.original.retailPerUnit}
           currency={row.original.currency}
           ratePending={row.original.ratePending === true}
         />
