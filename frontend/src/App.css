@@ -1331,7 +1331,7 @@ select.tx-filter-select {
 .tx-station-name { font: 600 0.75rem var(--font-body); color: var(--color-accent-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tx-station-place { font: 400 0.65625rem var(--font-body); color: #a4abb9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tx-gal { color: #3a4460; }
-.tx-total { font: 700 0.85rem var(--font-heading); letter-spacing: 0.01em; color: var(--color-accent-800); }
+.tx-total { font: 700 1rem var(--font-heading); letter-spacing: 0.01em; color: var(--color-accent-800); }
 .tx-receipt-mark {
   display: inline-grid;
   place-items: center;
