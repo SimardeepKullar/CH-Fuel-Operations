@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ImportInvoiceResponse, InvoiceListItem } from "@ch/core/api/routes/invoices";
+import type { ImportInvoiceResponse, InvoiceFx, InvoiceListItem } from "@ch/core/api/routes/invoices";
 import { ApiError, getInvoice, listInvoices, patchInvoiceWeek, uploadInvoice } from "../../../lib/api";
 import { useWeek } from "../../../hooks/useWeek";
 import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
@@ -14,6 +14,7 @@ import ReconciliationPreview from "../../../components/ReconciliationPreview";
 import QuarantineScreen, { type QuarantineRejection } from "../../../components/QuarantineScreen";
 import ImportHistory from "../../../components/ImportHistory";
 import EmptyState from "../../../components/EmptyState";
+import FxRateDialog from "../../../components/FxRateDialog";
 
 type ImportView =
   | { phase: "idle" }
@@ -23,6 +24,14 @@ type ImportView =
   | { phase: "quarantined"; invoiceNumber: string; rejections: QuarantineRejection[] }
   | { phase: "duplicate"; invoiceNumber: string }
   | { phase: "error"; message: string };
+
+/** The US invoice just imported, whose rate the dialog asks for (T-67). */
+interface FxPrompt {
+  invoiceId: string;
+  invoiceNumber: string;
+  billingWeekEnd: string;
+  fx: InvoiceFx | null;
+}
 
 /** How much of the file has been read so far — an honest progress figure,
  * not the promoted fuel-stop row count the server computes after grouping
@@ -65,6 +74,7 @@ export default function ImportPage() {
   const [view, setView] = useState<ImportView>({ phase: "idle" });
   const [historyRows, setHistoryRows] = useState<InvoiceListItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [fxPrompt, setFxPrompt] = useState<FxPrompt | null>(null);
   const { reloadPeriods } = useWeek();
   const { refresh: refreshCounts } = useStandingCountsValue();
 
@@ -108,6 +118,14 @@ export default function ImportPage() {
             });
           } else {
             setView({ phase: "imported", response });
+            if (response.report.currency === "USD") {
+              setFxPrompt({
+                invoiceId: response.invoiceId,
+                invoiceNumber: response.report.invoiceNumber,
+                billingWeekEnd: response.report.billingWeekEnd,
+                fx: response.fx,
+              });
+            }
           }
           refreshHistory();
           // The invoice is already written, so a failed re-read of the top bar's
@@ -134,6 +152,7 @@ export default function ImportPage() {
   }, []);
 
   const reset = useCallback(() => setView({ phase: "idle" }), []);
+  const closeFxPrompt = useCallback(() => setFxPrompt(null), []);
 
   // Moves an invoice to another billing week, then re-reads both lists so the
   // history row and the top bar's selector show it without a page reload. A
@@ -202,6 +221,7 @@ export default function ImportPage() {
           onMoveWeek={moveWeek}
         />
       </div>
+      {fxPrompt !== null && <FxRateDialog {...fxPrompt} onSaved={reloadPeriods} onClose={closeFxPrompt} />}
     </>
   );
 }

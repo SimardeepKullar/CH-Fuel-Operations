@@ -42,16 +42,17 @@ export function useFxRateDraft({ invoiceId, fx: fxProp, onSaved }: UseFxRateDraf
 
   const dirty = draft.trim() !== textOf(fx);
 
-  async function save(): Promise<void> {
-    if (saving) return;
+  /** Resolves `true` when a PATCH went through; `false` when nothing was sent or the API refused. */
+  async function save(): Promise<boolean> {
+    if (saving) return false;
     const text = draft.trim();
     if (text === textOf(fx)) {
       setError(null);
-      return;
+      return false;
     }
     if (text !== "" && !DECIMAL.test(text)) {
       setError("Enter the rate as a number, e.g. 1.3712");
-      return;
+      return false;
     }
     setSaving(true);
     setError(null);
@@ -60,8 +61,10 @@ export function useFxRateDraft({ invoiceId, fx: fxProp, onSaved }: UseFxRateDraf
       setFx(updated.fx);
       setDraft(textOf(updated.fx));
       await onSaved();
+      return true;
     } catch (err) {
       setError(err instanceof ApiError ? (err.detail ?? err.message) : err instanceof Error ? err.message : String(err));
+      return false;
     } finally {
       setSaving(false);
     }

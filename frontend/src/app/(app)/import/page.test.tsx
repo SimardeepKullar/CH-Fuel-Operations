@@ -16,6 +16,7 @@ const uploadInvoice = vi.fn();
 const listInvoices = vi.fn();
 const getInvoice = vi.fn();
 const patchInvoiceWeek = vi.fn();
+const patchInvoiceFx = vi.fn();
 const getHealth = vi.fn();
 const listPeriods = vi.fn();
 
@@ -27,6 +28,7 @@ vi.mock("../../../lib/api", async () => {
     listInvoices: (...args: unknown[]) => listInvoices(...args),
     getInvoice: (...args: unknown[]) => getInvoice(...args),
     patchInvoiceWeek: (...args: unknown[]) => patchInvoiceWeek(...args),
+    patchInvoiceFx: (...args: unknown[]) => patchInvoiceFx(...args),
     getHealth: (...args: unknown[]) => getHealth(...args),
     listPeriods: (...args: unknown[]) => listPeriods(...args),
   };
@@ -117,6 +119,7 @@ afterEach(() => {
   listInvoices.mockReset();
   getInvoice.mockReset();
   patchInvoiceWeek.mockReset();
+  patchInvoiceFx.mockReset();
   getHealth.mockReset();
   listPeriods.mockReset();
   searchParams = new URLSearchParams();
@@ -330,13 +333,12 @@ describe("ImportPage — billing weeks (T-64 step 64.4)", () => {
     expect(screen.queryByTestId("dates-differ-note-inv-us")).toBeNull();
   });
 
-  it("does not ask for the exchange rate — that is entered on the Overview (T-66)", async () => {
+  it("the history rows do not open the rate dialog by themselves", async () => {
     listInvoices.mockResolvedValue(historyResult([usInvoice, caInvoice()]));
     render(<ImportPage />);
 
     await waitFor(() => expect(screen.getByTestId("dates-differ-note-inv-ca")).toBeTruthy());
-    expect(screen.queryByTestId("fx-rate")).toBeNull();
-    expect(screen.queryByText(/exchange rate/i)).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("'Belongs to week ending' calls PATCH, and the top bar's selector shows the new week without a reload", async () => {
@@ -431,5 +433,106 @@ describe("ImportPage — the upload panel (T-77)", () => {
     expect(panel.querySelector(".import-panel-title")!.textContent).toBe("Upload invoice");
     expect(panel.textContent).toContain("One invoice per file · US or Canada");
     expect(panel.querySelector("[data-testid=dropzone]")).toBeTruthy();
+  });
+});
+
+/** T-67: the rate prompt after a US invoice imports. */
+describe("ImportPage — the exchange-rate prompt after a US import (T-67)", () => {
+  const FX = { rate: 1.3712, enteredAt: "2026-10-01T12:00:00.000Z" };
+
+  async function upload(response: ImportInvoiceResponse, name = "invoice_999210.csv") {
+    listInvoices.mockResolvedValue(historyResult());
+    uploadInvoice.mockResolvedValue(response);
+    render(<ImportPage />);
+    await waitFor(() => expect(screen.getByTestId("dropzone")).toBeTruthy());
+    fireEvent.drop(screen.getByTestId("dropzone"), { dataTransfer: { files: [makeFile(name)] } });
+  }
+
+  const usImported = (fx: ImportInvoiceResponse["fx"] = null): ImportInvoiceResponse => ({
+    status: "imported",
+    invoiceId: "inv-us",
+    fx,
+    report: report(),
+  });
+
+  it("a US import opens the dialog for that invoice, and the invoice is already written", async () => {
+    await upload(usImported());
+    const dialog = await screen.findByRole("dialog", { name: /Exchange rate/ });
+    expect(dialog.textContent).toContain("Exchange rate (CAD per USD) for 🇺🇸 999210");
+    expect(screen.getByTestId("reconciliation-preview")).toBeTruthy();
+    expect(patchInvoiceFx).not.toHaveBeenCalled();
+  });
+
+  it("a CA import, a quarantine, a duplicate and a failed upload show no dialog", async () => {
+    await upload({ status: "imported", invoiceId: "inv-ca", fx: null, report: report({ currency: "CAD", qtyUnit: "L" }) });
+    await waitFor(() => expect(screen.getByTestId("reconciliation-preview")).toBeTruthy());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    cleanup();
+
+    await upload({ status: "quarantined", invoiceId: "inv-q", fx: null, report: report() });
+    await waitFor(() => expect(screen.getByTestId("quarantine-screen")).toBeTruthy());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    cleanup();
+
+    await upload({ status: "duplicate", invoiceId: "inv-us", fx: null, report: report() });
+    await waitFor(() => expect(screen.getByTestId("duplicate-notice")).toBeTruthy());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    cleanup();
+
+    listInvoices.mockResolvedValue(historyResult());
+    uploadInvoice.mockRejectedValue(new ApiError({ title: "Conflict", status: 409, detail: "nope" }));
+    render(<ImportPage />);
+    await waitFor(() => expect(screen.getByTestId("dropzone")).toBeTruthy());
+    fireEvent.drop(screen.getByTestId("dropzone"), { dataTransfer: { files: [makeFile("invoice_1.csv")] } });
+    await waitFor(() => expect(screen.getByTestId("import-error")).toBeTruthy());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("entering 1.3712 PATCHes that invoice, re-reads the weeks, then shows the rate, its time and the week's link; Done closes", async () => {
+    patchInvoiceFx.mockResolvedValue({ fx: { rate: 1.3712, enteredAt: "2026-11-02T09:30:00.000Z" } });
+    await upload(usImported());
+    await screen.findByRole("dialog");
+    const periodReads = listPeriods.mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText("Exchange rate (CAD per USD)"), { target: { value: "1.3712" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save rate" }));
+
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-us", 1.3712));
+    await waitFor(() => expect(listPeriods.mock.calls.length).toBeGreaterThan(periodReads));
+    const saved = await screen.findByTestId("fx-dialog-saved");
+    expect(saved.textContent).toContain("1.3712 CAD per USD");
+    expect(saved.textContent).toContain("entered");
+    expect(screen.getByRole("link", { name: /Overview/ }).getAttribute("href")).toBe("/overview?scope=week&w=2026-08-31");
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("'Enter later' PATCHes nothing and closes, leaving the invoice at rate pending", async () => {
+    await upload(usImported());
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Enter later" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(patchInvoiceFx).not.toHaveBeenCalled();
+  });
+
+  it("an invoice that already has a rate opens pre-filled with it and when it was entered", async () => {
+    await upload(usImported(FX));
+    await screen.findByRole("dialog");
+    expect((screen.getByLabelText("Exchange rate (CAD per USD)") as HTMLInputElement).value).toBe("1.3712");
+    expect(screen.getByTestId("fx-dialog-current").textContent).toContain("entered");
+  });
+
+  it("a 400 keeps what was typed and shows its reason", async () => {
+    patchInvoiceFx.mockRejectedValue(new ApiError({ title: "Bad Request", status: 400, detail: "fxCadPerUsd must be between 0.5 and 3" }));
+    await upload(usImported());
+    await screen.findByRole("dialog");
+    const input = screen.getByLabelText("Exchange rate (CAD per USD)") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save rate" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("between 0.5 and 3");
+    expect(input.value).toBe("9");
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });

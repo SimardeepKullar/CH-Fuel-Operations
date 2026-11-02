@@ -1479,6 +1479,10 @@ select.tx-filter-select {
 .fx-rate-input { width: 9ch; height: 1.625rem; min-height: 0; padding: 0 0.375rem; font: 400 0.75rem var(--font-body); font-variant-numeric: tabular-nums; text-align: right; }
 .fx-rate-status { font: 400 0.75rem var(--font-body); color: #a4abb9; }
 .fx-rate-error { flex-basis: 100%; color: var(--color-error); }
+/* T-67: the rate prompt after a US import. */
+.fx-dialog { width: min(30rem, 100%); padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.fx-dialog-line { margin: 0; font: 400 0.8125rem var(--font-body); color: var(--color-accent-800); }
+.fx-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.625rem; margin-top: 0.25rem; }
 
 /* T-65: US and CA side by side, the combined panel below. */
 .overview-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; align-items: start; }
