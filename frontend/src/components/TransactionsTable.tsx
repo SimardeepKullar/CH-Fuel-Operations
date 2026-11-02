@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createColumnHelper,
   flexRender,
@@ -276,6 +276,8 @@ interface TransactionsTableProps {
   truckOptions: FilterOption[];
   cardOptions: FilterOption[];
   stateOptions: FilterOption[];
+  /** The units toggle, handed to the filter bar (T-82). */
+  unitsControl?: ReactNode;
 }
 
 /**
@@ -303,6 +305,7 @@ export default function TransactionsTable({
   truckOptions,
   cardOptions,
   stateOptions,
+  unitsControl,
 }: TransactionsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -410,6 +413,7 @@ export default function TransactionsTable({
         stateOptions={stateOptions}
         shown={rows.length}
         total={totalBeforeSearch}
+        unitsControl={unitsControl}
       />
 
       <div className="tx-panel">

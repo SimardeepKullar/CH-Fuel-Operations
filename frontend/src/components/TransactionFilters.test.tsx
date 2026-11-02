@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TransactionFilters from "./TransactionFilters";
 import type { TransactionFiltersState } from "../hooks/useTransactionFilters";
@@ -8,7 +9,7 @@ afterEach(cleanup);
 
 const NONE: TransactionFiltersState = { q: "", driverId: "", truckId: "", cardId: "", state: "", product: "", receiptStatus: "", flags: "", anomalyOnly: false, sort: "" };
 
-function setup(filters: Partial<TransactionFiltersState> = {}) {
+function setup(filters: Partial<TransactionFiltersState> = {}, unitsControl?: ReactNode) {
   const props = {
     filters: { ...NONE, ...filters },
     setFilter: vi.fn(),
@@ -21,11 +22,29 @@ function setup(filters: Partial<TransactionFiltersState> = {}) {
     shown: 12,
     total: 68,
   };
-  render(<TransactionFilters {...props} />);
+  render(<TransactionFilters {...props} unitsControl={unitsControl} />);
   return props;
 }
 
 const button = (name: RegExp) => screen.getByRole("button", { name });
+
+describe("TransactionFilters — units slot (T-82)", () => {
+  it("renders the units control between More and the count", () => {
+    setup({}, <div role="group" aria-label="Show amounts in" />);
+    const bar = document.querySelector(".tx-bar")!;
+    const units = screen.getByRole("group", { name: "Show amounts in" });
+    const more = button(/More/);
+    const count = document.querySelector(".tx-bar-count")!;
+    expect(bar.contains(units)).toBe(true);
+    expect(more.compareDocumentPosition(units) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(units.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("renders nothing extra when no units control is given", () => {
+    setup();
+    expect(document.querySelector(".tx-units")).toBeNull();
+  });
+});
 
 describe("TransactionFilters — nothing filtered (T-87)", () => {
   it("shows every filter reading All, the count, and no chips or Clear", () => {

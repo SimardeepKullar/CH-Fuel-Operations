@@ -234,9 +234,6 @@ export default function TransactionsPage() {
         />
       <div className="tx-page">
         <TransactionsStrip scope={scope} weeks={periods} inScope={inScope} side={side} onSide={setSide} />
-        <div className="tx-side-bar">
-          <ConversionToggle shown={shown} onChange={(choice) => setPick({ key: selectionKey, choice })} />
-        </div>
         <TransactionsTable
           rows={searched}
           totalBeforeSearch={rows.length}
@@ -254,6 +251,7 @@ export default function TransactionsPage() {
           truckOptions={filterOptions.trucks}
           cardOptions={filterOptions.cards}
           stateOptions={filterOptions.states}
+          unitsControl={<ConversionToggle shown={shown} onChange={(choice) => setPick({ key: selectionKey, choice })} />}
         />
       </div>
     </>
