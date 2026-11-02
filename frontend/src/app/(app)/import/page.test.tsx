@@ -144,7 +144,7 @@ describe("ImportPage (T-42)", () => {
     expect(screen.getByTestId("parsing-state").textContent).toContain("invoice_100001.csv");
     await waitFor(() => expect(screen.getByTestId("parsing-state").textContent).toContain("3 rows"));
 
-    resolveUpload({ status: "imported", invoiceId: "inv-1", report: report() });
+    resolveUpload({ status: "imported", invoiceId: "inv-1", fx: null, report: report() });
     await waitFor(() => expect(screen.getByTestId("reconciliation-preview")).toBeTruthy());
   });
 
@@ -161,7 +161,7 @@ describe("ImportPage (T-42)", () => {
 
   it("an imported upload shows the reconciliation-passed preview, and confirm returns to the dropzone", async () => {
     listInvoices.mockResolvedValue(historyResult());
-    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", report: report() });
+    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", fx: null, report: report() });
 
     render(<ImportPage />);
     await waitFor(() => expect(screen.getByTestId("dropzone")).toBeTruthy());
@@ -180,7 +180,7 @@ describe("ImportPage (T-42)", () => {
       .mockResolvedValueOnce({ weeks: [periodWeek("2026-09-09", [US_PERIOD])] })
       .mockResolvedValue({ weeks: [periodWeek("2026-10-28", [US_PERIOD]), periodWeek("2026-09-09", [US_PERIOD])] });
     listInvoices.mockResolvedValue(historyResult());
-    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", report: report() });
+    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", fx: null, report: report() });
 
     render(<ImportPage />);
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
@@ -193,7 +193,7 @@ describe("ImportPage (T-42)", () => {
   it("an upload's result refreshes the sidebar's receipt count", async () => {
     const refresh = vi.fn();
     listInvoices.mockResolvedValue(historyResult());
-    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", report: report() });
+    uploadInvoice.mockResolvedValue({ status: "imported", invoiceId: "inv-1", fx: null, report: report() });
 
     render(
       <StandingCountsProvider value={{ receipts: null, flags: null, refresh }}>
@@ -211,6 +211,7 @@ describe("ImportPage (T-42)", () => {
     uploadInvoice.mockResolvedValue({
       status: "quarantined",
       invoiceId: "inv-2",
+      fx: null,
       report: report({
         rejections: [
           {
@@ -234,7 +235,7 @@ describe("ImportPage (T-42)", () => {
 
   it("a duplicate upload renders a distinct rejection message, not the quarantine screen", async () => {
     listInvoices.mockResolvedValue(historyResult());
-    uploadInvoice.mockResolvedValue({ status: "duplicate", invoiceId: "inv-1", report: report() });
+    uploadInvoice.mockResolvedValue({ status: "duplicate", invoiceId: "inv-1", fx: null, report: report() });
 
     render(<ImportPage />);
     await waitFor(() => expect(screen.getByTestId("dropzone")).toBeTruthy());
