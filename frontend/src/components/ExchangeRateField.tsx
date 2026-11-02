@@ -14,8 +14,8 @@ interface ExchangeRateFieldProps {
 /**
  * The exchange rate on a US invoice, as the dispatcher enters it (T-66, T-68, D27):
  * CAD per 1 USD, shown with when it was entered, or "rate pending". The box can
- * be changed at any time — Enter, or leaving it, saves through `PATCH
- * /invoices/{id}`, and emptying it clears the rate back to pending. Nothing
+ * be changed at any time — Enter saves through `PATCH
+ * /invoices/{id}` (leaving the box does not, as in the Import history, T-67), and emptying it clears the rate back to pending. Nothing
  * converted is stored, so every screen re-converts at the new rate on its next
  * read. A 400's reason shows beside the field.
  */
@@ -33,7 +33,6 @@ export default function ExchangeRateField({ invoice, onSaved }: ExchangeRateFiel
           placeholder="e.g. 1.3712"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void save()}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();

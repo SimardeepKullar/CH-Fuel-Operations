@@ -81,7 +81,7 @@ function FxRateCell({ row, onFxSaved }: { row: InvoiceListItem; onFxSaved?: () =
           }
         }}
       />
-      <button type="button" className="import-history-move" data-testid={`fx-update-${row.id}`} disabled={!dirty || saving} onClick={() => void save()}>
+      <button type="button" className="import-history-move import-history-fx-update" data-testid={`fx-update-${row.id}`} disabled={!dirty || saving} onClick={() => void save()}>
         {saving ? "Saving…" : "Update"}
       </button>
       <span className="import-history-fx-status" data-testid={`fx-status-${row.id}`} title={fx === null ? undefined : formatFxEnteredAt(fx.enteredAt)}>

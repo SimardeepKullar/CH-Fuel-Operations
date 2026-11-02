@@ -1784,6 +1784,8 @@ a.kpi-tile-link:hover .kpi-card-link-hint { text-decoration: underline; }
 }
 .import-history-move:hover:not(:disabled) { background: rgba(0, 0, 0, 0.04); }
 .import-history-move:disabled { opacity: 0.5; cursor: default; }
+.import-history-fx-update { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.import-history-fx-update:hover:not(:disabled) { background: #0090c4; }
 .import-history-fx { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; }
 .import-history-fx-input { width: 5.75rem; height: 1.625rem; min-height: 0; padding: 0 0.375rem; font: 400 0.71875rem var(--font-body); font-variant-numeric: tabular-nums; text-align: right; }
 .import-history-fx-status { flex-basis: 100%; font-size: 0.65625rem; color: #7b869e; }
