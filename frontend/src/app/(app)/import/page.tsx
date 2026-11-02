@@ -166,6 +166,11 @@ export default function ImportPage() {
     [reloadPeriods],
   );
 
+  // A rate saved from a history row: the shell's weeks and this list both carry it, so re-read both.
+  const fxSaved = useCallback(async () => {
+    await Promise.all([reloadPeriods(), listInvoices({ pageSize: 200 }).then((result) => setHistoryRows(result.rows))]);
+  }, [reloadPeriods]);
+
   const quarantined = historyRows.filter((r) => r.status === "quarantined").length;
   const lastImport = historyRows.map((r) => r.importedAt).sort().at(-1);
 
@@ -219,6 +224,7 @@ export default function ImportPage() {
           loading={historyLoading}
           onReopenQuarantined={reopenQuarantined}
           onMoveWeek={moveWeek}
+          onFxSaved={fxSaved}
         />
       </div>
       {fxPrompt !== null && <FxRateDialog {...fxPrompt} onSaved={reloadPeriods} onClose={closeFxPrompt} />}

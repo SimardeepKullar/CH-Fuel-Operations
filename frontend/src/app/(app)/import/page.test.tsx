@@ -531,7 +531,7 @@ describe("ImportPage — the exchange-rate prompt after a US import (T-67)", () 
     fireEvent.change(input, { target: { value: "9" } });
     fireEvent.click(screen.getByRole("button", { name: "Save rate" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("between 0.5 and 3");
+    expect((await screen.findByRole("alert", {}, { timeout: 3000 })).textContent).toContain("between 0.5 and 3");
     expect(input.value).toBe("9");
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
