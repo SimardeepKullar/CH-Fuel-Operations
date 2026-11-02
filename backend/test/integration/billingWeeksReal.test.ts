@@ -129,8 +129,9 @@ describe.skipIf(!hasDatabase || !hasRealFixtures || !python)("billing weeks on t
     expect(pending.rows.filter((r) => r.ratePending === true && r.total === null)).toHaveLength(59);
 
     const caId = (await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = '999217'")).rows[0]!.id;
+    const usId = (await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = '999210'")).rows[0]!.id;
     const patched = await app.handle(
-      new Request(`http://localhost/api/v1/invoices/${caId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: 1.3712 }) }),
+      new Request(`http://localhost/api/v1/invoices/${usId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: 1.3712 }) }),
     );
     expect(patched.status).toBe(200);
     try {
@@ -152,7 +153,7 @@ describe.skipIf(!hasDatabase || !hasRealFixtures || !python)("billing weeks on t
       // The 999217 grand total is still stored as printed.
       expect((await pool.query<{ g: string }>("SELECT grand_total::text AS g FROM invoices WHERE id = $1", [caId])).rows[0]!.g).toBe("46837.33");
     } finally {
-      await pool.query("UPDATE invoices SET fx_cad_per_usd = NULL, fx_entered_at = NULL WHERE id = $1", [caId]);
+      await pool.query("UPDATE invoices SET fx_cad_per_usd = NULL, fx_entered_at = NULL WHERE id = $1", [usId]);
     }
   });
 
@@ -171,9 +172,9 @@ describe.skipIf(!hasDatabase || !hasRealFixtures || !python)("billing weeks on t
     expect(pending.combined).toMatchObject({ ratePending: true, partial: false });
     expect(pending.combined!.spend).toEqual({ beforeTax: null, tax: null, withTax: null });
 
-    const caId = (await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = '999217'")).rows[0]!.id;
+    const usId = (await pool.query<{ id: string }>("SELECT id FROM invoices WHERE invoice_number = '999210'")).rows[0]!.id;
     const patched = await app.handle(
-      new Request(`http://localhost/api/v1/invoices/${caId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: 1.3712 }) }),
+      new Request(`http://localhost/api/v1/invoices/${usId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: 1.3712 }) }),
     );
     expect(patched.status).toBe(200);
     try {
@@ -188,7 +189,7 @@ describe.skipIf(!hasDatabase || !hasRealFixtures || !python)("billing weeks on t
       expect(rated.combined!.spend.tax).toBe(tax);
       expect(Math.round(rated.combined!.spend.beforeTax! * 100) + Math.round(tax * 100)).toBe(Math.round(withTax * 100));
     } finally {
-      await pool.query("UPDATE invoices SET fx_cad_per_usd = NULL, fx_entered_at = NULL WHERE id = $1", [caId]);
+      await pool.query("UPDATE invoices SET fx_cad_per_usd = NULL, fx_entered_at = NULL WHERE id = $1", [usId]);
     }
   });
 });

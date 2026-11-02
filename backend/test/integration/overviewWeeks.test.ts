@@ -38,7 +38,7 @@ describe.skipIf(!hasDatabase)("GET /overview/weeks (integration, T-70)", () => {
   it("carries the same figures as the single-week overview, each side as printed", async () => {
     expect((await importUs(pool, usInWeek(), "invoice_100001.csv")).status).toBe("imported");
     expect((await importCa(pool)).status).toBe("imported");
-    await pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'CAD'");
+    await pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'USD'");
 
     const { weeks } = await getJson<OverviewWeeksResult>("/overview/weeks");
     const { us, ca } = await getJson<OverviewResult>(`/overview?week=${WEEK_END}`);

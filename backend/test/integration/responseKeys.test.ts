@@ -130,7 +130,7 @@ describe.skipIf(!hasDatabase)("response keys across the period-scoped routes (in
     // so /invoices and /periods below carry an entered fx too.
     const pending = await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=USD`);
     const overviewPending = await get(`/overview?week=${WEEK_END}`);
-    await pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'CAD'");
+    await pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'USD'");
     const toUsd = (await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=USD&units=imperial`)) as ListTransactionsResult;
     const toCad = await get(`/transactions?week=${WEEK_END}&pageSize=200&includeLines=true&convertTo=CAD`);
     expect(toUsd.rows.some((r) => r.fx !== undefined)).toBe(true);

@@ -148,7 +148,7 @@ export interface OverviewCombined {
   partial: boolean;
   /** Which side is missing when `partial`. */
   missingSide: InvoiceCurrency | null;
-  /** Converting needs the CA invoice's entered rate and there is none. */
+  /** Converting needs the week's US invoice's entered rate and there is none. */
   ratePending: boolean;
   spend: CombinedSplit;
   diesel: CombinedProduct;
@@ -163,7 +163,7 @@ export interface OverviewCombined {
 /**
  * The US side's tile figures in CAD and litres, for the corner of each US tile
  * (T-65): the dispatcher reads the whole week in CAD/L without a unit control.
- * Money and per-unit prices are converted at the CA invoice's entered rate and
+ * Money and per-unit prices are converted at the US invoice's entered rate and
  * are `null` while `ratePending` (D27); quantities need no rate.
  */
 export interface OverviewConverted {
@@ -191,7 +191,7 @@ export interface OverviewResult {
   ca: OverviewSide | null;
   /** `null` only when neither side is imported. */
   combined: OverviewCombined | null;
-  /** The CA invoice's entered exchange rate (CAD per 1 USD); `null` until entered, or with no CA invoice. */
+  /** The week's US invoice's entered exchange rate (CAD per 1 USD); `null` until entered, or with no US invoice. */
   fx: InvoiceFx | null;
 }
 
@@ -536,15 +536,23 @@ interface FxRow {
   fx_entered_at: Date | null;
 }
 
-export async function loadStoredFx(pool: Pool, invoiceId: string): Promise<StoredFx | null> {
-  const { rows } = await pool.query<FxRow>("SELECT fx_cad_per_usd, fx_entered_at FROM invoices WHERE id = $1", [invoiceId]);
+/**
+ * A billing week's exchange rate (T-68, D31): the one entered on the week's
+ * imported US invoice — the US side is the side that gets converted. A week
+ * with no US invoice has none, and needs none.
+ */
+export async function loadWeekFx(pool: Pool, weekEnd: string): Promise<StoredFx | null> {
+  const { rows } = await pool.query<FxRow>(
+    "SELECT fx_cad_per_usd, fx_entered_at FROM invoices WHERE billing_week_end = $1::date AND currency = 'USD' AND status = 'imported'",
+    [weekEnd],
+  );
   const row = rows[0];
   return row?.fx_cad_per_usd && row.fx_entered_at ? { rate: row.fx_cad_per_usd, enteredAt: row.fx_entered_at } : null;
 }
 
 /**
  * The combined panel (T-65, D27, D28). Money is converted into `target` at the
- * CA invoice's entered rate and only then added, in integer cents.
+ * US invoice's entered rate and only then added, in integer cents.
  *
  * **The one rounding point** is each CA figure's conversion: its cents are
  * divided by the rate (a US figure multiplied, for CAD) exactly and rounded
@@ -659,7 +667,7 @@ function convertUs(us: OverviewSide, fx: StoredFx | null): OverviewConverted {
  */
 export async function getOverview(pool: Pool, week: string, options: OverviewOptions = {}): Promise<OverviewResult> {
   const [us, ca] = await Promise.all([loadSide(pool, week, "USD", options), loadSide(pool, week, "CAD", options)]);
-  const storedFx = ca ? await loadStoredFx(pool, ca.kpis.invoiceId) : null;
+  const storedFx = await loadWeekFx(pool, week);
 
   const present = [us, ca].filter((side): side is OverviewSide => side !== null);
   const missingSide: InvoiceCurrency | null = present.length === 2 ? null : us === null ? "USD" : "CAD";

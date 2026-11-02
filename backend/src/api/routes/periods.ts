@@ -18,7 +18,7 @@ export interface PeriodInvoice {
   actualStart: string | null;
   actualEnd: string | null;
   datesDiffer: boolean;
-  /** The CA invoice's entered exchange rate (D27, T-66); `null` until entered — and always on a USD invoice. */
+  /** The US invoice's entered exchange rate (D27, T-68); `null` until entered — and always on a CAD invoice. */
   fx: InvoiceFx | null;
 }
 

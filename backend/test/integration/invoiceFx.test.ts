@@ -29,8 +29,8 @@ interface FxRow {
   billing_week_end: string;
 }
 
-/** T-66 step 66.1 — the rate a dispatcher enters, stored on the CA invoice. */
-describe.skipIf(!hasDatabase)("exchange rate on the CA invoice (integration, T-66)", () => {
+/** T-66 step 66.1, moved by T-68 — the rate a dispatcher enters, stored on the US invoice. */
+describe.skipIf(!hasDatabase)("exchange rate on the US invoice (integration, T-66, T-68)", () => {
   let adminPool: Pool;
   let pool: Pool;
   let schema: string;
@@ -59,14 +59,14 @@ describe.skipIf(!hasDatabase)("exchange rate on the CA invoice (integration, T-6
 
   describe("PATCH /invoices/{id} { fxCadPerUsd }", () => {
     it("stores the rate with when it was entered, and returns it as fx", async () => {
-      await importCa(pool);
-      const caId = await idOf("700001");
-      expect(await stored(caId)).toMatchObject({ fx_cad_per_usd: null, fx_entered_at: null });
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      const usId = await idOf("100001");
+      expect(await stored(usId)).toMatchObject({ fx_cad_per_usd: null, fx_entered_at: null });
 
-      const response = await patch(app, caId, { fxCadPerUsd: 1.3712 });
+      const response = await patch(app, usId, { fxCadPerUsd: 1.3712 });
       expect(response.status).toBe(200);
       const body = (await response.json()) as InvoiceListItem;
-      const row = await stored(caId);
+      const row = await stored(usId);
       expect(row.fx_cad_per_usd).toBe("1.371200");
       expect(row.fx_entered_at).toBeInstanceOf(Date);
       expect(body.fx).toEqual({ rate: 1.3712, enteredAt: row.fx_entered_at!.toISOString() });
@@ -74,110 +74,117 @@ describe.skipIf(!hasDatabase)("exchange rate on the CA invoice (integration, T-6
     });
 
     it("a second value corrects it and moves fx_entered_at; the same value again leaves the time alone", async () => {
-      await importCa(pool);
-      const caId = await idOf("700001");
-      await patch(app, caId, { fxCadPerUsd: 1.3712 });
-      const first = await stored(caId);
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      const usId = await idOf("100001");
+      await patch(app, usId, { fxCadPerUsd: 1.3712 });
+      const first = await stored(usId);
 
-      await patch(app, caId, { fxCadPerUsd: 1.3712 });
-      expect((await stored(caId)).fx_entered_at).toEqual(first.fx_entered_at);
+      await patch(app, usId, { fxCadPerUsd: 1.3712 });
+      expect((await stored(usId)).fx_entered_at).toEqual(first.fx_entered_at);
 
-      await patch(app, caId, { fxCadPerUsd: 1.38 });
-      const corrected = await stored(caId);
+      await patch(app, usId, { fxCadPerUsd: 1.38 });
+      const corrected = await stored(usId);
       expect(corrected.fx_cad_per_usd).toBe("1.380000");
       expect(corrected.fx_entered_at!.getTime()).toBeGreaterThan(first.fx_entered_at!.getTime());
     });
 
     it("null clears the rate and its timestamp — back to pending", async () => {
-      await importCa(pool);
-      const caId = await idOf("700001");
-      await patch(app, caId, { fxCadPerUsd: 1.3712 });
-
-      const response = await patch(app, caId, { fxCadPerUsd: null });
-      expect(response.status).toBe(200);
-      expect(((await response.json()) as InvoiceListItem).fx).toBeNull();
-      expect(await stored(caId)).toMatchObject({ fx_cad_per_usd: null, fx_entered_at: null });
-    });
-
-    it("is a 400 on a USD invoice, with nothing changed", async () => {
       await importUs(pool, usInWeek(), "invoice_100001.csv");
       const usId = await idOf("100001");
+      await patch(app, usId, { fxCadPerUsd: 1.3712 });
 
-      const response = await patch(app, usId, { fxCadPerUsd: 1.3712 });
+      const response = await patch(app, usId, { fxCadPerUsd: null });
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as InvoiceListItem).fx).toBeNull();
+      expect(await stored(usId)).toMatchObject({ fx_cad_per_usd: null, fx_entered_at: null });
+    });
+
+    it("is a 400 on a CAD invoice, with nothing changed", async () => {
+      await importCa(pool);
+      const caId = await idOf("700001");
+
+      const response = await patch(app, caId, { fxCadPerUsd: 1.3712 });
       expect(response.status).toBe(400);
       expect(response.headers.get("content-type")).toContain("application/problem+json");
-      expect(((await response.json()) as { detail: string }).detail).toContain("USD invoice");
-      expect(await stored(usId)).toMatchObject({ fx_cad_per_usd: null, fx_entered_at: null });
-      // Clearing is no different: a USD invoice has no rate to touch.
-      expect((await patch(app, usId, { fxCadPerUsd: null })).status).toBe(400);
+      expect(((await response.json()) as { detail: string }).detail).toContain("CAD invoice");
+      expect(await stored(caId)).toMatchObject({ fx_cad_per_usd: null, fx_entered_at: null });
+      // Clearing is no different: a CAD invoice has no rate to touch.
+      expect((await patch(app, caId, { fxCadPerUsd: null })).status).toBe(400);
+    });
+
+    it("the migration's CHECK refuses a rate on a CAD invoice and accepts one on a USD invoice", async () => {
+      await importCa(pool);
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      await expect(pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'CAD'")).rejects.toThrow(/check/i);
+      await pool.query("UPDATE invoices SET fx_cad_per_usd = 1.3712, fx_entered_at = now() WHERE currency = 'USD'");
     });
 
     it("is a 400 for 0, -1, 0.4, 3.1, a string, or more than six places — with nothing changed", async () => {
-      await importCa(pool);
-      const caId = await idOf("700001");
-      await patch(app, caId, { fxCadPerUsd: 1.3712 });
-      const before = await stored(caId);
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      const usId = await idOf("100001");
+      await patch(app, usId, { fxCadPerUsd: 1.3712 });
+      const before = await stored(usId);
 
       for (const fxCadPerUsd of [0, -1, 0.4, 3.1, "1.3712", true, 1.3712345]) {
-        const response = await patch(app, caId, { fxCadPerUsd });
+        const response = await patch(app, usId, { fxCadPerUsd });
         expect(response.status, JSON.stringify(fxCadPerUsd)).toBe(400);
         expect(((await response.json()) as { detail: string }).detail.length).toBeGreaterThan(0);
       }
-      expect(await stored(caId)).toEqual(before);
+      expect(await stored(usId)).toEqual(before);
     });
 
     it("beside billingWeekEnd, applies both", async () => {
-      await importCa(pool);
-      const caId = await idOf("700001");
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      const usId = await idOf("100001");
 
-      const response = await patch(app, caId, { billingWeekEnd: "2026-09-16", fxCadPerUsd: 1.3712 });
+      const response = await patch(app, usId, { billingWeekEnd: "2026-09-16", fxCadPerUsd: 1.3712 });
       expect(response.status).toBe(200);
-      expect(await stored(caId)).toMatchObject({ billing_week_end: "2026-09-16", fx_cad_per_usd: "1.371200" });
+      expect(await stored(usId)).toMatchObject({ billing_week_end: "2026-09-16", fx_cad_per_usd: "1.371200" });
     });
 
     it("beside billingWeekEnd, applies neither when either is refused", async () => {
-      await importCa(pool);
-      const caId = await idOf("700001");
-      // Another CA invoice holding 2026-09-16, so the move is a 409.
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      const usId = await idOf("100001");
+      // Another US invoice holding 2026-09-16, so the move is a 409.
       await pool.query(
         `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date,
                                currency, qty_unit, grand_total, status, file_sha256)
          VALUES ('CA-HOLDER', '2026-09-10', '2026-09-16', '2026-09-16', '2026-09-17', '2026-09-18',
-                 'CAD', 'L', 0, 'imported', repeat('a', 64))`,
+                 'USD', 'gal', 0, 'imported', repeat('a', 64))`,
       );
-      const before = await stored(caId);
+      const before = await stored(usId);
 
-      const conflict = await patch(app, caId, { billingWeekEnd: "2026-09-16", fxCadPerUsd: 1.3712 });
+      const conflict = await patch(app, usId, { billingWeekEnd: "2026-09-16", fxCadPerUsd: 1.3712 });
       expect(conflict.status).toBe(409);
-      expect(await stored(caId)).toEqual(before);
+      expect(await stored(usId)).toEqual(before);
 
-      const badRate = await patch(app, caId, { billingWeekEnd: "2026-09-23", fxCadPerUsd: 3.1 });
+      const badRate = await patch(app, usId, { billingWeekEnd: "2026-09-23", fxCadPerUsd: 3.1 });
       expect(badRate.status).toBe(400);
-      expect(await stored(caId)).toEqual(before);
+      expect(await stored(usId)).toEqual(before);
 
-      const badWeek = await patch(app, caId, { billingWeekEnd: "2026-9-23", fxCadPerUsd: 1.3712 });
+      const badWeek = await patch(app, usId, { billingWeekEnd: "2026-9-23", fxCadPerUsd: 1.3712 });
       expect(badWeek.status).toBe(400);
-      expect(await stored(caId)).toEqual(before);
+      expect(await stored(usId)).toEqual(before);
     });
 
     it("leaves the rate alone when only the week moves", async () => {
-      await importCa(pool);
-      const caId = await idOf("700001");
-      await patch(app, caId, { fxCadPerUsd: 1.3712 });
-      const before = await stored(caId);
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      const usId = await idOf("100001");
+      await patch(app, usId, { fxCadPerUsd: 1.3712 });
+      const before = await stored(usId);
 
-      expect((await patch(app, caId, { billingWeekEnd: "2026-09-16" })).status).toBe(200);
-      expect(await stored(caId)).toMatchObject({
+      expect((await patch(app, usId, { billingWeekEnd: "2026-09-16" })).status).toBe(200);
+      expect(await stored(usId)).toMatchObject({
         billing_week_end: "2026-09-16",
         fx_cad_per_usd: "1.371200",
         fx_entered_at: before.fx_entered_at,
       });
     });
 
-    it("GET /invoices, GET /invoices/{id} and GET /periods carry fx — null on USD and until entered", async () => {
+    it("GET /invoices, GET /invoices/{id} and GET /periods carry fx — null on CAD and until entered", async () => {
       await importUs(pool, usInWeek(), "invoice_100001.csv");
       await importCa(pool);
-      const caId = await idOf("700001");
+      const usId = await idOf("100001");
 
       const weekFx = async () =>
         ((await (await get(app, "/periods")).json()) as { weeks: PeriodWeek[] }).weeks[0]!.invoices.map((i) => [i.currency, i.fx]);
@@ -186,36 +193,36 @@ describe.skipIf(!hasDatabase)("exchange rate on the CA invoice (integration, T-6
         ["CAD", null],
       ]);
 
-      await patch(app, caId, { fxCadPerUsd: 1.3712 });
-      const enteredAt = (await stored(caId)).fx_entered_at!.toISOString();
+      await patch(app, usId, { fxCadPerUsd: 1.3712 });
+      const enteredAt = (await stored(usId)).fx_entered_at!.toISOString();
       const fx = { rate: 1.3712, enteredAt };
 
       expect(await weekFx()).toEqual([
-        ["USD", null],
-        ["CAD", fx],
+        ["USD", fx],
+        ["CAD", null],
       ]);
       const list = (await (await get(app, "/invoices")).json()) as { rows: InvoiceListItem[] };
-      expect(Object.fromEntries(list.rows.map((r) => [r.currency, r.fx]))).toEqual({ USD: null, CAD: fx });
-      expect(((await (await get(app, `/invoices/${caId}`)).json()) as InvoiceListItem).fx).toEqual(fx);
+      expect(Object.fromEntries(list.rows.map((r) => [r.currency, r.fx]))).toEqual({ USD: fx, CAD: null });
+      expect(((await (await get(app, `/invoices/${usId}`)).json()) as InvoiceListItem).fx).toEqual(fx);
     });
   });
 
   describe("at import", () => {
-    it("importInvoice stores a rate given for a CA invoice", async () => {
-      const result = await importInvoice(pool, caPdf(), { sourceFilename: "sample-ca.pdf" }, { parse: parseInvoicePdf, fxCadPerUsd: 1.3712 });
+    it("importInvoice stores a rate given for a US invoice", async () => {
+      const result = await importInvoice(pool, usInWeek(), { sourceFilename: "invoice_100001.csv" }, { fxCadPerUsd: 1.3712 });
       expect(result.status).toBe("imported");
-      const row = await stored(await idOf("700001"));
+      const row = await stored(await idOf("100001"));
       expect(row.fx_cad_per_usd).toBe("1.371200");
       expect(row.fx_entered_at).toBeInstanceOf(Date);
     });
 
-    it("importInvoice refuses a rate on a USD invoice, or outside the band, before any row is written", async () => {
-      await expect(importInvoice(pool, usInWeek(), { sourceFilename: "invoice_100001.csv" }, { fxCadPerUsd: 1.3712 })).rejects.toThrow(
-        /USD invoice.*nothing was imported/,
-      );
+    it("importInvoice refuses a rate on a CAD invoice, or outside the band, before any row is written", async () => {
       await expect(
-        importInvoice(pool, caPdf(), { sourceFilename: "sample-ca.pdf" }, { parse: parseInvoicePdf, fxCadPerUsd: 13.712 }),
-      ).rejects.toThrow(/between 0.5 and 3.0/);
+        importInvoice(pool, caPdf(), { sourceFilename: "sample-ca.pdf" }, { parse: parseInvoicePdf, fxCadPerUsd: 1.3712 }),
+      ).rejects.toThrow(/CAD invoice.*nothing was imported/);
+      await expect(importInvoice(pool, usInWeek(), { sourceFilename: "invoice_100001.csv" }, { fxCadPerUsd: 13.712 })).rejects.toThrow(
+        /between 0.5 and 3.0/,
+      );
       for (const table of ["invoices", "fuel_stops", "invoice_totals", "invoice_rejections", "express_charges", "anomalies"]) {
         expect((await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`)).rows[0]!.n, table).toBe("0");
       }
@@ -245,15 +252,15 @@ describe.skipIf(!hasDatabase)("exchange rate on the CA invoice (integration, T-6
       };
       const printed = (spy: ReturnType<typeof vi.spyOn>) => spy.mock.calls.map((call) => String(call[0])).join("\n");
 
-      it("sets the rate on a CA file", async () => {
-        expect(await runImportInvoiceCli([written("sample-ca.pdf", caPdf()), "--fx-rate", "1.3712"], pool)).toBe(0);
-        expect((await stored(await idOf("700001"))).fx_cad_per_usd).toBe("1.371200");
+      it("sets the rate on a US file", async () => {
+        expect(await runImportInvoiceCli([written("invoice_100001.csv", usInWeek()), "--fx-rate", "1.3712"], pool)).toBe(0);
+        expect((await stored(await idOf("100001"))).fx_cad_per_usd).toBe("1.371200");
         expect(printed(logSpy)).toContain("1.3712 CAD per USD");
       });
 
-      it("fails on a USD file before any row is written", async () => {
-        expect(await runImportInvoiceCli([written("invoice_100001.csv", usInWeek()), "--fx-rate", "1.3712"], pool)).toBe(1);
-        expect(printed(errorSpy)).toContain("USD invoice");
+      it("fails on a CA file before any row is written", async () => {
+        expect(await runImportInvoiceCli([written("sample-ca.pdf", caPdf()), "--fx-rate", "1.3712"], pool)).toBe(1);
+        expect(printed(errorSpy)).toContain("CAD invoice");
         expect((await pool.query<{ n: string }>("SELECT count(*) AS n FROM invoices")).rows[0]!.n).toBe("0");
       });
 
@@ -263,10 +270,10 @@ describe.skipIf(!hasDatabase)("exchange rate on the CA invoice (integration, T-6
       });
 
       it("leaves an already-imported invoice's rate alone on a duplicate, and says how to correct it", async () => {
-        const file = written("sample-ca.pdf", caPdf());
+        const file = written("invoice_100001.csv", usInWeek());
         expect(await runImportInvoiceCli([file, "--fx-rate", "1.3712"], pool)).toBe(0);
         expect(await runImportInvoiceCli([file, "--fx-rate", "1.40"], pool)).toBe(0);
-        expect((await stored(await idOf("700001"))).fx_cad_per_usd).toBe("1.371200");
+        expect((await stored(await idOf("100001"))).fx_cad_per_usd).toBe("1.371200");
         expect(printed(logSpy)).toContain("exchange rate not applied");
       });
     });

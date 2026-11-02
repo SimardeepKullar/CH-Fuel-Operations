@@ -146,7 +146,7 @@ interface TransactionRow {
   invoice_number: string;
 }
 
-/** `BASE_SELECT`'s row: a `TransactionRow` plus the rate of its billing week's CA invoice. */
+/** `BASE_SELECT`'s row: a `TransactionRow` plus the rate of its billing week's US invoice. */
 interface ListRow extends TransactionRow {
   fx_cad_per_usd: string | null;
   fx_entered_at: Date | null;
@@ -180,13 +180,13 @@ const BASE_SELECT = `
     WHERE fuel_stop_id = fs.id AND product_code = 'TA'
     LIMIT 1
   ) ta ON true
-  -- T-66: the rate any conversion of this row uses — the one entered on its
-  -- billing week's CA invoice (a CA row's own; a US row's week-mate). One
+  -- T-66, T-68: the rate any conversion of this row uses — the one entered on
+  -- its billing week's US invoice (a US row's own; a CA row's week-mate). One
   -- imported invoice per currency per week (D26), so at most one row.
   LEFT JOIN LATERAL (
-    SELECT ca.fx_cad_per_usd, ca.fx_entered_at
-    FROM invoices ca
-    WHERE ca.billing_week_end = i.billing_week_end AND ca.currency = 'CAD' AND ca.status = 'imported'
+    SELECT us.fx_cad_per_usd, us.fx_entered_at
+    FROM invoices us
+    WHERE us.billing_week_end = i.billing_week_end AND us.currency = 'USD' AND us.status = 'imported'
   ) fx ON true
 `;
 
