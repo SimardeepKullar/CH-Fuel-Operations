@@ -277,7 +277,8 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(lastTableRequest()).toMatchObject({ week: "2026-09-09", currency: "CAD" });
     expect(lastTableRequest().units).toBeUndefined();
     expect(chipStates()).toEqual({ USD: "not-in-view", CAD: "in-view", all: "not-in-view" });
-    expect(pressed()).toBe("CAD/L");
+    // A CA invoice is never converted (T-68): no control, rows as printed.
+    expect(screen.queryByRole("group", { name: "Show amounts in" })).toBeNull();
     const head = document.querySelector(".tx-head-row")!.textContent!;
     expect(head).toContain("Diesel L");
     expect(head).toContain("Total CAD");
@@ -314,39 +315,49 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(lastTableRequest().currency).toBeUndefined();
     expect(lastTableRequest().units).toBeUndefined();
     expect(chipStates()).toEqual({ USD: "not-in-view", CAD: "not-in-view", all: "in-view" });
-    // Two invoices as printed: neither button describes everything on screen.
-    expect(pressed()).toBeNull();
+    // The US rows as printed, the CA rows as printed: USD/gal is the pressed default (T-68).
+    expect(pressed()).toBe("USD/gal");
     // Each row says which invoice, and which country, it came from.
     expect(screen.getAllByTestId("tx-invoice-tag").map((t) => t.textContent)).toEqual(["🇺🇸 999210", "🇨🇦 999217"]);
   });
 
-  it("USD/gal on the CA invoice asks for gallons and USD, and shows USD money with the rate and when it was entered (T-66)", async () => {
+  it("the CA invoice has no conversion control and never asks for units or convertTo (T-68)", async () => {
     searchParams = new URLSearchParams({ invoice: "inv-ca" });
     setupWeeks([PAIRED_WEEK]);
     render(<TransactionsPage />);
     await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
-
-    await waitFor(() => expect(lastTableRequest()).toMatchObject({ currency: "CAD", units: "imperial", convertTo: "USD" }));
-    await waitFor(() => expect(document.querySelector(".tx-total")!.textContent).toBe("$156.96"));
-    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Diesel billed USD/gal");
-    expect(screen.getByTestId("fx-rate-line").textContent).toContain("Converted at 1.3712 CAD per USD, entered Oct 6, 2026");
-    expect(screen.queryByTestId("conversion-pending")).toBeNull();
-    expect(pressed()).toBe("USD/gal");
+    expect(screen.queryByRole("group", { name: "Show amounts in" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "USD/gal" })).toBeNull();
+    expect(lastTableRequest().units).toBeUndefined();
+    expect(lastTableRequest().convertTo).toBeUndefined();
+    expect(document.querySelector(".tx-head-row")!.textContent).toContain("Diesel L");
   });
 
-  it("USD/gal on the CA invoice with no rate entered shows 'rate pending' and a link to that week's Overview", async () => {
-    searchParams = new URLSearchParams({ invoice: "inv-ca" });
+  it("CAD/L on the US invoice converts at the week's rate, shown with when it was entered (T-66, T-68)", async () => {
+    setupWeeks([PAIRED_WEEK]);
+    render(<TransactionsPage />);
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "CAD/L" }));
+
+    await waitFor(() => expect(lastTableRequest()).toMatchObject({ currency: "USD", units: "metric", convertTo: "CAD" }));
+    await waitFor(() => expect(document.querySelector(".tx-total")!.textContent).toBe("$326.70"));
+    expect(screen.getByTestId("fx-rate-line").textContent).toContain("Converted at 1.3712 CAD per USD, entered Oct 6, 2026");
+    expect(screen.queryByTestId("conversion-pending")).toBeNull();
+    expect(pressed()).toBe("CAD/L");
+  });
+
+  it("CAD/L on the US invoice with no rate entered shows 'rate pending' and a link to that week's Overview", async () => {
     setupWeeks([PAIRED_WEEK], "2026-09-09", false);
     render(<TransactionsPage />);
-    await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
+    fireEvent.click(screen.getByRole("button", { name: "CAD/L" }));
 
     await waitFor(() => expect(document.querySelector(".tx-total")!.textContent).toBe("rate pending"));
     expect(screen.getByTestId("conversion-pending").textContent).toContain("rate pending");
-    expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?scope=week&w=2026-09-09");
+    expect(screen.getByTestId("enter-rate-link").getAttribute("href")).toBe("/overview?scope=week&w=2026-09-09&rate=1");
   });
 
   it("CAD/L on the US invoice asks for litres; choosing the invoice's own format again sends nothing", async () => {
@@ -362,38 +373,42 @@ describe("TransactionsPage — invoice picker and the USD/gal | CAD/L conversion
     expect(lastTableRequest().convertTo).toBeUndefined();
   });
 
-  it("the conversion applies to every row under All invoices", async () => {
+  it("under All invoices CAD/L asks for litres and CAD with no currency, and the CA rows stay as printed (T-68)", async () => {
     searchParams = new URLSearchParams({ invoice: "all" });
     setupWeeks([PAIRED_WEEK]);
     render(<TransactionsPage />);
     await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
-    await waitFor(() => expect(lastTableRequest()).toMatchObject({ units: "imperial", convertTo: "USD" }));
+    fireEvent.click(screen.getByRole("button", { name: "CAD/L" }));
+    await waitFor(() => expect(lastTableRequest()).toMatchObject({ units: "metric", convertTo: "CAD" }));
     expect(lastTableRequest().currency).toBeUndefined();
-    expect(pressed()).toBe("USD/gal");
+    expect(pressed()).toBe("CAD/L");
+    // Back to USD/gal sends nothing at all.
+    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
+    await waitFor(() => expect(lastTableRequest().units).toBeUndefined());
+    expect(lastTableRequest().convertTo).toBeUndefined();
   });
 
   it("a conversion does not carry over: picking another invoice shows it as it came in", async () => {
-    searchParams = new URLSearchParams({ invoice: "inv-ca" });
+    searchParams = new URLSearchParams({ invoice: "inv-us" });
     setupWeeks([PAIRED_WEEK]);
     const view = render(<TransactionsPage />);
-    await waitFor(() => expect(screen.getByText("SAM")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "USD/gal" }));
-    await waitFor(() => expect(lastTableRequest().units).toBe("imperial"));
+    await waitFor(() => expect(screen.getByText("JORDAN")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "CAD/L" }));
+    await waitFor(() => expect(lastTableRequest().units).toBe("metric"));
 
-    // The strip's chip navigates; the URL now names the US invoice.
-    searchParams = new URLSearchParams({ invoice: "inv-us" });
-    view.rerender(<TransactionsPage />);
-    await waitFor(() => expect(lastTableRequest().currency).toBe("USD"));
-    expect(lastTableRequest().units).toBeUndefined();
-
-    // And back to the CA invoice: CAD/L again, not the earlier USD/gal.
+    // The strip's chip navigates to the CA invoice: no control, as printed.
     searchParams = new URLSearchParams({ invoice: "inv-ca" });
     view.rerender(<TransactionsPage />);
     await waitFor(() => expect(lastTableRequest().currency).toBe("CAD"));
     expect(lastTableRequest().units).toBeUndefined();
-    expect(pressed()).toBe("CAD/L");
+
+    // And back to the US invoice: USD/gal again, not the earlier CAD/L.
+    searchParams = new URLSearchParams({ invoice: "inv-us" });
+    view.rerender(<TransactionsPage />);
+    await waitFor(() => expect(lastTableRequest().currency).toBe("USD"));
+    expect(lastTableRequest().units).toBeUndefined();
+    expect(pressed()).toBe("USD/gal");
   });
 
   it("a one-invoice week shows the missing side as Not imported and no All chip", async () => {

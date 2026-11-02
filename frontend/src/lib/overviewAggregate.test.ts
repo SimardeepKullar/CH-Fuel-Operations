@@ -67,6 +67,23 @@ describe("aggregateWeeks — conversion and the combined band", () => {
     expect(agg.fx.meanRate).toBeCloseTo(1.4, 10);
   });
 
+  it("a CA-only week needs no rate: it is combined as billed and is not counted as missing one (T-68)", () => {
+    const [a, b] = overviewFixture("all").slice(0, 2) as [WeekFigures, WeekFigures];
+    a.fx = 1.3;
+    b.us = null;
+    b.fx = null;
+    const agg = aggregateWeeks([a, b]);
+    expect(agg.fx).toMatchObject({ weeksWithData: 1, covered: 1, missing: [], meanRate: 1.3 });
+    expect(agg.combined!.coveredWeeks).toBe(2);
+    expect(agg.combined!.caTotal).toBeCloseTo(a.ca!.dieselWithTax + a.ca!.defWithTax + a.ca!.other + b.ca!.dieselWithTax + b.ca!.defWithTax + b.ca!.other, 6);
+
+    // A US week with no rate is left out of the combined figures, as before.
+    a.fx = null;
+    const unrated = aggregateWeeks([a, b]);
+    expect(unrated.fx).toMatchObject({ weeksWithData: 1, covered: 0, missing: [a.weekEnd] });
+    expect(unrated.combined!.coveredWeeks).toBe(1);
+  });
+
   it("combined price is Σ diesel CAD / Σ litres", () => {
     const agg = aggregateWeeks(overviewFixture("all"));
     expect(agg.combined!.pricePerLitre).toBeCloseTo(agg.combined!.diesel / agg.combined!.litres, 10);

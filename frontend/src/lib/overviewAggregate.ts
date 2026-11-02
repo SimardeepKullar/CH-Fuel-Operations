@@ -230,10 +230,11 @@ function aggregateCa(weeks: readonly WeekFigures[]): CaAggregate | null {
   };
 }
 
-/** US converted at each covered week's own rate plus CA as billed, over weeks that have a rate. */
-function aggregateCombined(covered: readonly (WeekFigures & { fx: number })[]): CombinedAggregate | null {
+/** US converted at each covered week's own rate plus CA as billed. A CA-only week needs no rate (T-68). */
+function aggregateCombined(covered: readonly WeekFigures[]): CombinedAggregate | null {
   if (covered.length === 0) return null;
-  const us = (w: WeekFigures & { fx: number }, pick: (u: UsWeekFigures) => number) => (w.us === null ? 0 : pick(w.us) * w.fx);
+  // A week with a US side is in `covered` only with its rate, so `fx` is set wherever it is read.
+  const us = (w: WeekFigures, pick: (u: UsWeekFigures) => number) => (w.us === null ? 0 : pick(w.us) * w.fx!);
   const ca = (w: WeekFigures, pick: (c: CaWeekFigures) => number) => (w.ca === null ? 0 : pick(w.ca));
   const diesel = sum(covered, (w) => us(w, (u) => u.diesel) + ca(w, (c) => c.dieselWithTax));
   const litres = sum(covered, (w) => (w.us === null ? 0 : w.us.gal * LITRES_PER_GALLON) + ca(w, (c) => c.litres));
@@ -255,17 +256,19 @@ function aggregateCombined(covered: readonly (WeekFigures & { fx: number })[]): 
 
 /** Every figure the Overview shows, for any list of weeks (one, a range, or all). */
 export function aggregateWeeks(weeks: readonly WeekFigures[]): ScopeAggregate {
-  const withData = weeks.filter((w) => w.us !== null || w.ca !== null);
-  const covered = withData.filter((w): w is WeekFigures & { fx: number } => w.fx !== null);
+  // The rate converts the US side (T-68, D31): only a week with a US invoice needs one.
+  const needRate = weeks.filter((w) => w.us !== null);
+  const rated = needRate.filter((w): w is WeekFigures & { fx: number } => w.fx !== null);
+  const combinable = weeks.filter((w) => (w.us !== null && w.fx !== null) || (w.us === null && w.ca !== null));
   return {
     us: aggregateUs(weeks),
     ca: aggregateCa(weeks),
-    combined: aggregateCombined(covered),
+    combined: aggregateCombined(combinable),
     fx: {
-      weeksWithData: withData.length,
-      covered: covered.length,
-      missing: withData.filter((w) => w.fx === null).map((w) => w.weekEnd),
-      meanRate: covered.length === 0 ? null : sum(covered, (w) => w.fx) / covered.length,
+      weeksWithData: needRate.length,
+      covered: rated.length,
+      missing: needRate.filter((w) => w.fx === null).map((w) => w.weekEnd),
+      meanRate: rated.length === 0 ? null : sum(rated, (w) => w.fx) / rated.length,
     },
   };
 }

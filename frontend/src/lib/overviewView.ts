@@ -351,10 +351,13 @@ export function buildOverviewView(all: readonly WeekFigures[], scope: Scope, tra
   const rateMeta = single
     ? first?.fx != null
       ? `Exchange rate ${first.fx.toFixed(2)} CAD per USD`
-      : "No exchange rate entered"
+      : first?.us
+        ? "No exchange rate entered"
+        : "No US invoice, so no exchange rate needed"
     : `Exchange rates entered for ${fx.covered} of ${fx.weeksWithData} weeks`;
 
-  const missingWeeks = weeks.filter((w) => (w.us || w.ca) && w.fx === null);
+  // Only a week with a US invoice needs a rate: a CA-only week is in CAD already (T-68).
+  const missingWeeks = weeks.filter((w) => w.us && w.fx === null);
   const fxNotice: FxNoticeView | null =
     missingWeeks.length === 0
       ? null

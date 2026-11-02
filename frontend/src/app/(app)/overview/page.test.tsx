@@ -48,7 +48,7 @@ function periodsFor(scenario: OverviewScenario): PeriodWeek[] {
   return overviewFixture(scenario)
     .map((w): PeriodWeek => ({
       weekEnd: w.weekEnd,
-      invoices: [...(w.us ? [invoice(`us-${w.weekEnd}`, "USD", w.us.invoice)] : []), ...(w.ca ? [invoice(`ca-${w.weekEnd}`, "CAD", w.ca.invoice, w.fx === null ? null : { rate: w.fx, enteredAt: "2026-09-10T12:00:00.000Z" })] : [])],
+      invoices: [...(w.us ? [invoice(`us-${w.weekEnd}`, "USD", w.us.invoice, w.fx === null ? null : { rate: w.fx, enteredAt: "2026-09-10T12:00:00.000Z" })] : []), ...(w.ca ? [invoice(`ca-${w.weekEnd}`, "CAD", w.ca.invoice)] : [])],
     }))
     .reverse();
 }
@@ -231,8 +231,64 @@ describe("OverviewPage — entering the exchange rate", () => {
     const input = (await screen.findByPlaceholderText("e.g. 1.3712")) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "1.3712" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith(expect.stringMatching(/^ca-/), 1.3712));
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith(expect.stringMatching(/^us-/), 1.3712));
     await waitFor(() => expect(getOverviewWeeks).toHaveBeenCalledTimes(2));
+  });
+
+  it("the rates pop-up is a dialog on the US invoice; Escape and Close dismiss it (T-68)", async () => {
+    mount("today");
+    await screen.findByTestId("us-panel");
+    fireEvent.click(screen.getByRole("link", { name: "Edit rates" }));
+    const dialog = await screen.findByRole("dialog", { name: "Exchange rates" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(within(dialog).getByTestId("fx-rate-status").textContent).toContain("🇺🇸");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("link", { name: "Edit rates" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("?rate=1 opens the pop-up on load, and closing it drops the key", async () => {
+    mount("fxnone", "rate=1");
+    expect(await screen.findByRole("dialog", { name: "Exchange rates" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(replace).toHaveBeenLastCalledWith("/overview");
+  });
+
+  it("a 400's reason shows beside the field and keeps what was typed", async () => {
+    mount("today");
+    await screen.findByTestId("us-panel");
+    const { ApiError } = await import("../../../lib/api");
+    patchInvoiceFx.mockRejectedValue(new ApiError({ type: "about:blank", title: "Bad Request", status: 400, detail: "the rate must be between 0.5 and 3.0" }));
+    fireEvent.click(screen.getByRole("link", { name: "Edit rates" }));
+    const input = (await screen.findByPlaceholderText("e.g. 1.3712")) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "13.712" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect((await screen.findByTestId("fx-rate-error")).textContent).toContain("between 0.5 and 3.0");
+    expect(input.value).toBe("13.712");
+  });
+
+  it("a CA-only week shows no rate field and is not flagged as missing a rate (T-68)", async () => {
+    searchParams = new URLSearchParams();
+    const weeks = overviewFixture("today");
+    const last = weeks[weeks.length - 1]!;
+    last.us = null;
+    last.fx = null;
+    getOverviewWeeks.mockResolvedValue({ weeks });
+    listPeriods.mockResolvedValue({
+      weeks: periodsFor("today").map((p) => (p.weekEnd === last.weekEnd ? { ...p, invoices: p.invoices.filter((i) => i.currency === "CAD") } : p)),
+    });
+    getHealth.mockResolvedValue({ latestInvoicePeriod: last.weekEnd });
+    render(<OverviewPage />);
+    await screen.findByTestId("ca-panel");
+
+    expect(screen.queryByTestId("fx-notice")).toBeNull();
+    fireEvent.click(screen.getByRole("link", { name: "Edit rates" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByTestId("fx-rate")).toBeNull();
+    expect(within(dialog).getByText("No US invoice, so no rate is needed this week.")).toBeTruthy();
   });
 
   it("the missing-rate notice's link opens the same panel", async () => {
