@@ -15,13 +15,13 @@ interface Oracle {
   lines: Record<string, { amount: string; preTax: string | null; hst: string; gst: string; pst: string; qst: string; retail: string; billed: string }>;
 }
 
-/** T-66 step 66.3 — money in the Transactions conversion, at the entered rate. */
+/** T-66 step 66.3, rate moved to the US invoice by T-68 — money in the Transactions conversion, at the entered rate. */
 describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)", () => {
   let adminPool: Pool;
   let pool: Pool;
   let schema: string;
   let app: App;
-  let caId: string;
+  let usId: string;
 
   const get = async (query: string): Promise<ListTransactionsResult> => {
     const response = await app.handle(new Request(`http://localhost/api/v1/transactions?${query}`));
@@ -29,7 +29,7 @@ describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)"
     return (await response.json()) as ListTransactionsResult;
   };
   const setRate = (rate: number | null) =>
-    app.handle(new Request(`http://localhost/api/v1/invoices/${caId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: rate }) }));
+    app.handle(new Request(`http://localhost/api/v1/invoices/${usId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: rate }) }));
 
   const week = `week=${WEEK_END}&pageSize=200&includeLines=true`;
   const byId = (result: ListTransactionsResult) => new Map(result.rows.map((r) => [r.id, r]));
@@ -83,19 +83,19 @@ describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)"
     ({ adminPool, scopedPool: pool, schema } = await scopedSchema("test_tx_convert"));
     await seedUsFixtureRoster(pool);
     app = createApp({ pool, authRequired: false });
-    expect((await importUs(pool, usInWeek(), "invoice_100001.csv")).status).toBe("imported");
-    const ca = await importCa(pool);
-    expect(ca.status).toBe("imported");
-    caId = ca.status === "imported" ? ca.invoiceId : "";
+    const us = await importUs(pool, usInWeek(), "invoice_100001.csv");
+    expect(us.status).toBe("imported");
+    usId = us.status === "imported" ? us.invoiceId : "";
+    expect((await importCa(pool)).status).toBe("imported");
   });
 
   afterEach(async () => {
     await teardown(adminPool, pool, schema);
   });
 
-  it("convertTo=USD divides each CAD money field and line by the entered rate, rounded once; the row carries fx and invoiceCurrency", async () => {
+  it("convertTo=USD divides each CAD money field and line by the week's US invoice rate, rounded once; the row carries fx and invoiceCurrency", async () => {
     expect((await setRate(1.3712)).status).toBe(200);
-    const enteredAt = (await pool.query<{ t: Date }>("SELECT fx_entered_at AS t FROM invoices WHERE id = $1", [caId])).rows[0]!.t.toISOString();
+    const enteredAt = (await pool.query<{ t: Date }>("SELECT fx_entered_at AS t FROM invoices WHERE id = $1", [usId])).rows[0]!.t.toISOString();
 
     const result = await get(`${week}&currency=CAD&convertTo=USD`);
     const expected = await oracle("CAD", "/", "1.3712");
@@ -107,7 +107,7 @@ describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)"
       expectConverted(row, expected.get(row.id)!);
     }
     // Every row names the invoice BVD billed it on, conversion or not.
-    const caNumber = (await pool.query<{ n: string }>("SELECT invoice_number AS n FROM invoices WHERE id = $1", [caId])).rows[0]!.n;
+    const caNumber = (await pool.query<{ n: string }>("SELECT invoice_number AS n FROM invoices WHERE currency = 'CAD'", [])).rows[0]!.n;
     expect(new Set(result.rows.map((r) => r.invoiceNumber))).toEqual(new Set([caNumber]));
     // At least one line carries real tax, so the tax columns were converted, not just zeros.
     expect(result.rows.some((r) => r.lines!.some((l) => (l.hst ?? 0) !== 0))).toBe(true);
@@ -137,7 +137,7 @@ describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)"
     }
   });
 
-  it("with no entered rate, every CA money figure is null and the row is ratePending — never converted at 1.0", async () => {
+  it("with no rate on the week's US invoice, every CA money figure is null and the row is ratePending — never converted at 1.0", async () => {
     const result = await get(`${week}&currency=CAD&convertTo=USD`);
     expect(result.rows.length).toBeGreaterThan(0);
     for (const row of result.rows) {
@@ -170,7 +170,7 @@ describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)"
     expect(await snapshot()).toEqual(before);
   });
 
-  it("convertTo=CAD multiplies a US row by its week's CA rate, and is rate pending in a week with no CA invoice", async () => {
+  it("convertTo=CAD multiplies a US row by its own invoice's rate", async () => {
     await setRate(1.3712);
     const result = await get(`${week}&currency=USD&convertTo=CAD`);
     const expected = await oracle("USD", "*", "1.3712");
@@ -179,12 +179,43 @@ describe.skipIf(!hasDatabase)("GET /transactions?convertTo= (integration, T-66)"
       expect(row).toMatchObject({ currency: "CAD", invoiceCurrency: "USD", fx: { rate: 1.3712 } });
       expectConverted(row, expected.get(row.id)!);
     }
+  });
 
-    // Another week, US only: no CA rate to use.
-    await importUs(pool, redatedCsv("sample-redacted-2.csv", { "2026-01-19": "2026-09-02" }), "invoice_100002.csv");
+  it("two weeks, two rates: no row is converted at another week's rate; a US week with no rate is pending", async () => {
+    await setRate(1.3712);
+    const second = await importUs(pool, redatedCsv("sample-redacted-2.csv", { "2026-01-19": "2026-09-02" }), "invoice_100002.csv");
+    const secondId = second.status === "imported" ? second.invoiceId : "";
+    // Entered rate on the second week's own invoice: a different one.
+    await app.handle(new Request(`http://localhost/api/v1/invoices/${secondId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: 1.5 }) }));
+
+    const all = await get("pageSize=200&currency=USD&convertTo=CAD");
+    const weekOf = new Map(
+      (await pool.query<{ id: string; invoice_id: string }>("SELECT id, invoice_id FROM fuel_stops")).rows.map((r) => [r.id, r.invoice_id]),
+    );
+    expect(all.rows.some((r) => weekOf.get(r.id) === secondId)).toBe(true);
+    for (const row of all.rows) {
+      expect(row.fx!.rate, row.baseAuthCode).toBe(weekOf.get(row.id) === secondId ? 1.5 : 1.3712);
+    }
+
+    // Clearing the second week's rate makes only that week pending.
+    await app.handle(new Request(`http://localhost/api/v1/invoices/${secondId}`, { method: "PATCH", body: JSON.stringify({ fxCadPerUsd: null }) }));
     const lonely = await get("week=2026-09-02&pageSize=200&convertTo=CAD");
     expect(lonely.rows.length).toBeGreaterThan(0);
     expect(lonely.rows.every((r) => r.ratePending === true && r.total === null && r.currency === "CAD")).toBe(true);
+    const first = await get(`${week}&currency=USD&convertTo=CAD`);
+    expect(first.rows.every((r) => r.fx!.rate === 1.3712 && r.total !== null)).toBe(true);
+  });
+
+  it("a CA row in a week with no US invoice cannot be converted to USD: rate pending", async () => {
+    await setRate(1.3712);
+    // Move the US invoice, rate and all, to another week: the CA week is left with no US invoice.
+    await app.handle(new Request(`http://localhost/api/v1/invoices/${usId}`, { method: "PATCH", body: JSON.stringify({ billingWeekEnd: "2026-09-16" }) }));
+    const result = await get(`${week}&currency=CAD&convertTo=USD`);
+    expect(result.rows.length).toBeGreaterThan(0);
+    for (const row of result.rows) {
+      expect(row).toMatchObject({ currency: "USD", invoiceCurrency: "CAD", ratePending: true, total: null });
+      expect(row).not.toHaveProperty("fx");
+    }
   });
 
   it("under All invoices with convertTo=USD every row is in USD, so the money sums in one currency", async () => {

@@ -25,7 +25,9 @@
 .ov-fxnote-list { font: 400 0.78125rem var(--font-body); color: #8a5a0b; }
 .ov-fxnote-link { margin-left: auto; font: 600 0.8125rem var(--font-body); color: #7a4f08; }
 
-/* Rates panel */
+/* Rates panel — a pop-up (T-68) */
+.ov-modal-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 8vh 1rem 1rem; background: rgba(12, 22, 44, 0.55); overflow-y: auto; }
+.ov-modal { width: min(46rem, 100%); background: #fff; border: 1px solid #c9d2e3; box-shadow: 0 1.5rem 3rem rgba(12, 22, 44, 0.35); }
 .ov-rates-head { display: flex; align-items: center; justify-content: space-between; padding: 0.875rem 1.25rem; border-bottom: 1px solid #e3e8f1; }
 .ov-rates-body { display: flex; flex-direction: column; gap: 0.625rem; padding: 0.875rem 1.25rem 1.125rem; }
 .ov-rates-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem; }

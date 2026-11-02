@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import { loadSide, loadStoredFx, type OverviewSide } from "./overview.js";
+import { loadSide, loadWeekFx, type OverviewSide } from "./overview.js";
 
 /** Every figure the Overview needs of one billing week (T-70): what its range, all-time and
  * single-week views are all aggregated from. Each side is as BVD printed it — US in USD and
@@ -56,7 +56,7 @@ export interface OverviewWeek {
   /** The first and last transaction's date across the week's invoices (the printed range for one with none). */
   start: string;
   end: string;
-  /** CAD per 1 USD for the week; `null` until entered. Read from the week's CA invoice until T-68 moves it. */
+  /** CAD per 1 USD for the week; `null` until entered. Read from the week's US invoice (T-68). */
   fx: number | null;
   us: OverviewWeekUs | null;
   ca: OverviewWeekCa | null;
@@ -166,7 +166,7 @@ export async function getOverviewWeeks(pool: Pool): Promise<OverviewWeeksResult>
   const weeks = await Promise.all(
     rows.map(async (r): Promise<OverviewWeek> => {
       const [us, ca] = await Promise.all([loadSide(pool, r.week_end, "USD", options), loadSide(pool, r.week_end, "CAD", options)]);
-      const fx = ca ? await loadStoredFx(pool, ca.kpis.invoiceId) : null;
+      const fx = await loadWeekFx(pool, r.week_end);
       return {
         weekEnd: r.week_end,
         start: r.start,

@@ -96,7 +96,7 @@ export async function loadWeekInvoice(pool: Pool, week: string, currency: Invoic
 }
 
 /**
- * D27 (as amended): the exchange rate a dispatcher enters on a CA invoice, CAD
+ * D27 (as amended): the exchange rate a dispatcher enters on a US invoice (T-68), CAD
  * per 1 USD, stored as `numeric(10,6)`. The band is a typo guard — 13.712 or
  * 0.13712 for 1.3712 — not a market check.
  */
@@ -135,8 +135,8 @@ export interface InvoiceFx {
 /** `?convertTo=`: absent means each row in the currency its invoice was billed in. */
 export type RequestedCurrency = InvoiceCurrency | null;
 
-/** The rate behind a row as read from `invoices` — the CA invoice of the row's
- * billing week: its own for a CA row, its week's for a US one. */
+/** The rate behind a row as read from `invoices` — the US invoice of the row's
+ * billing week: its own for a US row, its week's for a CA one. */
 export interface StoredFx {
   /** `numeric(10,6)` as pg returns it, e.g. `"1.371200"`. */
   rate: string;
@@ -191,7 +191,7 @@ const CONVERTED_PRICE_PLACES = 4;
 /**
  * Edge 3 for invoice money (T-66, amending D25): `?convertTo=` converts every
  * money figure and per-unit price on a row at the rate the dispatcher entered
- * on that billing week's CA invoice — CAD -> USD divides by it, USD -> CAD
+ * on that billing week's US invoice — CAD -> USD divides by it, USD -> CAD
  * multiplies. Each stored figure is converted on its own and rounded once:
  * money to the cent, prices to four places (a price whose unit also changes
  * takes the unit factor inside that same rounding). Nothing converted is

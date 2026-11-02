@@ -124,7 +124,7 @@ interface InvoiceListRow {
   fx_entered_at: Date | null;
 }
 
-/** D27 (as amended): the exchange rate a dispatcher entered on a CA invoice. */
+/** D27 (as amended): the exchange rate a dispatcher entered on a US invoice (T-68). */
 export type { InvoiceFx };
 
 export interface InvoiceListItem {
@@ -145,7 +145,7 @@ export interface InvoiceListItem {
   grandTotal: number;
   status: "imported" | "quarantined";
   importedAt: string;
-  /** The entered rate; `null` until one is entered ("rate pending") and always on a USD invoice. */
+  /** The entered rate; `null` until one is entered ("rate pending") and always on a CAD invoice. */
   fx: InvoiceFx | null;
 }
 
@@ -326,9 +326,9 @@ const patchInvoiceSchema = z
  * invoice of the same currency already holds is a 409, not a silent merge (the
  * unique index decides, so two concurrent moves cannot both win).
  *
- * `fxCadPerUsd` (D27, T-66) enters or corrects a CA invoice's exchange rate —
+ * `fxCadPerUsd` (D27, T-66, T-68) enters or corrects a US invoice's exchange rate —
  * CAD per 1 USD — or clears it with `null`, back to "rate pending".
- * `fx_entered_at` moves only when the rate actually changes. A USD invoice has
+ * `fx_entered_at` moves only when the rate actually changes. A CAD invoice has
  * no rate (400), and a value outside 0.5–3.0 is a typo (400).
  *
  * Both fields go in one UPDATE, so a request carrying both applies both or
@@ -363,11 +363,11 @@ export async function handlePatchInvoice(pool: Pool, id: string, request: Reques
   if (!invoice) {
     return problemResponse({ title: "Not Found", status: 404, detail: `No invoice with id ${id}`, instance: url.pathname });
   }
-  if (setsFx && invoice.currency !== "CAD") {
+  if (setsFx && invoice.currency !== "USD") {
     return problemResponse({
       title: "Bad Request",
       status: 400,
-      detail: "a USD invoice has no exchange rate — the rate is entered on the CA invoice",
+      detail: "a CAD invoice has no exchange rate — the rate is entered on the week's US invoice",
       instance: url.pathname,
     });
   }

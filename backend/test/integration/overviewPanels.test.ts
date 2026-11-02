@@ -11,7 +11,7 @@ const RATE = 1.3712;
 const cents = (n: number): number => Math.round(n * 100);
 
 /**
- * T-65 step 65.1: `GET /overview` returns `{ us, ca, combined, fx }`. The
+ * T-65 step 65.1, rate moved to the US invoice by T-68: `GET /overview` returns `{ us, ca, combined, fx }`. The
  * synthetic block runs everywhere a database does: sample-redacted.csv (US)
  * and sample-ca.pdf (CA) share the week ending 2026-09-09. The real
  * 999210 + 999217 figures are in overviewPanels.real.test.ts.
@@ -38,7 +38,7 @@ describe.skipIf(!hasDatabase)("GET /overview: us, ca, combined, fx (integration,
   }
 
   const enterRate = (rate = RATE) =>
-    pool.query("UPDATE invoices SET fx_cad_per_usd = $1, fx_entered_at = now() WHERE currency = 'CAD'", [rate]);
+    pool.query("UPDATE invoices SET fx_cad_per_usd = $1, fx_entered_at = now() WHERE currency = 'USD'", [rate]);
 
   async function get(query: string): Promise<Awaited<ReturnType<typeof getOverview>>> {
     const response = await app.handle(new Request(`http://localhost/api/v1/overview?week=${WEEK_END}${query}`));
@@ -147,7 +147,7 @@ describe.skipIf(!hasDatabase)("GET /overview: us, ca, combined, fx (integration,
     expect(ca!.kpis.total.amount).toBeGreaterThan(0);
   });
 
-  it("a US-only week: ca is null, combined is partial, and needs no rate", async () => {
+  it("a US-only week: ca is null, combined is partial; USD needs no rate, CAD waits for it", async () => {
     expect((await importUs(pool, usInWeek(), "invoice_100001.csv")).status).toBe("imported");
     const { us, ca, combined, fx } = await get("");
 
@@ -155,24 +155,45 @@ describe.skipIf(!hasDatabase)("GET /overview: us, ca, combined, fx (integration,
     expect(fx).toBeNull();
     expect(combined).toMatchObject({ partial: true, missingSide: "CAD", ratePending: false, currency: "USD" });
     expect(combined!.spend.withTax).toBe(us!.kpis.total.amount);
-    // The same week read in CAD would need a rate no CA invoice can carry.
+    // The US invoice is the one converted, so the same week in CAD reads "rate pending" until it is entered.
     const inCad = await get("&convertTo=CAD");
     expect(inCad.combined).toMatchObject({ partial: true, ratePending: true });
     expect(inCad.combined!.spend).toEqual({ beforeTax: null, tax: null, withTax: null });
-  });
-
-  it("a CA-only week: us is null, combined is partial, and converting waits on the rate", async () => {
-    expect((await importCa(pool)).status).toBe("imported");
-    const pending = await get("");
-    expect(pending.us).toBeNull();
-    expect(pending.combined).toMatchObject({ partial: true, missingSide: "USD", ratePending: true });
+    expect((await get("")).usConverted).toMatchObject({ ratePending: true, total: null });
 
     await enterRate();
-    const { ca, combined } = await get("");
-    expect(combined!.ratePending).toBe(false);
-    expect(cents(combined!.spend.withTax!)).toBe(Math.round((cents(ca!.kpis.total.amount) * 10000) / 13712));
-    // In CAD it is the invoice itself, no rate involved.
-    expect((await get("&convertTo=CAD")).combined!.spend.withTax).toBe(ca!.kpis.total.amount);
+    const rated = await get("&convertTo=CAD");
+    expect(rated.combined).toMatchObject({ partial: true, ratePending: false, currency: "CAD" });
+    expect(cents(rated.combined!.spend.withTax!)).toBe(Math.round((cents(us!.kpis.total.amount) * 13712) / 10000));
+    expect(rated.fx).toEqual({ rate: RATE, enteredAt: expect.any(String) });
+  });
+
+  it("a CA-only week: us is null, and in CAD the combined panel is the CA invoice with no rate at all", async () => {
+    expect((await importCa(pool)).status).toBe("imported");
+    const { us, ca, combined, fx } = await get("&convertTo=CAD");
+    expect(us).toBeNull();
+    expect(fx).toBeNull();
+    expect(combined).toMatchObject({ partial: true, missingSide: "USD", ratePending: false, currency: "CAD" });
+    expect(combined!.spend.withTax).toBe(ca!.kpis.total.amount);
+    // Converting a CA invoice to USD has no rate to use: there is no US invoice to hold one.
+    expect((await get("")).combined).toMatchObject({ ratePending: true });
+  });
+
+  it("two weeks, two rates: each week's figures use its own US invoice's rate and no other", async () => {
+    await bothSides();
+    await enterRate();
+    // A second week, 7 days on, with its own US invoice at a different rate.
+    await pool.query(
+      `INSERT INTO invoices (invoice_number, period_start, period_end, billing_week_end, invoice_date, due_date,
+                             currency, qty_unit, grand_total, status, file_sha256, fx_cad_per_usd, fx_entered_at)
+       VALUES ('US-NEXT', '2026-09-10', '2026-09-16', '2026-09-16', '2026-09-17', '2026-09-18',
+               'USD', 'gal', 0, 'imported', repeat('b', 64), 1.5, now())`,
+    );
+    const first = await get("&convertTo=CAD");
+    expect(first.fx!.rate).toBe(RATE);
+    const second = await app.handle(new Request("http://localhost/api/v1/overview?week=2026-09-16&convertTo=CAD"));
+    expect(((await second.json()) as { fx: { rate: number } }).fx.rate).toBe(1.5);
+    expect(cents(first.usConverted!.total!)).toBe(Math.round((cents(first.us!.kpis.total.amount) * 13712) / 10000));
   });
 
   it("a week with neither invoice is a well-formed empty payload", async () => {

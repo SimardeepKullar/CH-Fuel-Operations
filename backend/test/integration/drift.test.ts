@@ -114,7 +114,7 @@ const FX_SHAPE = {
     { name: "fx_entered_at", type: "timestamptz", nullable: true },
   ],
   checks: [
-    "CHECK (((currency = 'CAD'::text) OR ((fx_cad_per_usd IS NULL) AND (fx_entered_at IS NULL))))",
+    "CHECK (((currency = 'USD'::text) OR ((fx_cad_per_usd IS NULL) AND (fx_entered_at IS NULL))))",
     "CHECK (((fx_cad_per_usd IS NULL) = (fx_entered_at IS NULL)))",
     "CHECK ((fx_cad_per_usd > (0)::numeric))",
   ].sort(),

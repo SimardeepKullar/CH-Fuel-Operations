@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choiceCurrency, choiceUnit, conversionParams, formatFxEnteredAt, nativeChoice } from "./conversion";
+import { choiceCurrency, choiceUnit, conversionParams, formatFxEnteredAt, nativeChoice, toggleFor } from "./conversion";
 
 describe("the USD/gal | CAD/L conversion (T-64)", () => {
   it("each invoice's default is the format it came in", () => {
@@ -18,6 +18,12 @@ describe("the USD/gal | CAD/L conversion (T-64)", () => {
     expect(conversionParams(null)).toEqual({});
     expect(conversionParams("USD/gal")).toEqual({ units: "imperial", convertTo: "USD" });
     expect(conversionParams("CAD/L")).toEqual({ units: "metric", convertTo: "CAD" });
+  });
+
+  it("toggleFor: a CA invoice is never converted, so it has no control; the US invoice and All default to USD/gal (T-68)", () => {
+    expect(toggleFor("CAD")).toEqual({ visible: false, native: "CAD/L" });
+    expect(toggleFor("USD")).toEqual({ visible: true, native: "USD/gal" });
+    expect(toggleFor("all")).toEqual({ visible: true, native: "USD/gal" });
   });
 
   it("formats when a rate was entered as a date with its year", () => {

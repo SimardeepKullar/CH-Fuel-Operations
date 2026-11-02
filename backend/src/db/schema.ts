@@ -237,7 +237,7 @@ export const SCHEMA: readonly TableDescriptor[] = [
     ],
     checks: [
       "CHECK ((currency = ANY (ARRAY['USD'::text, 'CAD'::text])))",
-      "CHECK (((currency = 'CAD'::text) OR ((fx_cad_per_usd IS NULL) AND (fx_entered_at IS NULL))))",
+      "CHECK (((currency = 'USD'::text) OR ((fx_cad_per_usd IS NULL) AND (fx_entered_at IS NULL))))",
       "CHECK (((fx_cad_per_usd IS NULL) = (fx_entered_at IS NULL)))",
       "CHECK ((fx_cad_per_usd > (0)::numeric))",
       "CHECK ((qty_unit = ANY (ARRAY['gal'::text, 'L'::text])))",

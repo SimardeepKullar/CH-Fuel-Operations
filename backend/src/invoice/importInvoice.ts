@@ -42,9 +42,9 @@ export interface ImportInvoiceOptions {
     sourceFilename: string,
   ) => ParsedInvoice | Promise<ParsedInvoice>;
   /**
-   * D27 (T-66): the exchange rate the dispatcher entered for a CA invoice, CAD
+   * D27 (T-66): the exchange rate the dispatcher entered for a US invoice, CAD
    * per 1 USD — the import CLI's `--fx-rate`. Checked as soon as the file is
-   * parsed, before anything is written: on a USD invoice, or outside the typo
+   * parsed, before anything is written: on a CAD invoice, or outside the typo
    * band, `importInvoice` throws and the database is untouched. A duplicate
    * file is a no-op and leaves an already-imported invoice's rate alone —
    * correcting it is `PATCH /invoices/{id}`'s job.
@@ -470,10 +470,10 @@ export async function importInvoice(
 
   const fxCadPerUsd = options?.fxCadPerUsd ?? null;
   if (fxCadPerUsd !== null) {
-    if (parsed.header.currency !== "CAD") {
+    if (parsed.header.currency !== "USD") {
       throw new Error(
         `invoice ${parsed.header.invoiceNumber} is a ${parsed.header.currency} invoice — ` +
-          "an exchange rate is entered on a CA invoice only; nothing was imported",
+          "an exchange rate is entered on a US invoice only; nothing was imported",
       );
     }
     const problem = fxRateProblem(fxCadPerUsd);

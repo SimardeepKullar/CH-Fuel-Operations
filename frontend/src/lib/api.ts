@@ -171,8 +171,8 @@ export function patchInvoiceWeek(id: string, billingWeekEnd: string): Promise<In
   });
 }
 
-/** `PATCH /invoices/{id}` `{ fxCadPerUsd }` (T-66, D27) — enters or corrects a CA invoice's
- * exchange rate, CAD per 1 USD, or clears it with `null` back to "rate pending". A USD invoice,
+/** `PATCH /invoices/{id}` `{ fxCadPerUsd }` (T-66, T-68, D27) — enters or corrects a US invoice's
+ * exchange rate, CAD per 1 USD, or clears it with `null` back to "rate pending". A CAD invoice,
  * or a rate outside 0.5–3.0, is a 400 whose `detail` says why; `ApiError` carries it. */
 export function patchInvoiceFx(id: string, fxCadPerUsd: number | null): Promise<InvoiceListItem> {
   return request<InvoiceListItem>(`/invoices/${encodeURIComponent(id)}`, {

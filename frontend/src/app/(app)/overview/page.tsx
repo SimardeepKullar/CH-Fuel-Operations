@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useOverviewScope } from "../../../hooks/useOverviewScope";
 import { useOverviewWeeks } from "../../../hooks/useOverviewWeeks";
 import { useWeek } from "../../../hooks/useWeek";
@@ -31,7 +32,20 @@ export default function OverviewPage() {
   const { weeks: periods, reloadPeriods } = useWeek();
   const weekEnds = useMemo(() => weeks.map((w) => w.weekEnd), [weeks]);
   const { scope, setScope } = useOverviewScope(weekEnds);
-  const [ratesOpen, setRatesOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // A "rate pending" link from another screen opens the pop-up with `?rate=1` (T-68).
+  const [ratesOpen, setRatesOpen] = useState(searchParams.get("rate") === "1");
+  const closeRates = useCallback(() => {
+    setRatesOpen(false);
+    if (searchParams.get("rate") !== null) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("rate");
+      const query = params.toString();
+      router.replace(query === "" ? pathname : `${pathname}?${query}`);
+    }
+  }, [searchParams, router, pathname]);
 
   const view = useMemo(
     () => buildOverviewView(weeks, scope, (side: Side | "all") => anomaliesLink(scope, side === "us" ? "USD" : side === "ca" ? "CAD" : "all")),
@@ -100,7 +114,7 @@ export default function OverviewPage() {
       <div className="ov">
         <InvoicesStrip view={view.invoices} />
         {view.fxNotice !== null && <FxNotice notice={view.fxNotice} onEnter={() => setRatesOpen(true)} />}
-        {ratesOpen && <RatesPanel weeks={view.weeks} periods={periods} onSaved={rateSaved} onClose={() => setRatesOpen(false)} />}
+        {ratesOpen && <RatesPanel weeks={view.weeks} periods={periods} onSaved={rateSaved} onClose={closeRates} />}
         <CombinedBand view={view.combined} onEnterRates={() => setRatesOpen(true)} />
         <BreakdownByCountry>
           <div className="ov-regions">

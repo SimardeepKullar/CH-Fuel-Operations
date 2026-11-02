@@ -10,14 +10,14 @@ import { formatFxEnteredAt } from "../lib/conversion";
 const DECIMAL = /^\d+(\.\d+)?$/;
 
 interface ExchangeRateFieldProps {
-  /** The selected week's CA invoice — the only kind that carries a rate. */
+  /** The week's US invoice — the only kind that carries a rate (T-68). */
   invoice: PeriodInvoice;
   /** After a save: re-read the shell's weeks, so every screen sees the new rate without a reload. */
   onSaved: () => Promise<void> | void;
 }
 
 /**
- * The exchange rate on a CA invoice, as the dispatcher enters it (T-66, D27):
+ * The exchange rate on a US invoice, as the dispatcher enters it (T-66, T-68, D27):
  * CAD per 1 USD, shown with when it was entered, or "rate pending". The box can
  * be changed at any time — Enter, or leaving it, saves through `PATCH
  * /invoices/{id}`, and emptying it clears the rate back to pending. Nothing
@@ -80,8 +80,8 @@ export default function ExchangeRateField({ invoice, onSaved }: ExchangeRateFiel
         {saving
           ? "Saving…"
           : fx === null
-            ? `rate pending — enter the rate for 🇨🇦 ${invoice.invoiceNumber}`
-            : `${fx.rate} CAD per USD for 🇨🇦 ${invoice.invoiceNumber} · entered ${formatFxEnteredAt(fx.enteredAt)}`}
+            ? `rate pending — enter the rate for 🇺🇸 ${invoice.invoiceNumber}`
+            : `${fx.rate} CAD per USD for 🇺🇸 ${invoice.invoiceNumber} · entered ${formatFxEnteredAt(fx.enteredAt)}`}
       </span>
       {error !== null && (
         <span className="fx-rate-error" role="alert" data-testid="fx-rate-error">

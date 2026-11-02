@@ -3,11 +3,14 @@
  * and `CAD/L`. Pure — what a choice means, and what it asks the API for.
  *
  * With no choice an invoice shows as BVD printed it: a US invoice in USD/gal, a
- * CA one in CAD/L. A choice converts every row on screen to its unit and its
- * currency: `?units=` converts quantity and per-unit price, `?convertTo=` money
- * and per-unit price, at the rate the dispatcher entered on the week's CA
- * invoice (T-66, D27). With no rate entered the API returns the money as `null`
- * with `ratePending` — never a 1.0 rate.
+ * CA one in CAD/L. A choice converts the **US rows** to its unit and currency
+ * (T-68): a CA invoice is never converted, so the toggle is hidden with it
+ * selected and, under All invoices, `CAD/L` leaves the CA rows as printed (the
+ * API's identity for a request that matches the row). `?units=` converts
+ * quantity and per-unit price, `?convertTo=` money and per-unit price, at the
+ * rate the dispatcher entered on the week's US invoice (T-66, T-68, D27). With
+ * no rate entered the API returns the money as `null` with `ratePending` —
+ * never a 1.0 rate.
  */
 import type { InvoiceCurrency, InvoiceQtyUnit } from "@ch/core/db/types";
 
@@ -18,6 +21,11 @@ export const DISPLAY_CHOICES: readonly DisplayChoice[] = ["USD/gal", "CAD/L"];
 /** The choice an invoice shows in by default — the one it came in. */
 export function nativeChoice(currency: InvoiceCurrency): DisplayChoice {
   return currency === "CAD" ? "CAD/L" : "USD/gal";
+}
+
+/** Whether the toggle shows for a side, and the choice that means "as printed" there (T-68). */
+export function toggleFor(side: "USD" | "CAD" | "all"): { visible: boolean; native: DisplayChoice } {
+  return side === "CAD" ? { visible: false, native: "CAD/L" } : { visible: true, native: "USD/gal" };
 }
 
 export function choiceCurrency(choice: DisplayChoice): InvoiceCurrency {

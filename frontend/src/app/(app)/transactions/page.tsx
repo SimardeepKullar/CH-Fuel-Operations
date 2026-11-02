@@ -14,7 +14,7 @@ import { anchorWeek, normaliseDays, rangeForDays, resolveSide, scopeDays, scopeQ
 import PageBanner from "../../../components/PageBanner";
 import ScopeControl from "../../../components/ScopeControl";
 import TransactionsStrip from "../../../components/TransactionsStrip";
-import { choiceCurrency, choiceUnit, conversionParams, nativeChoice, type DisplayChoice } from "../../../lib/conversion";
+import { choiceCurrency, choiceUnit, conversionParams, toggleFor, type DisplayChoice } from "../../../lib/conversion";
 import ConversionToggle from "../../../components/ConversionToggle";
 import { useTransactionFilterOptions } from "../../../hooks/useTransactionFilterOptions";
 import { useTransactionFilters } from "../../../hooks/useTransactionFilters";
@@ -131,8 +131,10 @@ export default function TransactionsPage() {
     setLastKey(selectionKey);
     setPick(null);
   }
-  const native = currency === undefined ? null : nativeChoice(currency);
-  const chosen = pick !== null && pick.key === selectionKey ? pick.choice : null;
+  const toggle = toggleFor(side);
+  const native = toggle.native;
+  // A CA invoice is never converted (T-68): a stale pick cannot reach it.
+  const chosen = toggle.visible && pick !== null && pick.key === selectionKey ? pick.choice : null;
   // Choosing the invoice's own format is the same as choosing nothing — no params.
   const conversion = chosen === native ? null : chosen;
   const shown = conversion ?? native;
@@ -251,7 +253,7 @@ export default function TransactionsPage() {
           truckOptions={filterOptions.trucks}
           cardOptions={filterOptions.cards}
           stateOptions={filterOptions.states}
-          unitsControl={<ConversionToggle shown={shown} onChange={(choice) => setPick({ key: selectionKey, choice })} />}
+          unitsControl={!toggle.visible ? undefined : <ConversionToggle shown={shown} onChange={(choice) => setPick({ key: selectionKey, choice })} />}
         />
       </div>
     </>
