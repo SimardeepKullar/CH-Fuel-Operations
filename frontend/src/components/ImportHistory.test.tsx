@@ -1,10 +1,20 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
-import ImportHistory from "./ImportHistory";
+const patchInvoiceFx = vi.fn();
+vi.mock("../lib/api", async () => {
+  const actual = await vi.importActual<typeof import("../lib/api")>("../lib/api");
+  return { ...actual, patchInvoiceFx: (...args: unknown[]) => patchInvoiceFx(...args) };
+});
 
-afterEach(cleanup);
+const { default: ImportHistory } = await import("./ImportHistory");
+const { ApiError } = await import("../lib/api");
+
+afterEach(() => {
+  cleanup();
+  patchInvoiceFx.mockReset();
+});
 
 function row(overrides: Partial<InvoiceListItem> = {}): InvoiceListItem {
   return {
@@ -64,7 +74,7 @@ describe("ImportHistory (T-42)", () => {
     expect(screen.getByText("No invoices imported yet")).toBeTruthy();
   });
 
-  it("is one row per invoice, with the week input and Move in that row's last cell (T-77)", () => {
+  it("is one row per invoice, with the week input and Move in one cell and the exchange rate in the next (T-77, T-67)", () => {
     render(<ImportHistory rows={[row()]} onReopenQuarantined={vi.fn()} onMoveWeek={vi.fn()} />);
     const entry = screen.getByTestId("import-history-row-inv-1").closest(".import-history-entry")!;
     expect(entry.querySelectorAll(".import-history-row")).toHaveLength(1);
@@ -72,7 +82,7 @@ describe("ImportHistory (T-42)", () => {
     expect(week.querySelector("input[type=date]")).toBeTruthy();
     expect(week.textContent).toContain("Move");
     const headers = Array.from(screen.getByTestId("import-history").querySelectorAll(".import-history-head > span")).map((e) => e.textContent);
-    expect(headers).toEqual(["Invoice #", "Period", "Total", "Status", "Imported", "Belongs to week ending"]);
+    expect(headers).toEqual(["Invoice #", "Period", "Total", "Status", "Imported", "Belongs to week ending", "Exchange rate (1 USD to CAD)"]);
   });
 
   it("badges the invoice by country instead of a flag, and pills the status (T-77)", () => {
@@ -139,5 +149,91 @@ describe("ImportHistory (T-42)", () => {
       expect(shown()).toEqual([]);
       expect(screen.getByText("No invoice matches")).toBeTruthy();
     });
+  });
+});
+
+/** T-67: the exchange-rate column. */
+describe("ImportHistory — the exchange-rate column (T-67)", () => {
+  const FX = { rate: 1.3712, enteredAt: "2026-10-01T12:00:00.000Z" };
+  const input = (id = "inv-1") => screen.getByTestId(`fx-input-${id}`) as HTMLInputElement;
+  const update = (id = "inv-1") => screen.getByTestId(`fx-update-${id}`) as HTMLButtonElement;
+  const renderRows = (rows: InvoiceListItem[], onFxSaved = vi.fn()) => {
+    render(<ImportHistory rows={rows} onReopenQuarantined={vi.fn()} onFxSaved={onFxSaved} />);
+    return onFxSaved;
+  };
+
+  it("a US row shows an input pre-filled with its rate, an Update button and when it was entered", () => {
+    renderRows([row({ fx: FX })]);
+    expect(input().value).toBe("1.3712");
+    expect(update().textContent).toBe("Update");
+    expect(screen.getByTestId("fx-status-inv-1").textContent).toMatch(/^entered Oct 1, 2026$/);
+  });
+
+  it("a US row with no rate has an empty input and says 'rate pending'", () => {
+    renderRows([row()]);
+    expect(input().value).toBe("");
+    expect(screen.getByTestId("fx-status-inv-1").textContent).toBe("rate pending");
+  });
+
+  it("a CA row has no input and no button — a muted n/a that says CAD invoices are never converted", () => {
+    renderRows([row({ id: "inv-ca", currency: "CAD" })]);
+    expect(screen.queryByTestId("fx-input-inv-ca")).toBeNull();
+    expect(screen.queryByTestId("fx-update-inv-ca")).toBeNull();
+    const na = screen.getByTestId("fx-na-inv-ca");
+    expect(na.textContent).toBe("n/a");
+    expect(na.getAttribute("title")).toBe("CAD invoices are never converted.");
+  });
+
+  it("a quarantined US row has no input and shows a dash", () => {
+    renderRows([row({ id: "inv-q", status: "quarantined" })]);
+    expect(screen.queryByTestId("fx-input-inv-q")).toBeNull();
+    expect(screen.getByTestId("fx-none-inv-q").textContent).toBe("—");
+  });
+
+  it("Update is disabled until the draft differs from the saved value", () => {
+    renderRows([row({ fx: FX })]);
+    expect(update().disabled).toBe(true);
+    fireEvent.change(input(), { target: { value: "1.40" } });
+    expect(update().disabled).toBe(false);
+    fireEvent.change(input(), { target: { value: "1.3712" } });
+    expect(update().disabled).toBe(true);
+  });
+
+  it("Update PATCHes that row's invoice with the number typed, then asks for the weeks to be re-read", async () => {
+    patchInvoiceFx.mockResolvedValue({ fx: { rate: 1.4, enteredAt: "2026-11-02T09:30:00.000Z" } });
+    const onFxSaved = renderRows([row({ id: "inv-a" }), row({ id: "inv-b", invoiceNumber: "999211" })]);
+    fireEvent.change(input("inv-b"), { target: { value: "1.4" } });
+    fireEvent.click(update("inv-b"));
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-b", 1.4));
+    expect(patchInvoiceFx).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onFxSaved).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("fx-status-inv-b").textContent).toMatch(/^entered /);
+    expect(update("inv-b").disabled).toBe(true);
+  });
+
+  it("emptying the box and pressing Update PATCHes null and goes back to rate pending", async () => {
+    patchInvoiceFx.mockResolvedValue({ fx: null });
+    renderRows([row({ fx: FX })]);
+    fireEvent.change(input(), { target: { value: "" } });
+    fireEvent.click(update());
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-1", null));
+    await waitFor(() => expect(screen.getByTestId("fx-status-inv-1").textContent).toBe("rate pending"));
+  });
+
+  it("a 400 shows its reason in that row, keeps the typed text, and leaves the other rows alone", async () => {
+    patchInvoiceFx.mockRejectedValue(new ApiError({ title: "Bad Request", status: 400, detail: "fxCadPerUsd must be between 0.5 and 3" }));
+    renderRows([row({ fx: FX }), row({ id: "inv-b", invoiceNumber: "999211" })]);
+    fireEvent.change(input(), { target: { value: "9" } });
+    fireEvent.click(update());
+    expect((await screen.findByTestId("fx-error-inv-1")).textContent).toContain("between 0.5 and 3");
+    expect(input().value).toBe("9");
+    expect(screen.queryByTestId("fx-error-inv-b")).toBeNull();
+    expect(input("inv-b").value).toBe("");
+  });
+
+  it("follows the invoice when the list is re-read with a new rate", () => {
+    const { rerender } = render(<ImportHistory rows={[row()]} onReopenQuarantined={vi.fn()} onFxSaved={vi.fn()} />);
+    rerender(<ImportHistory rows={[row({ fx: FX })]} onReopenQuarantined={vi.fn()} onFxSaved={vi.fn()} />);
+    expect(input().value).toBe("1.3712");
   });
 });

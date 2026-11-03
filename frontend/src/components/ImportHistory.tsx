@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { InvoiceListItem } from "@ch/core/api/routes/invoices";
 import { ApiError } from "../lib/api";
+import { useFxRateDraft } from "../hooks/useFxRateDraft";
+import { formatFxEnteredAt } from "../lib/conversion";
 import { formatMoneyGrouped } from "../lib/formatMoney";
 import { formatDatesDifferNote, formatImportedAt } from "../lib/weeks";
 import EmptyState from "./EmptyState";
@@ -15,6 +17,8 @@ interface ImportHistoryProps {
   /** Moves an invoice to another billing week (`PATCH /invoices/{id}`, D26). Rejects with the API's
    * problem on a refusal — a 409 names the invoice already holding the week. */
   onMoveWeek?: (id: string, weekEnd: string) => Promise<void>;
+  /** After an exchange rate is saved from a row: re-read the shell's weeks and this list (T-67). */
+  onFxSaved?: () => Promise<void> | void;
 }
 
 const STATUS_LABELS: Record<InvoiceListItem["status"], string> = {
@@ -42,6 +46,56 @@ function matchesQuery(row: InvoiceListItem, query: string): boolean {
   return terms.every((term) => haystack.includes(term));
 }
 
+/** "Oct 1, 2026" — the day a rate was entered; the full time is in the cell's tooltip. */
+function formatEnteredDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * A US invoice's exchange rate in its history row (T-67, D27): an input, an Update button that
+ * is live only once the draft differs from the saved value, and "rate pending" or "entered
+ * <day>". The draft, validation and save are `useFxRateDraft`, shared with the Overview.
+ */
+function FxRateCell({ row, onFxSaved }: { row: InvoiceListItem; onFxSaved?: () => Promise<void> | void }) {
+  const { fx, draft, setDraft, dirty, saving, error, save } = useFxRateDraft({
+    invoiceId: row.id,
+    fx: row.fx,
+    onSaved: onFxSaved ?? (() => undefined),
+  });
+  return (
+    <>
+      <input
+        type="text"
+        inputMode="decimal"
+        className="input import-history-fx-input"
+        placeholder="e.g. 1.3712"
+        aria-label={`Exchange rate (1 USD to CAD) for ${row.invoiceNumber}`}
+        data-testid={`fx-input-${row.id}`}
+        value={draft}
+        disabled={saving}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && dirty) {
+            e.preventDefault();
+            void save();
+          }
+        }}
+      />
+      <button type="button" className="import-history-move import-history-fx-update" data-testid={`fx-update-${row.id}`} disabled={!dirty || saving} onClick={() => void save()}>
+        {saving ? "Saving…" : "Update"}
+      </button>
+      <span className="import-history-fx-status" data-testid={`fx-status-${row.id}`} title={fx === null ? undefined : formatFxEnteredAt(fx.enteredAt)}>
+        {fx === null ? "rate pending" : `entered ${formatEnteredDay(fx.enteredAt)}`}
+      </span>
+      {error !== null && (
+        <span className="import-history-error" role="alert" data-testid={`fx-error-${row.id}`}>
+          {error}
+        </span>
+      )}
+    </>
+  );
+}
+
 function messageOf(err: unknown): string {
   if (err instanceof ApiError) return err.detail ?? err.title;
   if (err instanceof Error) return err.message;
@@ -67,6 +121,7 @@ export default function ImportHistory({
   loading = false,
   onReopenQuarantined,
   onMoveWeek,
+  onFxSaved,
 }: ImportHistoryProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -126,6 +181,7 @@ export default function ImportHistory({
             <span>Status</span>
             <span>Imported</span>
             <span>Belongs to week ending</span>
+            <span>Exchange rate (1 USD to CAD)</span>
           </div>
           {visible.map((row) => {
             const reopenable = row.status === "quarantined";
@@ -194,6 +250,19 @@ export default function ImportHistory({
                           </span>
                         )}
                       </>
+                    )}
+                  </span>
+                  <span className="import-history-fx">
+                    {!imported ? (
+                      <span className="muted" data-testid={`fx-none-${row.id}`}>
+                        —
+                      </span>
+                    ) : row.currency === "CAD" ? (
+                      <span className="muted" title="CAD invoices are never converted." data-testid={`fx-na-${row.id}`}>
+                        n/a
+                      </span>
+                    ) : (
+                      <FxRateCell row={row} onFxSaved={onFxSaved} />
                     )}
                   </span>
                 </div>

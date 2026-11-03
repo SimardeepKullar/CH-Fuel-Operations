@@ -25,6 +25,8 @@ type ImportedReport = Extract<ImportInvoiceResult, { status: "imported" }>["repo
 export interface ImportInvoiceResponse {
   status: "imported" | "quarantined" | "duplicate";
   invoiceId: string;
+  /** The invoice's stored exchange rate (T-67): `null` until one is entered, and always on a CAD invoice. */
+  fx: InvoiceFx | null;
   report: ImportedReport;
 }
 
@@ -35,12 +37,17 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function importResultResponse(result: ImportInvoiceResult, url: URL): Response {
+async function importResultResponse(pool: Pool, result: ImportInvoiceResult, url: URL): Promise<Response> {
   switch (result.status) {
     case "imported":
     case "quarantined":
     case "duplicate":
-      return jsonResponse({ status: result.status, invoiceId: result.invoiceId, report: result.report });
+      return jsonResponse({
+        status: result.status,
+        invoiceId: result.invoiceId,
+        fx: await loadInvoiceFx(pool, result.invoiceId),
+        report: result.report,
+      });
     case "conflict":
       // A byte-different file under an already-used invoice number, or a
       // second imported invoice of one currency in an occupied billing week
@@ -100,7 +107,7 @@ export async function handleImportInvoice(pool: Pool, request: Request, url: URL
       ? await importInvoice(pool, buffer, meta, { parse: parseInvoicePdf })
       : await importInvoice(pool, buffer, meta);
 
-  return importResultResponse(result, url);
+  return importResultResponse(pool, result, url);
 }
 
 const listQuerySchema = z.object({
@@ -197,6 +204,15 @@ function toListItem(row: InvoiceListRow): InvoiceListItem {
     importedAt: row.imported_at.toISOString(),
     fx: toInvoiceFx(row),
   };
+}
+
+/** The rate stored on one invoice, read after an import so a rate set at import (the CLI's `--fx-rate`) comes back too. */
+async function loadInvoiceFx(pool: Pool, id: string): Promise<InvoiceFx | null> {
+  const { rows } = await pool.query<{ fx_cad_per_usd: string | null; fx_entered_at: Date | null }>(
+    "SELECT fx_cad_per_usd, fx_entered_at FROM invoices WHERE id = $1",
+    [id],
+  );
+  return rows[0] === undefined ? null : toInvoiceFx(rows[0]);
 }
 
 export function toInvoiceFx(row: { fx_cad_per_usd: string | null; fx_entered_at: Date | null }): InvoiceFx | null {

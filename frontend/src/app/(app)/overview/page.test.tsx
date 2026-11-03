@@ -235,6 +235,17 @@ describe("OverviewPage — entering the exchange rate", () => {
     await waitFor(() => expect(getOverviewWeeks).toHaveBeenCalledTimes(2));
   });
 
+  it("clicking out of the box without pressing Enter does not save (T-67)", async () => {
+    mount("today");
+    await screen.findByTestId("us-panel");
+    fireEvent.click(screen.getByRole("link", { name: "Edit rates" }));
+    const input = (await screen.findByPlaceholderText("e.g. 1.3712")) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "1.3712" } });
+    fireEvent.blur(input);
+    expect(patchInvoiceFx).not.toHaveBeenCalled();
+    expect(input.value).toBe("1.3712");
+  });
+
   it("the rates pop-up is a dialog on the US invoice; Escape and Close dismiss it (T-68)", async () => {
     mount("today");
     await screen.findByTestId("us-panel");

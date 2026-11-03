@@ -57,6 +57,44 @@ describe.skipIf(!hasDatabase)("exchange rate on the US invoice (integration, T-6
       )
     ).rows[0]!;
 
+  describe("POST /invoices/import carries the invoice's rate (T-67)", () => {
+    const upload = (buffer: Buffer, filename: string) => {
+      const formData = new FormData();
+      formData.append("file", new Blob([buffer]), filename);
+      return app.handle(new Request("http://localhost/api/v1/invoices/import", { method: "POST", body: formData }));
+    };
+
+    it("a fresh US import has fx: null, with the invoice id and currency to PATCH against", async () => {
+      const body = (await (await upload(usInWeek(), "invoice_100001.csv")).json()) as {
+        status: string;
+        invoiceId: string;
+        fx: unknown;
+        report: { currency: string };
+      };
+      expect(body.status).toBe("imported");
+      expect(body.invoiceId).toBe(await idOf("100001"));
+      expect(body.report.currency).toBe("USD");
+      expect(body.fx).toBeNull();
+    });
+
+    it("an invoice that already has a rate comes back with it and when it was entered", async () => {
+      await importUs(pool, usInWeek(), "invoice_100001.csv");
+      const usId = await idOf("100001");
+      await patch(app, usId, { fxCadPerUsd: 1.3712 });
+      const row = await stored(usId);
+      const body = (await (await upload(usInWeek(), "invoice_100001.csv")).json()) as { status: string; fx: unknown };
+      expect(body.status).toBe("duplicate");
+      expect(body.fx).toEqual({ rate: 1.3712, enteredAt: row.fx_entered_at!.toISOString() });
+    });
+
+    it("a CA import has fx: null", async () => {
+      const response = await upload(caPdf(), "sample-ca.pdf");
+      const body = (await response.json()) as { status: string; fx: unknown; report: { currency: string } };
+      expect(body.report.currency).toBe("CAD");
+      expect(body.fx).toBeNull();
+    });
+  });
+
   describe("PATCH /invoices/{id} { fxCadPerUsd }", () => {
     it("stores the rate with when it was entered, and returns it as fx", async () => {
       await importUs(pool, usInWeek(), "invoice_100001.csv");

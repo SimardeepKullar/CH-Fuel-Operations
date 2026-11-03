@@ -482,9 +482,13 @@ guard), it is a 400 whose `detail` says why, and nothing changes. Responses carr
 the rate as `fx: { rate, enteredAt } | null` — on `GET /invoices`, `GET
 /invoices/{id}`, the `PATCH` response and each `/periods` invoice — `null` until
 entered and always on a CAD invoice; `enteredAt` moves only when the rate does.
-The request key is `fxCadPerUsd`; no *response* key carries `Usd`. The Overview
-is the one screen that enters it, in a pop-up ("Edit rates", or a "rate pending" link
-with `?rate=1`); the Import screen does not ask for it (T-67 adds that prompt).
+The request key is `fxCadPerUsd`; no *response* key carries `Usd`. The rate is entered in three places, all through `PATCH /invoices/{id}`: the Overview's pop-up
+("Edit rates", or a "rate pending" link with `?rate=1`); a **dialog on the Import screen** right
+after a US invoice imports (T-67; optional — "Enter later" leaves it at "rate pending" — and
+pre-filled when the invoice already carries a rate); and the Import history's **"Exchange rate
+(1 USD to CAD)" column** (T-67), an input and an Update button on imported US rows only (a CA row
+shows "n/a", a quarantined one "—"). `POST /invoices/import` returns the invoice's `fx` beside
+`invoiceId` so the dialog can pre-fill it.
 
 **Query parameters**, on every period-scoped route:
 

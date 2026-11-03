@@ -58,7 +58,7 @@ export default function ReconciliationPreview({ report, onConfirm }: Reconciliat
         This invoice has already been written to the database — Confirm just closes this screen and adds it to
         the history below.
       </p>
-      <button className="btn btn-primary" onClick={onConfirm} data-testid="confirm-button">
+      <button className="btn btn-primary btn-square btn-block" onClick={onConfirm} data-testid="confirm-button">
         Confirm
       </button>
     </div>

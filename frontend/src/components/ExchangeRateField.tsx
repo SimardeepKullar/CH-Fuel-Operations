@@ -1,13 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import type { InvoiceFx } from "@ch/core/api/routes/invoices";
 import type { PeriodInvoice } from "@ch/core/api/routes/periods";
-import { ApiError, patchInvoiceFx } from "../lib/api";
+import { useFxRateDraft } from "../hooks/useFxRateDraft";
 import { formatFxEnteredAt } from "../lib/conversion";
-
-/** A plain decimal, as typed — `Number("")` is 0 and `Number("0x1")` is 1, so `Number` alone won't do. */
-const DECIMAL = /^\d+(\.\d+)?$/;
 
 interface ExchangeRateFieldProps {
   /** The week's US invoice — the only kind that carries a rate (T-68). */
@@ -19,42 +14,13 @@ interface ExchangeRateFieldProps {
 /**
  * The exchange rate on a US invoice, as the dispatcher enters it (T-66, T-68, D27):
  * CAD per 1 USD, shown with when it was entered, or "rate pending". The box can
- * be changed at any time — Enter, or leaving it, saves through `PATCH
- * /invoices/{id}`, and emptying it clears the rate back to pending. Nothing
+ * be changed at any time — Enter saves through `PATCH
+ * /invoices/{id}` (leaving the box does not, as in the Import history, T-67), and emptying it clears the rate back to pending. Nothing
  * converted is stored, so every screen re-converts at the new rate on its next
  * read. A 400's reason shows beside the field.
  */
 export default function ExchangeRateField({ invoice, onSaved }: ExchangeRateFieldProps) {
-  const [fx, setFx] = useState<InvoiceFx | null>(invoice.fx);
-  const [draft, setDraft] = useState(invoice.fx === null ? "" : String(invoice.fx.rate));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function save() {
-    if (saving) return;
-    const text = draft.trim();
-    if (text === (fx === null ? "" : String(fx.rate))) {
-      setError(null);
-      return;
-    }
-    if (text !== "" && !DECIMAL.test(text)) {
-      setError("Enter the rate as a number, e.g. 1.3712");
-      return;
-    }
-    const rate = text === "" ? null : Number(text);
-    setSaving(true);
-    setError(null);
-    try {
-      const updated = await patchInvoiceFx(invoice.id, rate);
-      setFx(updated.fx);
-      setDraft(updated.fx === null ? "" : String(updated.fx.rate));
-      await onSaved();
-    } catch (err) {
-      setError(err instanceof ApiError ? (err.detail ?? err.message) : err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  }
+  const { fx, draft, setDraft, saving, error, save } = useFxRateDraft({ invoiceId: invoice.id, fx: invoice.fx, onSaved });
 
   return (
     <div className="panel-card fx-rate" data-testid="fx-rate">
@@ -67,7 +33,6 @@ export default function ExchangeRateField({ invoice, onSaved }: ExchangeRateFiel
           placeholder="e.g. 1.3712"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void save()}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
