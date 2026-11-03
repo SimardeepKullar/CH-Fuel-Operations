@@ -99,6 +99,37 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     ]);
   });
 
+  it("a unit entered without its leading zero is not a mismatch; '0' on the same truck still is", async () => {
+    const invoiceId = await importCases();
+    const { rows: base } = await scopedPool.query<{ card_id: string; driver_id: string }>(
+      "SELECT card_id, driver_id FROM fuel_stops WHERE invoice_id = $1 AND driver_id IS NOT NULL LIMIT 1",
+      [invoiceId],
+    );
+    const { rows: truck } = await scopedPool.query<{ id: string }>(
+      "SELECT id FROM trucks WHERE unit_number = '050'", // seeded by the roster migration
+    );
+    const insertStop = async (authCode: string, unitRaw: string): Promise<string> => {
+      const { rows } = await scopedPool.query<{ id: string }>(
+        `INSERT INTO fuel_stops
+           (invoice_id, base_auth_code, occurred_at, card_id, truck_id, driver_id, unit_raw, driver_name_raw, total)
+         VALUES ($1, $2, '2026-02-03T10:00:00Z', $3, $4, $5, $6, 'DRIVER', 10)
+         RETURNING id`,
+        [invoiceId, authCode, base[0]!.card_id, truck[0]!.id, base[0]!.driver_id, unitRaw],
+      );
+      return rows[0]!.id;
+    };
+    const padless = await insertStop("T79-PADLESS", "50");
+    const wrong = await insertStop("T79-ZERO", "0");
+
+    await runAnomalies(scopedPool, invoiceId);
+
+    const { rows } = await scopedPool.query<{ subject_id: string }>(
+      "SELECT subject_id FROM anomalies WHERE rule = 'unit_mismatch' AND subject_id = ANY($1::uuid[])",
+      [[padless, wrong]],
+    );
+    expect(rows.map((r) => r.subject_id)).toEqual([wrong]);
+  });
+
   it("re-running produces no duplicates", async () => {
     const invoiceId = await importCases(); // runs the engine once, via importInvoice
     await runAnomalies(scopedPool, invoiceId); // run it again directly

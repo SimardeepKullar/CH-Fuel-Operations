@@ -34,4 +34,19 @@ describe("unitMismatch", () => {
 
     expect(unitMismatch(stops, {})).toEqual([]);
   });
+
+  it("does not flag a unit entered without its leading zero ('50' against '050')", () => {
+    const stops: UnitMismatchStop[] = [{ id: "stop-pad", unitRaw: "50", truckUnitNumber: "050" }];
+
+    expect(unitMismatch(stops, {})).toEqual([]);
+  });
+
+  it("still flags '0' and '3224' against a real truck once leading zeros are ignored", () => {
+    const stops: UnitMismatchStop[] = [
+      { id: "stop-zero", unitRaw: "0", truckUnitNumber: "072" },
+      { id: "stop-trailer", unitRaw: "3224", truckUnitNumber: "064" },
+    ];
+
+    expect(unitMismatch(stops, {}).map((finding) => finding.subjectId)).toEqual(["stop-zero", "stop-trailer"]);
+  });
 });
