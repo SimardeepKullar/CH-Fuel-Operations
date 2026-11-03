@@ -242,7 +242,7 @@ function buildColumns(
         return (
           <span className="tx-flags">
             {flags.map((f) => (
-              <AnomalyFlag key={f.rule} flag={f} />
+              <AnomalyFlag key={f.rule} flag={f} enteredUnit={row.original.truck.raw} />
             ))}
           </span>
         );

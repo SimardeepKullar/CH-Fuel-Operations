@@ -20,6 +20,10 @@ INSERT INTO anomaly_thresholds (rule, config) VALUES
   -- truck's unit_number or it doesn't (T-29's own agrees comparison).
   ('unit_mismatch', '{}'),
 
+  -- No tunable knob: a stop has a truck or it doesn't (T-78). The engine throws
+  -- on a rule without a row here.
+  ('no_truck_on_file', '{}'),
+
   -- Two fills on the same card at the same station within this many minutes
   -- are implausible back-to-back purchases (§A10: 78 minutes at LOVES #275).
   ('too_close', '{"maxMinutesApart": 120}'),

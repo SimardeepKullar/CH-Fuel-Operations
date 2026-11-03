@@ -111,8 +111,8 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("GET /overview against 999210 (
   it("receipt compliance and anomaly count reflect the database, not A5's pre-T-30/T-35 figures", async () => {
     const result = await getOverview(scopedPool, "2026-09-09");
     expect(result.us!.kpis.receiptCompliance).toEqual({ confirmed: 0, total: 66 });
-    // 30 against the owner's current roster; invoice999210.test.ts breaks it down.
-    expect(result.us!.kpis.anomaliesFlagged).toBe(30);
+    // 38 against the owner's current roster; invoice999210.test.ts breaks it down.
+    expect(result.us!.kpis.anomaliesFlagged).toBe(38);
   });
 
   it("a period with no matching invoice returns a well-formed empty payload over HTTP, not an error", async () => {

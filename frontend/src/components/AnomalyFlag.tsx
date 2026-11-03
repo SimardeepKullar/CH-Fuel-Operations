@@ -10,6 +10,7 @@ const RULE_LABELS: Record<string, string> = {
   charges_no_fuel: "Scale",
   price_above_published: "Price high",
   not_on_roster: "Not on roster",
+  no_truck_on_file: "No truck",
 };
 
 /** The rules a dispatcher can filter by: every one the screen renders (`charges_no_fuel` never shows, T-40H). */
@@ -24,6 +25,7 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
   too_close: "Another fill on the same card at the same station came shortly before",
   price_above_published: "Billed price is above BVD's published price",
   not_on_roster: "This card has no driver on the fleet roster",
+  no_truck_on_file: "No truck on file for this driver on this date",
 };
 
 /** `Unit mismatch: Unit typed at the pump…` — the text a flag's hover shows. */
@@ -43,15 +45,25 @@ export function flagLabel(rule: string): string {
 
 interface AnomalyFlagProps {
   flag: AnomalyFlagData;
+  /** What the driver typed at the pump. Shown beside "No truck on file", the
+   * one flag whose point is the unit there was nothing to compare it with. */
+  enteredUnit?: string;
 }
 
 /** A10: two severities only — amber ("worth a look") and red ("probably a
  * billing error"). `AnomalySeverity` is a two-valued union at the type
  * level (`db/types.ts`), so a third level is unrepresentable, not merely
  * unused. */
-export default function AnomalyFlag({ flag }: AnomalyFlagProps) {
+export default function AnomalyFlag({ flag, enteredUnit }: AnomalyFlagProps) {
+  const description = flag.rule === "no_truck_on_file" ? flagDescription(flag.rule) : null;
+  const title =
+    description === null ? undefined : enteredUnit ? `${description} — entered ${enteredUnit}` : description;
   return (
-    <span className={`anomaly-flag anomaly-flag-${flag.severity}`} data-severity={flag.severity}>
+    <span
+      className={`anomaly-flag anomaly-flag-${flag.severity}`}
+      data-severity={flag.severity}
+      title={title}
+    >
       {flagLabel(flag.rule)}
     </span>
   );
