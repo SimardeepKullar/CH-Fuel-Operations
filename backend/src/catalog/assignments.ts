@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { isUuid } from "../actuals/ids.js";
+import { emptyReport, reresolveInTransaction, windowPeriod, type FlagChange, type ReresolveReport } from "../resolve/reresolve.js";
+import { changedWindow } from "./assignmentWindow.js";
 
 export interface TruckAssignmentForMatch {
   driverId: string;
@@ -87,7 +89,7 @@ interface TruckAssignmentQueryRow {
  * regardless of the session's timezone setting.
  */
 export async function resolveAssignment(
-  pool: Pool,
+  pool: Pool | PoolClient,
   cardId: string,
   at: Date,
 ): Promise<AssignmentResolution> {
@@ -155,6 +157,16 @@ export type AssignmentChange =
 export interface AssignmentPreview {
   /** The affected driver's assignment rows before and after the change. */
   assignments: { before: AssignmentRow[]; after: AssignmentRow[] };
+  /** Stops whose truck would change (`before` → `after`, as truck ids). */
+  stops: ReresolveReport["stopMoves"];
+  /** Flags that would clear, appear or change on the stops that move. */
+  flags: { cleared: FlagChange[]; appeared: FlagChange[]; changed: FlagChange[] };
+}
+
+/** What a write did: the row it wrote and the re-resolve that followed it. */
+export interface AssignmentWriteResult {
+  assignmentId: string;
+  report: ReresolveReport;
 }
 
 interface RawAssignmentRow {
@@ -329,66 +341,102 @@ async function editDatesInTransaction(
   return driverId;
 }
 
+interface AppliedChange {
+  assignmentId: string;
+  driverId: string;
+  before: AssignmentRow[];
+  after: AssignmentRow[];
+  report: ReresolveReport;
+}
+
+async function driverOfAssignment(client: PoolClient, assignmentId: string): Promise<string> {
+  const { rows } = isUuid(assignmentId)
+    ? await client.query<{ driver_id: string }>("SELECT driver_id FROM truck_assignments WHERE id = $1", [assignmentId])
+    : { rows: [] };
+  if (!rows[0]) {
+    throw new AssignmentRejected("assignment_not_found", `no assignment ${assignmentId}`);
+  }
+  return rows[0].driver_id;
+}
+
+/**
+ * The change, then its consequences, on the caller's transaction: the stops
+ * whose truck can differ (only the driver's, only the days whose truck changed
+ * — a stop before the change keeps its truck and flags) are re-resolved and
+ * their invoices' flags rebuilt. Nothing here commits.
+ */
+async function applyChange(client: PoolClient, change: AssignmentChange): Promise<AppliedChange> {
+  const driverId = change.kind === "reassign" ? change.driverId : await driverOfAssignment(client, change.assignmentId);
+  await lockDriver(client, driverId);
+  const before = await loadDriverAssignments(client, driverId);
+
+  const assignmentId =
+    change.kind === "reassign"
+      ? await reassignInTransaction(client, change)
+      : (await editDatesInTransaction(client, change), change.assignmentId);
+
+  const after = await loadDriverAssignments(client, driverId);
+  const window = changedWindow(before, after);
+  const report = window ? await reresolveInTransaction(client, windowPeriod(driverId, window)) : emptyReport(false);
+  return { assignmentId, driverId, before, after, report };
+}
+
 /**
  * A *new* truck for a driver from `from` (a `YYYY-MM-DD` day), which may be in
  * the past. Closes the driver's open row the day before and opens the new one;
  * a driver with no open row just gets the new row. Rejects (as
  * `AssignmentRejected`) an unknown or inactive truck, the open row's own truck
  * (that is a date edit) and a `from` on or before the open row's start.
- * Returns the new assignment's id.
+ *
+ * In the same transaction, re-resolves the driver's stops from `from` on and
+ * rebuilds their invoices' flags — stops before `from` are untouched.
  */
 export async function reassignTruck(
   pool: Pool,
   input: { driverId: string; truckId: string; from: string },
-): Promise<string> {
-  return inTransaction(pool, (client) => reassignInTransaction(client, input));
+): Promise<AssignmentWriteResult> {
+  return inTransaction(pool, async (client) => {
+    const { assignmentId, report } = await applyChange(client, { kind: "reassign", ...input });
+    return { assignmentId, report };
+  });
 }
 
 /**
  * Moves an existing row's start or end, either direction. The schema's
  * exclusion constraint refuses an overlap with the driver's other rows; a gap
- * is allowed (its stops become "No truck on file").
+ * is allowed (its stops become "No truck on file"). Re-resolves the stops on
+ * the days whose truck changed, and rebuilds their flags, in the same transaction.
  */
 export async function editAssignmentDates(
   pool: Pool,
   input: { assignmentId: string; effectiveFrom: string; effectiveTo: string | null },
-): Promise<void> {
-  await inTransaction(pool, async (client) => {
-    await editDatesInTransaction(client, input);
+): Promise<AssignmentWriteResult> {
+  return inTransaction(pool, async (client) => {
+    const { assignmentId, report } = await applyChange(client, { kind: "editDates", ...input });
+    return { assignmentId, report };
   });
 }
 
 /**
- * Runs the same change a write would, inside a transaction it always rolls
- * back, and returns the driver's rows before and after. Rejects exactly as the
- * real write does. It informs; it does not block.
+ * Runs the same change a write would — rows, re-resolve and flag rebuild —
+ * inside a transaction it always rolls back, and returns the diff: the rows
+ * before and after, the stops whose truck changes and the flags that clear and
+ * appear. Rejects exactly as the real write does. It informs; it does not block.
  */
 export async function previewAssignmentChange(pool: Pool, change: AssignmentChange): Promise<AssignmentPreview> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    let driverId: string;
-    if (change.kind === "reassign") {
-      driverId = change.driverId;
-    } else {
-      const { rows } = isUuid(change.assignmentId)
-        ? await client.query<{ driver_id: string }>("SELECT driver_id FROM truck_assignments WHERE id = $1", [
-            change.assignmentId,
-          ])
-        : { rows: [] };
-      if (!rows[0]) {
-        throw new AssignmentRejected("assignment_not_found", `no assignment ${change.assignmentId}`);
-      }
-      driverId = rows[0].driver_id;
-    }
-    const before = await loadDriverAssignments(client, driverId);
-    if (change.kind === "reassign") {
-      await reassignInTransaction(client, change);
-    } else {
-      await editDatesInTransaction(client, change);
-    }
-    const after = await loadDriverAssignments(client, driverId);
-    return { assignments: { before, after } };
+    const { before, after, report } = await applyChange(client, change);
+    return {
+      assignments: { before, after },
+      stops: report.stopMoves,
+      flags: {
+        cleared: report.flags.filter((f) => f.change === "cleared"),
+        appeared: report.flags.filter((f) => f.change === "appeared"),
+        changed: report.flags.filter((f) => f.change === "changed"),
+      },
+    };
   } finally {
     await client.query("ROLLBACK");
     client.release();

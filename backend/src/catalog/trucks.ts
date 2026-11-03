@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import type { TruckRow } from "../db/types.js";
 import { sameUnit } from "../domain/units.js";
 
@@ -8,7 +8,7 @@ import { sameUnit } from "../domain/units.js";
  * display-time validator; a lookup here must not throw on a raw value that
  * fails its pattern, so it does not call it.
  */
-export async function getTruckById(pool: Pool, id: string): Promise<TruckRow | null> {
+export async function getTruckById(pool: Pool | PoolClient, id: string): Promise<TruckRow | null> {
   const { rows } = await pool.query<TruckRow>("SELECT * FROM trucks WHERE id = $1", [id]);
   return rows[0] ?? null;
 }

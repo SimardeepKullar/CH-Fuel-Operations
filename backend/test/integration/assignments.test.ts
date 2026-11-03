@@ -6,7 +6,15 @@ import {
   previewAssignmentChange,
   reassignTruck,
 } from "../../src/catalog/assignments.js";
-import { insertAssignment, insertDriver, insertTruck, scopedSchema, teardown } from "./support/actualsFixtures.js";
+import {
+  insertAssignment,
+  insertDriver,
+  insertInvoice,
+  insertTruck,
+  scopedSchema,
+  teardown,
+} from "./support/actualsFixtures.js";
+import { flagsOf, newScenario, truckOf } from "./support/truckScenario.js";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const NIL = "00000000-0000-0000-0000-000000000000";
@@ -243,7 +251,205 @@ describe.skipIf(!hasDatabase)("assignment write paths (integration)", () => {
     });
   });
 
+  describe("re-resolving the driver's stops on every write (T-78)", () => {
+    /** Example 1's driver: truck 1 from Sep 3, stops Sep 3-6 entering 1, 77, 4, 4. */
+    async function example1() {
+      const s = await newScenario(pool, "EX1");
+      const t1 = await insertTruck(pool, "1");
+      const t4 = await insertTruck(pool, "4");
+      await insertAssignment(pool, { driverId: s.driverId, truckId: t1, effectiveFrom: "2026-09-03" });
+      const stops = {
+        sep3: await s.addStop("2026-09-03", "1"),
+        sep4: await s.addStop("2026-09-04", "77"),
+        sep5: await s.addStop("2026-09-05", "4"),
+        sep6: await s.addStop("2026-09-06", "4"),
+      };
+      await s.flag();
+      return { s, t1, t4, stops };
+    }
+
+    it("a truckless driver given a truck gets it on their stops and loses No truck on file", async () => {
+      const s = await newScenario(pool, "TRUCKLESS");
+      const t2 = await insertTruck(pool, "2");
+      const sep3 = await s.addStop("2026-09-03", "2");
+      const sep4 = await s.addStop("2026-09-04", "2");
+      await s.flag();
+      expect(await flagsOf(pool, sep3)).toEqual(["no_truck_on_file:no_assignment"]);
+
+      const { report } = await reassignTruck(pool, { driverId: s.driverId, truckId: t2, from: "2026-09-03" });
+
+      expect(await truckOf(pool, sep3)).toBe("2");
+      expect(await truckOf(pool, sep4)).toBe("2");
+      expect(await flagsOf(pool, sep3)).toEqual([]);
+      expect(await flagsOf(pool, sep4)).toEqual([]);
+      expect(report.stopMoves).toHaveLength(2);
+    });
+
+    it("a reassignment from D leaves earlier stops' truck and flags as they were", async () => {
+      const { s, t1, t4, stops } = await example1();
+      expect(await flagsOf(pool, stops.sep4)).toEqual(["unit_mismatch"]);
+      expect(await flagsOf(pool, stops.sep5)).toEqual(["unit_mismatch"]); // entered 4, truck 1 so far
+
+      const { report } = await reassignTruck(pool, { driverId: s.driverId, truckId: t4, from: "2026-09-05" });
+
+      // From Sep 5: moved to truck 4, mismatches cleared.
+      expect([await truckOf(pool, stops.sep5), await truckOf(pool, stops.sep6)]).toEqual(["4", "4"]);
+      expect([await flagsOf(pool, stops.sep5), await flagsOf(pool, stops.sep6)]).toEqual([[], []]);
+      // Before Sep 5: untouched, Sep 4 still 77 vs 1.
+      expect([await truckOf(pool, stops.sep3), await truckOf(pool, stops.sep4)]).toEqual(["1", "1"]);
+      expect(await flagsOf(pool, stops.sep3)).toEqual([]);
+      expect(await flagsOf(pool, stops.sep4)).toEqual(["unit_mismatch"]);
+      expect(report.stopMoves.map((m) => m.stopId).sort()).toEqual([stops.sep5, stops.sep6].sort());
+      expect(report.stopMoves.every((m) => m.before === t1 && m.after === t4)).toBe(true);
+    });
+
+    it("an old stop imported after the change still resolves to the truck of its own date", async () => {
+      const { s, t4 } = await example1();
+      await reassignTruck(pool, { driverId: s.driverId, truckId: t4, from: "2026-09-05" });
+
+      // Last week's invoice arrives late: Sep 3 and Sep 4 stops, imported after the change.
+      const late = await insertInvoice(pool, { number: "EX1-LATE", periodStart: "2026-08-30", periodEnd: "2026-09-04" });
+      const sep3 = await s.addStop("2026-09-03", "1", late);
+      const sep4 = await s.addStop("2026-09-04", "77", late);
+      await s.flag(late);
+
+      expect([await truckOf(pool, sep3), await truckOf(pool, sep4)]).toEqual(["1", "1"]);
+      expect([await flagsOf(pool, sep3), await flagsOf(pool, sep4)]).toEqual([[], ["unit_mismatch"]]);
+    });
+
+    it("a recorded-late reassignment from Sep 10 leaves Sep 5-9 on truck 1 with their flags", async () => {
+      const { s, t4, stops } = await example1();
+
+      await reassignTruck(pool, { driverId: s.driverId, truckId: t4, from: "2026-09-10" });
+
+      expect([await truckOf(pool, stops.sep5), await truckOf(pool, stops.sep6)]).toEqual(["1", "1"]);
+      expect([await flagsOf(pool, stops.sep5), await flagsOf(pool, stops.sep6)]).toEqual([
+        ["unit_mismatch"],
+        ["unit_mismatch"],
+      ]);
+    });
+
+    it("a back-dating date edit gives a stop its truck and clears its flag; a gap takes it away again", async () => {
+      const s = await newScenario(pool, "EX2");
+      const t2 = await insertTruck(pool, "2");
+      const id = await insertAssignment(pool, { driverId: s.driverId, truckId: t2, effectiveFrom: "2026-09-04" });
+      const sep3 = await s.addStop("2026-09-03", "2");
+      const sep4 = await s.addStop("2026-09-04", "2");
+      await s.flag();
+      expect(await flagsOf(pool, sep3)).toEqual(["no_truck_on_file:no_assignment"]);
+      expect(await flagsOf(pool, sep4)).toEqual([]);
+
+      await editAssignmentDates(pool, { assignmentId: id, effectiveFrom: "2026-09-03", effectiveTo: null });
+      expect(await truckOf(pool, sep3)).toBe("2");
+      expect(await flagsOf(pool, sep3)).toEqual([]);
+
+      await editAssignmentDates(pool, { assignmentId: id, effectiveFrom: "2026-09-04", effectiveTo: null });
+      expect(await truckOf(pool, sep3)).toBeNull();
+      expect(await flagsOf(pool, sep3)).toEqual(["no_truck_on_file:no_assignment"]);
+      expect(await truckOf(pool, sep4)).toBe("2");
+    });
+
+    it("another driver's stops are never touched", async () => {
+      const { s, t4 } = await example1();
+      const other = await newScenario(pool, "OTHER", { invoiceId: s.invoiceId });
+      const tOther = await insertTruck(pool, "9");
+      await insertAssignment(pool, { driverId: other.driverId, truckId: tOther, effectiveFrom: "2026-09-01" });
+      const otherStop = await other.addStop("2026-09-06", "9");
+      await other.flag();
+
+      const { report } = await reassignTruck(pool, { driverId: s.driverId, truckId: t4, from: "2026-09-05" });
+
+      expect(report.stopMoves.map((m) => m.stopId)).not.toContain(otherStop);
+      expect(await truckOf(pool, otherStop)).toBe("9");
+    });
+
+    it("a failure leaves stops, flags and assignments exactly as they were", async () => {
+      const { s, t1, t4, stops } = await example1();
+      const snapshot = async () => ({
+        trucks: await Promise.all(Object.values(stops).map((id) => truckOf(pool, id))),
+        flags: await Promise.all(Object.values(stops).map((id) => flagsOf(pool, id))),
+        assignments: await datesFor(s.driverId),
+      });
+      const before = await snapshot();
+
+      // Fail the flag rebuild — after the rows were written and the stops re-resolved.
+      const failing = {
+        connect: async () => {
+          const client = await pool.connect();
+          const query = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+          (client as unknown as { query: unknown }).query = (text: unknown, ...rest: unknown[]) =>
+            typeof text === "string" && text.includes("DELETE FROM anomalies")
+              ? Promise.reject(new Error("boom"))
+              : query(text, ...rest);
+          return client;
+        },
+      } as unknown as Pool;
+
+      await expect(reassignTruck(failing, { driverId: s.driverId, truckId: t4, from: "2026-09-05" })).rejects.toThrow(
+        "boom",
+      );
+
+      expect(await snapshot()).toEqual(before);
+      expect(before.assignments).toEqual([[t1, "2026-09-03", null]]);
+    });
+  });
+
   describe("previewAssignmentChange", () => {
+    it("reports the stops that move and the flags that clear, and writes nothing", async () => {
+      const s = await newScenario(pool, "PREVIEW");
+      const t1 = await insertTruck(pool, "1");
+      const t4 = await insertTruck(pool, "4");
+      await insertAssignment(pool, { driverId: s.driverId, truckId: t1, effectiveFrom: "2026-09-03" });
+      const sep4 = await s.addStop("2026-09-04", "77");
+      const sep5 = await s.addStop("2026-09-05", "4");
+      const sep6 = await s.addStop("2026-09-06", "4");
+      await s.flag();
+      const flagsBefore = [await flagsOf(pool, sep4), await flagsOf(pool, sep5), await flagsOf(pool, sep6)];
+
+      const preview = await previewAssignmentChange(pool, {
+        kind: "reassign",
+        driverId: s.driverId,
+        truckId: t4,
+        from: "2026-09-05",
+      });
+
+      expect(preview.stops.map((m) => [m.stopId, m.before, m.after]).sort()).toEqual(
+        [
+          [sep5, t1, t4],
+          [sep6, t1, t4],
+        ].sort(),
+      );
+      expect(preview.flags.cleared.map((f) => [f.rule, f.stopId]).sort()).toEqual(
+        [
+          ["unit_mismatch", sep5],
+          ["unit_mismatch", sep6],
+        ].sort(),
+      );
+      expect(preview.flags.appeared).toEqual([]);
+      // Nothing written.
+      expect([await flagsOf(pool, sep4), await flagsOf(pool, sep5), await flagsOf(pool, sep6)]).toEqual(flagsBefore);
+      expect(await truckOf(pool, sep5)).toBe("1");
+      expect(await datesFor(s.driverId)).toEqual([[t1, "2026-09-03", null]]);
+    });
+
+    it("reports a flag that appears when a gap uncovers a stop", async () => {
+      const s = await newScenario(pool, "GAP");
+      const t2 = await insertTruck(pool, "2");
+      const id = await insertAssignment(pool, { driverId: s.driverId, truckId: t2, effectiveFrom: "2026-09-03" });
+      const sep3 = await s.addStop("2026-09-03", "2");
+      await s.flag();
+
+      const preview = await previewAssignmentChange(pool, {
+        kind: "editDates",
+        assignmentId: id,
+        effectiveFrom: "2026-09-04",
+        effectiveTo: null,
+      });
+
+      expect(preview.flags.appeared.map((f) => [f.rule, f.stopId])).toEqual([["no_truck_on_file", sep3]]);
+      expect(await truckOf(pool, sep3)).toBe("2");
+    });
+
     it("reports the row changes and writes nothing", async () => {
       const driverId = await insertDriver(pool, "P-D");
       const t1 = await insertTruck(pool, "J1");

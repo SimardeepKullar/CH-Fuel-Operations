@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { resolveDriverByName } from "../catalog/drivers.js";
 import type { ExpressMatchStatus } from "../db/types.js";
 
@@ -15,7 +15,7 @@ export interface ExpressDriverResolution {
  * blank-driver row in A19) is unmatched, not an error.
  */
 export async function resolveExpressDriver(
-  pool: Pool,
+  pool: Pool | PoolClient,
   driverNameRaw: string | null,
 ): Promise<ExpressDriverResolution> {
   if (driverNameRaw === null || driverNameRaw.trim() === "") {
