@@ -4,6 +4,7 @@ import {
   metersToMiles,
   milesToKm,
   milesToMeters,
+  sameUnit,
 } from "./units.js";
 
 describe("units", () => {
@@ -35,5 +36,27 @@ describe("units", () => {
 
   it("rejects non-digit input", () => {
     expect(() => formatUnitNumber("07a")).toThrow();
+  });
+
+  describe("sameUnit", () => {
+    it.each([
+      ["50", "050"],
+      ["72", "072"],
+      ["01012", "1012"],
+      [" 072 ", "072"],
+      ["072", "072"],
+      ["000", "0"],
+    ])("treats %j and %j as the same truck", (entered, unitNumber) => {
+      expect(sameUnit(entered, unitNumber)).toBe(true);
+    });
+
+    it.each([
+      ["0", "072"],
+      ["3224", "064"],
+      ["07a", "07"],
+      ["", "072"],
+    ])("does not treat %j and %j as the same truck", (entered, unitNumber) => {
+      expect(sameUnit(entered, unitNumber)).toBe(false);
+    });
   });
 });

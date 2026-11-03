@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runMigrations } from "../../src/db/migrate.js";
 import { getCardByNumber } from "../../src/catalog/cards.js";
-import { getTruckById } from "../../src/catalog/trucks.js";
+import { getTruckById, getTruckByUnitNumber } from "../../src/catalog/trucks.js";
 import { resolveTruckForStop } from "../../src/resolve/resolveTruck.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,6 +57,27 @@ describe.skipIf(!hasDatabase)("resolveTruckForStop (integration, T-29)", () => {
     const truck = await getTruckById(scopedPool, result.truckId!);
     expect(truck?.unit_number).toBe("072");
     expect(result.agrees).toBe(true);
+  });
+
+  it("agrees when the unit was entered without its leading zero ('72' for truck 072)", async () => {
+    const card = await getCardByNumber(scopedPool, "9000005");
+    const result = await resolveTruckForStop(
+      scopedPool,
+      card!.id,
+      new Date("2026-09-09T00:41:00Z"),
+      "72",
+    );
+    const truck = await getTruckById(scopedPool, result.truckId!);
+    expect(truck?.unit_number).toBe("072");
+    expect(result.agrees).toBe(true);
+  });
+
+  it("looks a truck up by a unit printed without its leading zero, exact match first", async () => {
+    expect((await getTruckByUnitNumber(scopedPool, "72"))?.unit_number).toBe("072");
+    expect((await getTruckByUnitNumber(scopedPool, " 072 "))?.unit_number).toBe("072");
+    expect((await getTruckByUnitNumber(scopedPool, "1012"))?.unit_number).toBe("1012");
+    expect(await getTruckByUnitNumber(scopedPool, "3224")).toBeNull();
+    expect(await getTruckByUnitNumber(scopedPool, "0")).toBeNull();
   });
 
   it("resolves two different cards entering the same unit text to two different trucks, never conflated", async () => {

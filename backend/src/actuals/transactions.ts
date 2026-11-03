@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { normalizeName } from "../resolve/normalizeName.js";
 import { parseStoreName } from "../resolution/storeNumber.js";
 import type { AnomalySeverity, InvoiceCurrency, InvoiceQtyUnit, ReceiptStatus } from "../db/types.js";
+import { sameUnit } from "../domain/units.js";
 import { buildTransactionFilterClause, type TransactionFilters } from "./transactionQuery.js";
 import {
   convertNullable,
@@ -213,7 +214,7 @@ export function truckRawResolved(row: Pick<TransactionRow, "truck_unit_number" |
   return {
     resolved,
     raw: row.unit_raw,
-    agrees: resolved === null ? null : row.unit_raw.trim() === resolved,
+    agrees: resolved === null ? null : sameUnit(row.unit_raw, resolved),
   };
 }
 

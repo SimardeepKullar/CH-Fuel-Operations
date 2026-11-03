@@ -1,3 +1,4 @@
+import { sameUnit } from "../../domain/units.js";
 import type { AnomalyFinding } from "../types.js";
 
 /** No tunable knob yet — reserved so the runner's "load config for every
@@ -27,10 +28,8 @@ export interface UnitMismatchStop {
  * mismatch is deliberate signal, not noise to suppress: it catches a wrong
  * number entered entirely (a trailer number instead of a truck number) and
  * a driver legitimately in a different truck that day, both worth a look.
- * The one shape that is NOT a real mismatch — `unitRaw` differing from
- * `truckUnitNumber` only by a missing leading zero (`"50"` vs `"050"`) —
- * is not yet special-cased here; a future ticket normalises that before
- * comparing, per A10.
+ * What counts as the same unit is `sameUnit`'s call, so a missing leading
+ * zero (`"50"` vs `"050"`) is a match, not a flag (A10).
  *
  * Pure — no database, no HTTP, no clock.
  */
@@ -45,7 +44,7 @@ export function unitMismatch(
     if (stop.truckUnitNumber === null) {
       continue;
     }
-    if (stop.unitRaw.trim() !== stop.truckUnitNumber) {
+    if (!sameUnit(stop.unitRaw, stop.truckUnitNumber)) {
       findings.push({
         subjectType: "fuel_stop",
         subjectId: stop.id,

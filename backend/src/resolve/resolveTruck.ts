@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { resolveAssignment } from "../catalog/assignments.js";
 import { getTruckById } from "../catalog/trucks.js";
+import { sameUnit } from "../domain/units.js";
 
 export interface TruckResolution {
   truckId: string | null;
@@ -35,6 +36,6 @@ export async function resolveTruckForStop(
   }
 
   const truck = await getTruckById(pool, truckId);
-  const agrees = truck !== null && unitRaw.trim() === truck.unit_number;
+  const agrees = truck !== null && sameUnit(unitRaw, truck.unit_number);
   return { truckId, driverId, agrees };
 }
