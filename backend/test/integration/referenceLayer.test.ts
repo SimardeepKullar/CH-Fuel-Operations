@@ -144,12 +144,18 @@ describe.skipIf(!hasDatabase)("reference layer (integration, T-26)", () => {
     expect(before.truckId).toBeNull();
   });
 
-  it("resolves each of the five unassigned CA drivers' cards to a driver and no truck (T-62)", async () => {
-    for (const cardNumber of ["9000030", "9000032", "9000033", "9000042", "9000047"]) {
+  it("resolves the one truckless CA driver's card to a driver and no truck, and the other four to a truck (T-62, T-78)", async () => {
+    for (const [cardNumber, hasTruck] of [
+      ["9000030", false],
+      ["9000032", true],
+      ["9000033", true],
+      ["9000042", true],
+      ["9000047", true],
+    ] as const) {
       const card = await getCardByNumber(scopedPool, cardNumber);
       const result = await resolveAssignment(scopedPool, card!.id, new Date("2026-09-08T12:00:00Z"));
       expect(result.driverId).not.toBeNull();
-      expect(result.truckId).toBeNull();
+      expect(result.truckId === null).toBe(!hasTruck);
     }
   });
 

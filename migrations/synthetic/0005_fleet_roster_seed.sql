@@ -1,30 +1,28 @@
--- Fleet roster (T-25 step 25.4): this company's data, replaceable — unlike the
--- required config in 0004. The 27 cards, 27 units and 27
--- drivers from PROJECT-SCOPE-v2.md §A19 (plus the CA invoice's additions,
--- T-62, at the end of this file), each card given its one permanent
--- driver and each driver one or more current truck_assignments rows.
--- Idempotent — re-running this file must not duplicate rows or clobber a
--- real reassignment.
+-- Synthetic fleet roster: every driver and fuel card the committed tests use,
+-- and each driver one current truck_assignments row (T-78) — the shape the
+-- owner's own roster has. Idempotent — re-running this file must not duplicate
+-- rows or clobber a real reassignment.
 --
--- The card→driver pairing and the driver→truck assignments below are
--- derived from one week's real invoice import, not guessed: every one of
--- the 27 cards appears with exactly one distinct raw driver name across
--- all its transactions that week, and most drivers show one consistent raw
--- unit number. Two pairs of drivers genuinely shared a truck at different
--- points in the week (Taylor/Finn Gray on 1019, Kit Barnes moving from 1012
--- to 101) — modelled below as sequential effective-dated rows, exactly what
--- `truck_assignments` exists for (a truck isn't owned by a driver; it's
--- whatever was assigned that day). Jordan and Harper Lane both genuinely
--- used 072 on overlapping days — left as two coexisting rows, which the
--- driver-scoped EXCLUDE constraint (migrations/0003_actuals_schema.sql)
--- allows. A handful of raw entries stay genuine mismatches on purpose:
--- Jordan's "0" (§A10's own worked example), Blake Hale's "31" and Iris Mae
--- Bentley's "3224" are not real unit numbers at all — real data-entry
--- errors, not a pairing to fix.
+-- The scenarios the tests lean on, all invented:
+--   * a team truck — JORDAN and HARPER LANE both hold 072 (two drivers on one
+--     truck is not a conflict: the exclusion constraint scopes one driver's own
+--     ranges);
+--   * a truckless driver — COLE WINTER has no assignment, so their stops resolve
+--     a driver and no truck (No truck on file);
+--   * borrows — TAYLOR holds 1019 and FINN GRAY 1020, yet Finn Gray's invoice
+--     rows enter 1019 from 2026-09-07; KIT BARNES holds 101 and enters 1012 for
+--     the days before 2026-09-04. A borrow is never an assignment (T-78): those
+--     stops are Unit mismatch against the driver's own truck;
+--   * entries that are not a driver's truck at all — JORDAN's "0" (§A10's own
+--     worked example), BLAKE HALE's "31" and IRIS MAE BENTLEY's "3224" are not
+--     real unit numbers, so they stay genuine mismatches on purpose;
+--   * one genuine dated reassignment — SAWYER drove 1021 until 2026-03-31 and
+--     has held 069 since 2026-04-01, long before the invoice weeks, so the
+--     history is exercised without moving any invoice stop.
 --
--- Names and card numbers are synthetic placeholders, not the real roster —
--- see T-58's history scrub. The pairing, the shared-truck scenarios and the
--- deliberate bad-unit rows are real and preserved exactly.
+-- Names and card numbers are synthetic placeholders, not the real roster — see
+-- T-58's history scrub. After the roster rebuild, assignments change only
+-- through Settings (T-47), never by editing this file.
 
 -- ─── Drivers ──────────────────────────────────────────────────────────────
 -- No unique constraint on display_name (two real drivers could share a
@@ -71,7 +69,7 @@ FROM (VALUES
   ('031'), ('039'), ('041'), ('044'), ('047'), ('050'), ('051'), ('052'),
   ('057'), ('061'), ('063'), ('064'), ('065'), ('066'), ('069'), ('070'),
   ('071'), ('072'), ('073'), ('101'), ('1012'), ('1013'), ('1016'), ('1017'),
-  ('1019'), ('1022'), ('1023')
+  ('1019'), ('1020'), ('1021'), ('1022'), ('1023')
 ) AS v(unit_number)
 ON CONFLICT (unit_number) DO NOTHING;
 
@@ -118,24 +116,17 @@ WHERE fc.card_number = pairing.card_number
   AND fc.driver_id IS NULL;
 
 -- ─── Driver → truck (effective-dated) ───────────────────────────────────
--- Effective from well before the earliest invoice date on disk, so every
--- real stop this week resolves against it. Most drivers get one
--- always-current row. Three exceptions, per the real invoice data (see the
--- header comment above): Taylor held 1019 through 2026-09-06, then handed
--- it to Finn Gray from 2026-09-07; Kit Barnes held 1012 through 2026-09-03,
--- then moved to 101 from 2026-09-04. Jordan and Harper Lane both genuinely
--- used 072 on overlapping days this week, so both simply get an
--- always-current row for it — the EXCLUDE constraint only scopes one
--- driver's own ranges, not a truck's, so two drivers sharing a truck is not
--- a conflict.
+-- One current row per driver, effective from well before the earliest invoice
+-- date on disk so every stop resolves against it — except SAWYER's invented
+-- past reassignment (see the header).
 
 INSERT INTO truck_assignments (driver_id, truck_id, effective_from, effective_to)
 SELECT d.id, t.id, v.effective_from::date, v.effective_to::date
 FROM (VALUES
   ('JORDAN',            '072',  '2026-01-01', NULL),
   ('HARPER LANE',       '072',  '2026-01-01', NULL),
-  ('TAYLOR',            '1019', '2026-01-01', '2026-09-06'),
-  ('FINN GRAY',         '1019', '2026-09-07', NULL),
+  ('TAYLOR',            '1019', '2026-01-01', NULL),
+  ('FINN GRAY',         '1020', '2026-01-01', NULL),
   ('ROBIN CROSS',       '057',  '2026-01-01', NULL),
   ('LOU FIELD',         '061',  '2026-01-01', NULL),
   ('MORGAN',            '1013', '2026-01-01', NULL),
@@ -144,8 +135,7 @@ FROM (VALUES
   ('ELLIS PARK',        '050',  '2026-01-01', NULL),
   ('SAGE MOORE',        '1016', '2026-01-01', NULL),
   ('TATUM REED',        '052',  '2026-01-01', NULL),
-  ('KIT BARNES',        '1012', '2026-01-01', '2026-09-03'),
-  ('KIT BARNES',        '101',  '2026-09-04', NULL),
+  ('KIT BARNES',        '101',  '2026-01-01', NULL),
   ('BLAKE HALE',        '1012', '2026-01-01', NULL),
   ('WREN OTIS',         '051',  '2026-01-01', NULL),
   ('IVY CRANE',         '065',  '2026-01-01', NULL),
@@ -159,7 +149,8 @@ FROM (VALUES
   ('NOVA REESE',        '073',  '2026-01-01', NULL),
   ('AVERY',             '070',  '2026-01-01', NULL),
   ('DREW',              '044',  '2026-01-01', NULL),
-  ('SAWYER',            '069',  '2026-01-01', NULL)
+  ('SAWYER',            '1021', '2026-01-01', '2026-03-31'),
+  ('SAWYER',            '069',  '2026-04-01', NULL)
 ) AS v(display_name, unit_number, effective_from, effective_to)
 JOIN drivers d ON d.display_name = v.display_name
 JOIN trucks t ON t.unit_number = v.unit_number
@@ -172,12 +163,10 @@ ON CONFLICT DO NOTHING;
 -- stops entered 20 unit numbers not yet in the roster — added as trucks
 -- with the same flagged working default as the 27 above.
 --
--- Assignments, decided 2026-10-01: the 16 new drivers whose CA stops all
--- carry one unit, and a unit no other new driver entered, are assigned it
--- from the invoice's first transaction date, 2026-09-03. The other 5 get no
--- assignment until one is set in Settings (T-47): one entered 067, 1017 and
--- 056; one entered 1002 and 062; one more entered 062; two entered 031.
--- Their stops resolve a driver (by card) and no truck. One existing driver
+-- Assignments (T-78): every new driver but one is assigned a truck from the
+-- invoice's first transaction date, 2026-09-03. COLE WINTER is the one truckless
+-- driver: their stops resolve a driver (by card) and no truck, and carry No
+-- truck on file until one is set in Settings (T-47). One existing driver
 -- entered 074 on the CA invoice — 074 is added as a truck but that driver's
 -- assignment above is left as it is, so the unit-mismatch flag fires.
 
@@ -259,7 +248,11 @@ FROM (VALUES
   ('KAI',              '034',  '2026-09-03', NULL),
   ('BRIAR',            '054',  '2026-09-03', NULL),
   ('SUTTON',           '040',  '2026-09-03', NULL),
-  ('CLEO MARSH',       '028',  '2026-09-03', NULL)
+  ('CLEO MARSH',       '028',  '2026-09-03', NULL),
+  ('REMY',             '067',  '2026-09-03', NULL),
+  ('ELLIOT',           '056',  '2026-09-03', NULL),
+  ('ROWAN',            '1002', '2026-09-03', NULL),
+  ('LENNOX',           '062',  '2026-09-03', NULL)
 ) AS v(display_name, unit_number, effective_from, effective_to)
 JOIN drivers d ON d.display_name = v.display_name
 JOIN trucks t ON t.unit_number = v.unit_number

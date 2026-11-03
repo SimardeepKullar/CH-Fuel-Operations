@@ -122,7 +122,7 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
     expect(rows).toEqual([{ at_utc: "2026-09-10 00:45:19", after_period_end: true }]);
   });
 
-  it("resolves the five unassigned CA drivers' stops to a driver and no truck (T-62)", async () => {
+  it("resolves the one truckless CA driver's stops to a driver and no truck, and the other four to theirs (T-62, T-78)", async () => {
     await importCa();
     const { rows } = await pool.query<{ card_number: string; has_driver: boolean; has_truck: boolean }>(
       `SELECT fc.card_number, fs.driver_id IS NOT NULL AS has_driver, fs.truck_id IS NOT NULL AS has_truck
@@ -131,7 +131,9 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
        ORDER BY fc.card_number`,
     );
     expect(rows).toHaveLength(5);
-    expect(rows.every((r) => r.has_driver && !r.has_truck)).toBe(true);
+    expect(rows.every((r) => r.has_driver)).toBe(true);
+    // 9000030 is the seed's one truckless driver; the other four were given a truck.
+    expect(rows.filter((r) => !r.has_truck).map((r) => r.card_number)).toEqual(["9000030"]);
     const unresolved = await pool.query("SELECT count(*) FROM fuel_stops WHERE driver_id IS NULL");
     expect(unresolved.rows[0].count).toBe("0");
   });
