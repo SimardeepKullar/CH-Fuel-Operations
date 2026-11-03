@@ -39,3 +39,25 @@ export function formatUnitNumber(unitNumber: string): string {
   }
   return trimmed;
 }
+
+const ALL_DIGITS = /^\d+$/;
+
+function stripLeadingZeros(digits: string): string {
+  return digits.replace(/^0+(?=\d)/, "");
+}
+
+/**
+ * Whether a unit as entered at the pump is the same truck as a roster
+ * `unit_number` (A10): `50` is `050`. Both are trimmed; when both are all
+ * digits their leading zeros are ignored (an all-zero value stays `0`), and
+ * anything else compares exactly. Compares only — `unit_raw` and
+ * `unit_number` are stored as written (D18).
+ */
+export function sameUnit(entered: string, unitNumber: string): boolean {
+  const a = entered.trim();
+  const b = unitNumber.trim();
+  if (ALL_DIGITS.test(a) && ALL_DIGITS.test(b)) {
+    return stripLeadingZeros(a) === stripLeadingZeros(b);
+  }
+  return a === b;
+}
