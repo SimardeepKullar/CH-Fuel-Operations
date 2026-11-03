@@ -191,10 +191,12 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
   it("anomaly count matches T-30's engine against the real file (measured, not A5's stale figure)", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
-    // 32, against the owner's current roster (T-78): stops on cards no longer
+    // 30, against the owner's current roster (T-78): stops on cards no longer
     // on it are not_on_roster (T-85), and this week's stops by drivers since
     // moved to another truck are unit_mismatch against today's assignment.
-    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("32");
+    // It was 32 until T-79: two stops were unit_mismatch only for a dropped
+    // leading zero, which `sameUnit` now treats as the same truck.
+    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("30");
     expect(
       (await scopedPool.query("SELECT count(*) FROM anomalies WHERE rule = 'not_on_roster'")).rows[0]!.count,
     ).toBe("8");
