@@ -508,6 +508,27 @@ describe("ImportPage — the exchange-rate prompt after a US import (T-67)", () 
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("a rate saved in the dialog shows in that invoice's history row without a reload", async () => {
+    const row = historyRow({ id: "inv-us", invoiceNumber: "999210", status: "imported", billingWeekEnd: "2026-08-31", fx: null });
+    patchInvoiceFx.mockResolvedValue({ fx: { rate: 1.3712, enteredAt: "2026-11-02T09:30:00.000Z" } });
+    uploadInvoice.mockResolvedValue(usImported());
+    // The history as the server has it: no rate until the PATCH has landed, then the saved one.
+    listInvoices.mockImplementation(async () =>
+      historyResult([patchInvoiceFx.mock.calls.length === 0 ? row : { ...row, fx: { rate: 1.3712, enteredAt: "2026-11-02T09:30:00.000Z" } }]),
+    );
+    render(<ImportPage />);
+    await waitFor(() => expect(screen.getByTestId("dropzone")).toBeTruthy());
+    fireEvent.drop(screen.getByTestId("dropzone"), { dataTransfer: { files: [makeFile("invoice_999210.csv")] } });
+    await screen.findByRole("dialog");
+    expect(screen.getByTestId("fx-status-inv-us").textContent).toBe("rate pending");
+
+    fireEvent.change(screen.getByLabelText("Exchange rate (CAD per USD)"), { target: { value: "1.3712" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save rate" }));
+
+    await waitFor(() => expect((screen.getByTestId("fx-input-inv-us") as HTMLInputElement).value).toBe("1.3712"));
+    expect(screen.getByTestId("fx-status-inv-us").textContent).toMatch(/^entered /);
+  });
+
   it("'Enter later' PATCHes nothing and closes, leaving the invoice at rate pending", async () => {
     await upload(usImported());
     await screen.findByRole("dialog");

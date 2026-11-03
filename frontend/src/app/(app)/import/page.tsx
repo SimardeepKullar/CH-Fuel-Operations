@@ -227,7 +227,7 @@ export default function ImportPage() {
           onFxSaved={fxSaved}
         />
       </div>
-      {fxPrompt !== null && <FxRateDialog {...fxPrompt} onSaved={reloadPeriods} onClose={closeFxPrompt} />}
+      {fxPrompt !== null && <FxRateDialog {...fxPrompt} onSaved={fxSaved} onClose={closeFxPrompt} />}
     </>
   );
 }
