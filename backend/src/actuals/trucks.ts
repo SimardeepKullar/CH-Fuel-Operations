@@ -137,6 +137,16 @@ export interface TruckAssignmentHistoryItem {
   inForce: boolean;
 }
 
+/** A driver holding the truck now (T-78): an assignment with no end date. A team
+ * truck has two. Not read off the week asked for — "current" is today's roster. */
+export interface TruckCurrentDriver {
+  assignmentId: string;
+  driver: { id: string; displayName: string };
+  card: TruckCard | null;
+  /** Inclusive calendar date, `YYYY-MM-DD`. */
+  effectiveFrom: string;
+}
+
 export interface TruckDetail {
   week: string;
   currency: InvoiceCurrency;
@@ -150,6 +160,9 @@ export interface TruckDetail {
    * schema's per-driver overlap guard allowed two drivers in the truck at once,
    * the latest-starting assignment wins. */
   assignedCard: TruckCard | null;
+  /** The driver(s) assigned now (`effective_to IS NULL`), oldest assignment first —
+   * the answer to "who has this truck", ahead of the history below. */
+  currentDrivers: TruckCurrentDriver[];
   /** Every assignment of this truck, oldest to newest. */
   assignments: TruckAssignmentHistoryItem[];
   summary: StopRollup;
@@ -255,6 +268,9 @@ export async function getTruckDetail(pool: Pool, id: string, query: WeekQuery): 
     effectiveTo: a.effective_to,
     inForce: inForceIds.has(a.id),
   }));
+  const currentDrivers: TruckCurrentDriver[] = assignments
+    .filter((a) => a.effectiveTo === null)
+    .map((a) => ({ assignmentId: a.id, driver: a.driver, card: a.card, effectiveFrom: a.effectiveFrom }));
   const assignedCard = [...assignments].reverse().find((a) => a.inForce)?.card ?? null;
 
   const truckRef = { id: truck.id, unitNumber: truck.unit_number };
@@ -265,6 +281,7 @@ export async function getTruckDetail(pool: Pool, id: string, query: WeekQuery): 
       truck: truckRef,
       asOf,
       assignedCard,
+      currentDrivers,
       assignments,
       summary: toRollup(EMPTY_SUMS, conv),
       fleet: { avgBilledPerUnit: null, qty: 0, stopCount: 0 },
@@ -287,6 +304,7 @@ export async function getTruckDetail(pool: Pool, id: string, query: WeekQuery): 
     truck: truckRef,
     asOf,
     assignedCard,
+    currentDrivers,
     assignments,
     summary,
     fleet: { avgBilledPerUnit: fleet.avgBilledPerUnit, qty: fleet.qty, stopCount: fleet.stopCount },

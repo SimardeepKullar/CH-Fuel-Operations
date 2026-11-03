@@ -82,17 +82,19 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     return result.invoiceId;
   }
 
-  it("produces the expected flag count on import: one anomaly per rule, four total, asserted as a number", async () => {
+  it("produces the expected flag count on import: one per rule plus No truck on file per truckless stop, ten total, asserted as a number", async () => {
     await importCases();
 
     const { rows } = await scopedPool.query<{ count: string }>("SELECT count(*) FROM anomalies");
-    expect(rows[0]?.count).toBe("4");
+    expect(rows[0]?.count).toBe("10");
 
     const { rows: byRule } = await scopedPool.query<{ rule: string; count: string }>(
       "SELECT rule, count(*) FROM anomalies GROUP BY rule ORDER BY rule",
     );
     expect(byRule).toEqual([
       { rule: "charges_no_fuel", count: "1" },
+      // Cards 3000001 and 3000003-6 have a driver but no assignment (beforeEach).
+      { rule: "no_truck_on_file", count: "6" },
       { rule: "sub_gallon", count: "1" },
       { rule: "too_close", count: "1" },
       { rule: "unit_mismatch", count: "1" },
@@ -130,25 +132,105 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
     expect(rows.map((r) => r.subject_id)).toEqual([wrong]);
   });
 
-  it("re-running produces no duplicates", async () => {
-    const invoiceId = await importCases(); // runs the engine once, via importInvoice
-    await runAnomalies(scopedPool, invoiceId); // run it again directly
+  async function findings(): Promise<string[]> {
+    const { rows } = await scopedPool.query<{ rule: string; subject_id: string; detail: unknown }>(
+      "SELECT rule, subject_id, detail FROM anomalies ORDER BY rule, subject_id",
+    );
+    return rows.map((r) => JSON.stringify([r.rule, r.subject_id, r.detail]));
+  }
 
-    const { rows } = await scopedPool.query<{ count: string }>("SELECT count(*) FROM anomalies");
-    expect(rows[0]?.count).toBe("4");
+  it("re-running with nothing changed writes the same set — no duplicates, none lost", async () => {
+    const invoiceId = await importCases(); // runs the engine once, via importInvoice
+    const before = await findings();
+
+    const result = await runAnomalies(scopedPool, invoiceId); // run it again directly
+
+    expect(before).toHaveLength(10);
+    expect(await findings()).toEqual(before);
+    expect(result).toMatchObject({ inserted: 10, removed: 10 });
   });
 
-  it("a dismissed anomaly stays dismissed after a re-run", async () => {
+  it("a stale Unit mismatch is removed once the entered unit matches", async () => {
     const invoiceId = await importCases();
-    await scopedPool.query("UPDATE anomalies SET dismissed_at = now() WHERE rule = 'sub_gallon'");
+    const { rows } = await scopedPool.query<{ id: string }>(
+      "SELECT subject_id AS id FROM anomalies WHERE rule = 'unit_mismatch'",
+    );
+    expect(rows).toHaveLength(1);
+
+    await scopedPool.query("UPDATE fuel_stops SET unit_raw = '205' WHERE id = $1", [rows[0]!.id]);
+    await runAnomalies(scopedPool, invoiceId);
+
+    expect((await scopedPool.query("SELECT 1 FROM anomalies WHERE rule = 'unit_mismatch'")).rowCount).toBe(0);
+    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("9");
+  });
+
+  it("a truckless stop is No truck on file with its reason and entered unit, never also a Unit mismatch", async () => {
+    await importCases();
+
+    const { rows } = await scopedPool.query<{ detail: { reason: string; unitRaw: string }; severity: string }>(
+      "SELECT detail, severity FROM anomalies WHERE rule = 'no_truck_on_file'",
+    );
+    expect(rows).toHaveLength(6);
+    expect(rows.every((r) => r.severity === "amber" && r.detail.reason === "no_assignment")).toBe(true);
+    expect(rows.every((r) => typeof r.detail.unitRaw === "string")).toBe(true);
+
+    const { rows: both } = await scopedPool.query(
+      `SELECT 1 FROM anomalies a JOIN anomalies b ON a.subject_id = b.subject_id
+        WHERE a.rule = 'no_truck_on_file' AND b.rule = 'unit_mismatch'`,
+    );
+    expect(both).toHaveLength(0);
+  });
+
+  it("a stop on a card with no driver is No truck on file with reason no_driver", async () => {
+    const invoiceId = await importCases();
+    const { rows: card } = await scopedPool.query<{ id: string }>(
+      "INSERT INTO fuel_cards (card_number) VALUES ('3000099') RETURNING id",
+    );
+    const { rows: stop } = await scopedPool.query<{ id: string }>(
+      `INSERT INTO fuel_stops (invoice_id, base_auth_code, occurred_at, card_id, unit_raw, driver_name_raw, total)
+       VALUES ($1, 'T78-NODRIVER', '2026-02-03T10:00:00Z', $2, '031', 'PAT LEFT', 10) RETURNING id`,
+      [invoiceId, card[0]!.id],
+    );
 
     await runAnomalies(scopedPool, invoiceId);
 
-    const { rows } = await scopedPool.query<{ dismissed_at: Date | null }>(
-      "SELECT dismissed_at FROM anomalies WHERE rule = 'sub_gallon'",
+    const { rows } = await scopedPool.query<{ detail: unknown }>(
+      "SELECT detail FROM anomalies WHERE rule = 'no_truck_on_file' AND subject_id = $1",
+      [stop[0]!.id],
     );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.dismissed_at).not.toBeNull();
+    expect(rows.map((r) => r.detail)).toEqual([{ reason: "no_driver", unitRaw: "031" }]);
+  });
+
+  it("No truck on file is removed once the stop has a truck", async () => {
+    const invoiceId = await importCases();
+    const { rows } = await scopedPool.query<{ id: string }>(
+      "SELECT subject_id AS id FROM anomalies WHERE rule = 'no_truck_on_file' LIMIT 1",
+    );
+    const { rows: truck } = await scopedPool.query<{ id: string }>("SELECT id FROM trucks WHERE unit_number = '205'");
+    await scopedPool.query("UPDATE fuel_stops SET truck_id = $1 WHERE id = $2", [truck[0]!.id, rows[0]!.id]);
+
+    await runAnomalies(scopedPool, invoiceId);
+
+    expect(
+      (await scopedPool.query("SELECT 1 FROM anomalies WHERE rule = 'no_truck_on_file' AND subject_id = $1", [rows[0]!.id]))
+        .rowCount,
+    ).toBe(0);
+    expect((await scopedPool.query("SELECT count(*) FROM anomalies WHERE rule = 'no_truck_on_file'")).rows[0]!.count).toBe("5");
+  });
+
+  it("rolls back the delete when an insert fails — the earlier findings stay", async () => {
+    const invoiceId = await importCases();
+    const before = await findings();
+    // Fail an insert after the delete has run: NOT VALID leaves the existing
+    // rows alone and refuses only the new ones.
+    await scopedPool.query(
+      "ALTER TABLE anomalies ADD CONSTRAINT t78_no_no_truck CHECK (rule <> 'no_truck_on_file') NOT VALID",
+    );
+
+    await expect(runAnomalies(scopedPool, invoiceId)).rejects.toThrow();
+
+    await scopedPool.query("ALTER TABLE anomalies DROP CONSTRAINT t78_no_no_truck");
+    expect(await findings()).toEqual(before);
   });
 
   it("a quarantined invoice produces zero anomalies", async () => {

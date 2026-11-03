@@ -77,6 +77,12 @@ CREATE TABLE truck_assignments (
 
 CREATE INDEX truck_assignments_driver ON truck_assignments (driver_id, effective_from);
 
+-- T-78: one current truck per driver. Two open-ended ranges always overlap, so the
+-- EXCLUDE above already refuses a second open row; this states the rule by name
+-- and gives the write paths a fixed lookup for the driver's open row.
+CREATE UNIQUE INDEX truck_assignments_one_open_per_driver
+  ON truck_assignments (driver_id) WHERE effective_to IS NULL;
+
 -- ─── Invoice layer ───────────────────────────────────────────────────────
 
 -- invoice_number and file_sha256 catch different mistakes: the hash catches

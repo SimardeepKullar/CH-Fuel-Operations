@@ -125,6 +125,8 @@ export interface FixtureStop {
   driverId?: string | null;
   truckId?: string | null;
   stationId?: string | null;
+  /** What the driver typed at the pump; defaults to blank. */
+  unitRaw?: string;
   receiptStatus?: "pending" | "confirmed" | "missing";
   /** Defaults to the sum of the lines' amounts. */
   totalUsd?: number;
@@ -143,7 +145,7 @@ export async function insertStop(pool: Pool, stop: FixtureStop): Promise<string>
     `INSERT INTO fuel_stops
        (invoice_id, base_auth_code, occurred_at, card_id, truck_id, driver_id, unit_raw, driver_name_raw,
         station_id, total, receipt_status)
-     VALUES ($1, $2, $3::timestamptz, $4, $5, $6, '', '', $7, $8, $9)
+     VALUES ($1, $2, $3::timestamptz, $4, $5, $6, $10, '', $7, $8, $9)
      RETURNING id`,
     [
       stop.invoiceId,
@@ -155,6 +157,7 @@ export async function insertStop(pool: Pool, stop: FixtureStop): Promise<string>
       stop.stationId ?? null,
       total,
       stop.receiptStatus ?? "pending",
+      stop.unitRaw ?? "",
     ],
   );
   const stopId = rows[0]!.id;

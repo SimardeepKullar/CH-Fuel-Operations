@@ -445,7 +445,7 @@ export default function ReceiptQueuePage() {
                             <span className="rq-flag-tip" role="tooltip" data-testid="queue-flag-tip">
                               {r.flags.map((f) => (
                                 <span className="rq-flag-line" key={f.rule}>
-                                  <AnomalyFlag flag={f} />
+                                  <AnomalyFlag flag={f} enteredUnit={r.truck.raw} />
                                   <span>{flagDescription(f.rule)}</span>
                                 </span>
                               ))}

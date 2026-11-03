@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getTruckDetail } from "../../src/actuals/trucks.js";
 import { runMigrations } from "../../src/db/migrate.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -95,22 +96,75 @@ describe.skipIf(!hasDatabase)("0005_fleet_roster_seed.sql (integration)", () => 
     };
   }
 
-  it("seeds 48 drivers, 48 cards (each with its driver) and 47 trucks with 42 current truck assignments", async () => {
-    // The US invoice's 27 cards/drivers/trucks (26 current assignments, not
-    // 27: TAYLOR handed truck 1019 off to FINN GRAY on 2026-09-07 and the
-    // seed does not give TAYLOR a new truck, so 28 assignment rows hold two
-    // superseded ones), plus T-62's CA additions: 21 cards and drivers, 20
-    // trucks and 16 assignments — the other 5 new drivers get none.
+  it("seeds 48 drivers, 48 cards (each with its driver) and 49 trucks with 47 current truck assignments", async () => {
+    // 27 US and 21 CA cards and drivers. Every driver but one holds exactly one
+    // current assignment (T-78): 47, the one truckless driver being COLE WINTER.
+    // The trucks are 27 + 20 from the invoices, plus 1020 and 1021, invented.
     expect(await counts()).toEqual({
       drivers: 48,
       cards: 48,
       cardsWithDriver: 48,
-      trucks: 47,
-      currentAssignments: 42,
+      trucks: 49,
+      currentAssignments: 47,
     });
   });
 
-  it("assigns the 16 single-unit CA drivers from 2026-09-03 and leaves the 5 multi- or shared-unit ones unassigned (T-62)", async () => {
+  it("gives every driver at most one open assignment, and exactly one driver none (T-78)", async () => {
+    const { rows } = await scopedPool.query<{ display_name: string; open_rows: string }>(
+      `SELECT d.display_name,
+              count(ta.id) FILTER (WHERE ta.effective_to IS NULL) AS open_rows
+         FROM drivers d LEFT JOIN truck_assignments ta ON ta.driver_id = d.id
+        GROUP BY d.id, d.display_name
+       HAVING count(ta.id) FILTER (WHERE ta.effective_to IS NULL) <> 1`,
+    );
+    expect(rows).toEqual([{ display_name: "COLE WINTER", open_rows: "0" }]);
+  });
+
+  it("has exactly one team truck (two drivers holding it now) — 072 (T-78)", async () => {
+    const { rows } = await scopedPool.query<{ unit_number: string; drivers: string }>(
+      `SELECT t.unit_number, count(*) AS drivers
+         FROM truck_assignments ta JOIN trucks t ON t.id = ta.truck_id
+        WHERE ta.effective_to IS NULL
+        GROUP BY t.unit_number HAVING count(*) > 1`,
+    );
+    expect(rows).toEqual([{ unit_number: "072", drivers: "2" }]);
+  });
+
+  it("truck detail for the team truck lists both its drivers as current (T-78)", async () => {
+    const { rows } = await scopedPool.query<{ id: string }>("SELECT id FROM trucks WHERE unit_number = '072'");
+
+    const detail = await getTruckDetail(scopedPool, rows[0]!.id, { week: "2026-09-09", currency: "USD", units: null });
+
+    expect(detail!.currentDrivers.map((d) => d.driver.displayName).sort()).toEqual(["HARPER LANE", "JORDAN"]);
+    expect(detail!.assignments).toHaveLength(2);
+  });
+
+  it("has no dated handovers: the only closed assignment is one invented past reassignment (T-78)", async () => {
+    const { rows } = await scopedPool.query<{ driver: string; unit_number: string; effective_to: string }>(
+      `SELECT d.display_name AS driver, t.unit_number, to_char(ta.effective_to, 'YYYY-MM-DD') AS effective_to
+         FROM truck_assignments ta
+         JOIN drivers d ON d.id = ta.driver_id JOIN trucks t ON t.id = ta.truck_id
+        WHERE ta.effective_to IS NOT NULL`,
+    );
+    expect(rows).toEqual([{ driver: "SAWYER", unit_number: "1021", effective_to: "2026-03-31" }]);
+  });
+
+  it("keeps a borrow a borrow: FINN GRAY's own truck is not the 1019 they entered (T-78)", async () => {
+    const { rows } = await scopedPool.query<{ driver: string; unit_number: string }>(
+      `SELECT d.display_name AS driver, t.unit_number
+         FROM truck_assignments ta
+         JOIN drivers d ON d.id = ta.driver_id JOIN trucks t ON t.id = ta.truck_id
+        WHERE d.display_name IN ('TAYLOR', 'FINN GRAY', 'KIT BARNES') AND ta.effective_to IS NULL
+        ORDER BY d.display_name`,
+    );
+    expect(rows).toEqual([
+      { driver: "FINN GRAY", unit_number: "1020" },
+      { driver: "KIT BARNES", unit_number: "101" },
+      { driver: "TAYLOR", unit_number: "1019" },
+    ]);
+  });
+
+  it("assigns the CA drivers from 2026-09-03 and leaves one, COLE WINTER, unassigned (T-62, T-78)", async () => {
     const { rows } = await scopedPool.query<{ card_number: string; units: string[] }>(
       `SELECT fc.card_number,
               COALESCE(array_agg(t.unit_number ORDER BY t.unit_number)
@@ -124,9 +178,8 @@ describe.skipIf(!hasDatabase)("0005_fleet_roster_seed.sql (integration)", () => 
     );
     expect(rows).toHaveLength(21);
     const unassigned = rows.filter((r) => r.units.length === 0).map((r) => r.card_number);
-    // 067/1017/056; 1002/062; 062; 031; 031.
-    expect(unassigned).toEqual(["9000030", "9000032", "9000033", "9000042", "9000047"]);
-    expect(rows.filter((r) => r.units.length === 1)).toHaveLength(16);
+    expect(unassigned).toEqual(["9000030"]);
+    expect(rows.filter((r) => r.units.length === 1)).toHaveLength(20);
 
     const dates = await scopedPool.query<{ effective_from: string }>(
       `SELECT DISTINCT to_char(ta.effective_from, 'YYYY-MM-DD') AS effective_from

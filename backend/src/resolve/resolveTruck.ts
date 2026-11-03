@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { resolveAssignment } from "../catalog/assignments.js";
 import { getTruckById } from "../catalog/trucks.js";
 import { sameUnit } from "../domain/units.js";
@@ -25,7 +25,7 @@ export interface TruckResolution {
  * text on the same day resolve independently and are never conflated.
  */
 export async function resolveTruckForStop(
-  pool: Pool,
+  pool: Pool | PoolClient,
   cardId: string,
   occurredAt: Date,
   unitRaw: string,

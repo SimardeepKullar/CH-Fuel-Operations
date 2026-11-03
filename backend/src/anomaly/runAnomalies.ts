@@ -1,7 +1,8 @@
 import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
-import type { Pool, PoolClient } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "../invoice/productCode.js";
 import { chargesNoFuel, type ChargesNoFuelConfig, type ChargesNoFuelStop } from "./rules/chargesNoFuel.js";
+import { noTruckOnFile, type NoTruckOnFileConfig, type NoTruckOnFileStop } from "./rules/noTruckOnFile.js";
 import { notOnRoster, type NotOnRosterConfig, type NotOnRosterStop } from "./rules/notOnRoster.js";
 import {
   priceAbovePublished,
@@ -20,6 +21,7 @@ type Db = Pool | PoolClient;
 const RULE_NAMES = [
   "sub_gallon",
   "unit_mismatch",
+  "no_truck_on_file",
   "too_close",
   "charges_no_fuel",
   "price_above_published",
@@ -34,8 +36,11 @@ export interface NotComputableEntry {
 }
 
 export interface RunAnomaliesResult {
+  /** Findings written this run: the whole current set for the invoice. */
   inserted: number;
-  updated: number;
+  /** Findings of the invoice's earlier run deleted before it, whether or not
+   * the same finding was written back. */
+  removed: number;
   /** Never collapsed into "no anomaly" — §A18 Q5's own requirement. Only
    * `price_above_published` produces these today. */
   notComputable: NotComputableEntry[];
@@ -46,6 +51,8 @@ interface StopRow {
   occurred_at: Date;
   card_id: string;
   station_id: string | null;
+  driver_id: string | null;
+  truck_id: string | null;
   unit_raw: string;
   truck_unit_number: string | null;
   driver_name_raw: string;
@@ -93,7 +100,7 @@ export async function loadPriceAbovePublishedConfig(db: Db): Promise<PriceAboveP
 
 async function loadStops(db: Db, invoiceId: string): Promise<StopRow[]> {
   const { rows } = await db.query<StopRow>(
-    `SELECT fs.id, fs.occurred_at, fs.card_id, fs.station_id, fs.unit_raw,
+    `SELECT fs.id, fs.occurred_at, fs.card_id, fs.station_id, fs.driver_id, fs.truck_id, fs.unit_raw,
             t.unit_number AS truck_unit_number, fs.driver_name_raw,
             fc.card_number, fc.driver_id AS card_driver_id
      FROM fuel_stops fs
@@ -169,40 +176,47 @@ function billedDieselPrice(lines: readonly LineRow[], fuelProductCode: string): 
   return line ? line.billed_per_unit : null;
 }
 
-/**
- * Upserts one finding, keyed on the schema's own `(rule, subject_type,
- * subject_id)` unique constraint (migrations/0003_actuals_schema.sql). A dismissed
- * row (`dismissed_at IS NOT NULL`) is left completely untouched — the `WHERE`
- * clause on the `DO UPDATE` makes the statement affect zero rows for it,
- * which is how a re-run never resurrects a dismissal.
- */
-async function upsertFinding(db: Db, rule: RuleName, finding: AnomalyFinding): Promise<"inserted" | "updated" | "skipped"> {
-  const { rows } = await db.query<{ inserted: boolean }>(
+async function insertFinding(db: Db, rule: RuleName, finding: AnomalyFinding): Promise<void> {
+  await db.query(
     `INSERT INTO anomalies (subject_type, subject_id, rule, severity, detail)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (rule, subject_type, subject_id) DO UPDATE
-       SET severity = EXCLUDED.severity, detail = EXCLUDED.detail
-       WHERE anomalies.dismissed_at IS NULL
-     RETURNING (xmax = 0) AS inserted`,
+     VALUES ($1, $2, $3, $4, $5)`,
     [finding.subjectType, finding.subjectId, rule, finding.severity, JSON.stringify(finding.detail)],
   );
-  const row = rows[0];
-  if (!row) {
-    return "skipped"; // conflicted with a dismissed row — left alone, on purpose
-  }
-  return row.inserted ? "inserted" : "updated";
 }
 
 /**
- * Runs every T-30 rule over one invoice's stops and upserts the findings.
+ * Rebuilds one invoice's findings: runs every rule over its stops, deletes the
+ * invoice's earlier findings and writes what the rules find now. A finding that
+ * is no longer true — a unit that now matches, a stop now covered by an
+ * assignment — disappears; a re-run with nothing changed writes the same set.
+ * Every finding is derived from the stops, so none is hand-cleared (T-78).
  * Thresholds come from `anomaly_thresholds`, never a code constant (D16).
  * An invoice with zero `fuel_stops` (a quarantined one) trivially produces
  * zero anomalies — there is nothing to run the rules over.
  *
- * Call after promotion, inside the same transaction `importInvoice` used to
- * write the stops, so the rules see what was just written.
+ * Given a `PoolClient`, joins the caller's transaction (`importInvoice` calls
+ * it after writing the stops, so the rules see what was just written); given a
+ * `Pool`, delete and insert run in one transaction of their own.
  */
 export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomaliesResult> {
+  if (!(db instanceof Pool)) {
+    return rebuildFindings(db, invoiceId);
+  }
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await rebuildFindings(client, invoiceId);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function rebuildFindings(db: Db, invoiceId: string): Promise<RunAnomaliesResult> {
   const thresholds = await loadThresholds(db);
   const stops = await loadStops(db, invoiceId);
   const linesByStop = await loadLines(db, invoiceId);
@@ -248,6 +262,16 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
     findings.push({ rule: "not_on_roster", finding });
   }
 
+  const noTruckStops: NoTruckOnFileStop[] = stops.map((s) => ({
+    id: s.id,
+    truckId: s.truck_id,
+    driverId: s.driver_id,
+    unitRaw: s.unit_raw,
+  }));
+  for (const finding of noTruckOnFile(noTruckStops, thresholds.get("no_truck_on_file") as NoTruckOnFileConfig)) {
+    findings.push({ rule: "no_truck_on_file", finding });
+  }
+
   const tooCloseStops: TooCloseStop[] = stops.map((s) => ({
     id: s.id,
     cardId: s.card_id,
@@ -289,13 +313,16 @@ export async function runAnomalies(db: Db, invoiceId: string): Promise<RunAnomal
     }
   }
 
-  let inserted = 0;
-  let updated = 0;
+  const { rowCount: removed } = await db.query(
+    `DELETE FROM anomalies
+      WHERE subject_type = 'fuel_stop'
+        AND rule = ANY($2)
+        AND subject_id IN (SELECT id FROM fuel_stops WHERE invoice_id = $1)`,
+    [invoiceId, RULE_NAMES],
+  );
   for (const { rule, finding } of findings) {
-    const outcome = await upsertFinding(db, rule, finding);
-    if (outcome === "inserted") inserted++;
-    else if (outcome === "updated") updated++;
+    await insertFinding(db, rule, finding);
   }
 
-  return { inserted, updated, notComputable };
+  return { inserted: findings.length, removed: removed ?? 0, notComputable };
 }

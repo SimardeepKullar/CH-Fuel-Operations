@@ -191,15 +191,21 @@ describe.skipIf(!hasDatabase || !hasRealFixture)("invoice 999210 import (integra
   it("anomaly count matches T-30's engine against the real file (measured, not A5's stale figure)", async () => {
     await runImportInvoiceCli([realFixturePath], scopedPool);
 
-    // 30, against the owner's current roster (T-78): stops on cards no longer
-    // on it are not_on_roster (T-85), and this week's stops by drivers since
-    // moved to another truck are unit_mismatch against today's assignment.
-    // It was 32 until T-79: two stops were unit_mismatch only for a dropped
-    // leading zero, which `sameUnit` now treats as the same truck.
-    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("30");
+    // 38, against the owner's current roster (T-78): 30 plus a No truck on file
+    // for each of the 8 stops on a card no longer on it, which have no driver
+    // and so no truck (T-85). Those 8 are also not_on_roster; the other 22
+    // were 30 before the rule existed — not_on_roster and unit_mismatch
+    // against today's assignment. It was 32 until T-79: two stops were
+    // unit_mismatch only for a dropped leading zero, which `sameUnit` now
+    // treats as the same truck.
+    expect((await scopedPool.query("SELECT count(*) FROM anomalies")).rows[0]!.count).toBe("38");
     expect(
       (await scopedPool.query("SELECT count(*) FROM anomalies WHERE rule = 'not_on_roster'")).rows[0]!.count,
     ).toBe("8");
+    expect(
+      (await scopedPool.query("SELECT detail->>'reason' AS reason, count(*) FROM anomalies WHERE rule = 'no_truck_on_file' GROUP BY 1"))
+        .rows,
+    ).toEqual([{ reason: "no_driver", count: "8" }]);
   });
 
   it("every stop and every express charge has a resolved truck or a named exclusion — none guessed", async () => {

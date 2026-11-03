@@ -152,12 +152,44 @@ describe.skipIf(!hasDatabase)("GET /trucks, /trucks/{id} (integration)", () => {
       expect(inP1.assignments[0]!.inForce).toBe(false);
     });
 
+    it("leads with the driver(s) currently assigned — the open rows, whatever the week asked for (T-78)", async () => {
+      // T2: Ann since 03-11, still open. T1: both rows closed, so nobody holds it now.
+      const t2 = await get<TruckDetail>(`/trucks/${ids.t2}?week=2026-03-10`);
+      expect(t2.currentDrivers).toEqual([
+        {
+          assignmentId: expect.any(String),
+          driver: { id: ids.ann, displayName: "T37 ANN" },
+          card: expect.objectContaining({ cardNumber: "T37-ANN" }),
+          effectiveFrom: "2026-03-11",
+        },
+      ]);
+      // Even in a week before Ann's assignment began, she is the current driver.
+      expect(t2.assignments[0]!.inForce).toBe(false);
+
+      const t1 = await get<TruckDetail>(`/trucks/${ids.t1}?week=2026-03-10`);
+      expect(t1.currentDrivers).toEqual([]);
+      expect(t1.assignments).toHaveLength(2);
+    });
+
+    it("lists both team drivers of a shared truck as current, oldest first, ahead of the history", async () => {
+      await insertAssignment(scopedPool, { driverId: ids.ben, truckId: ids.t2, effectiveFrom: "2026-03-01" });
+
+      const detail = await get<TruckDetail>(`/trucks/${ids.t2}?week=2026-03-17`);
+
+      expect(detail.currentDrivers.map((d) => [d.driver.displayName, d.effectiveFrom])).toEqual([
+        ["T37 BEN", "2026-03-01"],
+        ["T37 ANN", "2026-03-11"],
+      ]);
+      expect(Object.keys(detail).indexOf("currentDrivers")).toBeLessThan(Object.keys(detail).indexOf("assignments"));
+    });
+
     it("a truck with no assignments has an empty history and no assigned card — not an error", async () => {
       const lonely = await insertTruck(scopedPool, "T37-LONELY");
 
       const detail = await get<TruckDetail>(`/trucks/${lonely}?week=2026-03-10`);
 
       expect(detail.assignments).toEqual([]);
+      expect(detail.currentDrivers).toEqual([]);
       expect(detail.assignedCard).toBeNull();
     });
   });

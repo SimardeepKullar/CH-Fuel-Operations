@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { normalizeName } from "../resolve/normalizeName.js";
 import type { DriverRow } from "../db/types.js";
 
@@ -47,7 +47,7 @@ export function matchDriverName(
  * is small enough to scan for the display-name fallback rather than
  * maintaining a normalised column and index for it.
  */
-export async function resolveDriverByName(pool: Pool, nameRaw: string): Promise<DriverNameMatch> {
+export async function resolveDriverByName(pool: Pool | PoolClient, nameRaw: string): Promise<DriverNameMatch> {
   const normalized = normalizeName(nameRaw);
 
   const { rows: aliasRows } = await pool.query<{ driver_id: string }>(
