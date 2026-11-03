@@ -105,6 +105,52 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     ).rejects.toThrow();
   });
 
+  it("allows at most one open assignment (effective_to IS NULL) per driver", async () => {
+    const driverId = await insertDriver("DRIVER OPEN");
+    const truckA = await insertTruck("T10");
+    const truckB = await insertTruck("T11");
+
+    await scopedPool.query(
+      `INSERT INTO truck_assignments (driver_id, truck_id, effective_from, effective_to)
+       VALUES ($1, $2, '2026-03-01', NULL)`,
+      [driverId, truckA],
+    );
+    await expect(
+      scopedPool.query(
+        `INSERT INTO truck_assignments (driver_id, truck_id, effective_from, effective_to)
+         VALUES ($1, $2, '2026-01-01', NULL)`,
+        [driverId, truckB],
+      ),
+    ).rejects.toThrow();
+
+    // Two open-ended ranges always overlap, so the EXCLUDE above rejects this
+    // too; the partial unique index states the rule on its own and names it.
+    const { rows } = await scopedPool.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes
+       WHERE tablename = 'truck_assignments' AND indexname = 'truck_assignments_one_open_per_driver'`,
+    );
+    expect(rows[0]?.indexdef).toMatch(/UNIQUE.*\(driver_id\).*WHERE.*effective_to IS NULL/);
+  });
+
+  it("allows two drivers to hold one truck at once (team drivers)", async () => {
+    const driverA = await insertDriver("TEAM A");
+    const driverB = await insertDriver("TEAM B");
+    const truckId = await insertTruck("T12");
+
+    for (const driverId of [driverA, driverB]) {
+      await scopedPool.query(
+        `INSERT INTO truck_assignments (driver_id, truck_id, effective_from, effective_to)
+         VALUES ($1, $2, '2026-01-01', NULL)`,
+        [driverId, truckId],
+      );
+    }
+    const { rows } = await scopedPool.query<{ n: string }>(
+      `SELECT count(*) AS n FROM truck_assignments WHERE truck_id = $1 AND effective_to IS NULL`,
+      [truckId],
+    );
+    expect(rows[0]?.n).toBe("2");
+  });
+
   it("accepts effective_to = NULL as meaning current", async () => {
     const driverId = await insertDriver("DRIVER C");
     const truckId = await insertTruck("T3");
