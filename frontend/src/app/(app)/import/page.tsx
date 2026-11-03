@@ -29,7 +29,6 @@ type ImportView =
 interface FxPrompt {
   invoiceId: string;
   invoiceNumber: string;
-  billingWeekEnd: string;
   fx: InvoiceFx | null;
 }
 
@@ -122,7 +121,6 @@ export default function ImportPage() {
               setFxPrompt({
                 invoiceId: response.invoiceId,
                 invoiceNumber: response.report.invoiceNumber,
-                billingWeekEnd: response.report.billingWeekEnd,
                 fx: response.fx,
               });
             }

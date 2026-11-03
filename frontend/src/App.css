@@ -395,6 +395,18 @@ select.input { width: 100%; }
 }
 .btn-ghost:hover { background: rgba(0, 0, 0, 0.04); }
 
+/* Square, flat variant of .btn — the look of the history's Move/Update, for the import dialogs and Confirm. */
+.btn-square {
+  border-radius: 0;
+  height: 2.125rem;
+  padding: 0 1.125rem;
+  font: 700 0.6875rem var(--font-heading);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.btn-block { width: 100%; }
+.btn-square:disabled { opacity: 0.5; cursor: default; }
+
 /* Flat secondary action — square, no radius, control palette. */
 .btn-secondary-flat {
   width: 100%;
@@ -1481,6 +1493,8 @@ select.tx-filter-select {
 .fx-rate-error { flex-basis: 100%; color: var(--color-error); }
 /* T-67: the rate prompt after a US import. */
 .fx-dialog { width: min(30rem, 100%); padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.fx-dialog-invoice-line { margin: 0; display: flex; align-items: center; gap: 0.5rem; font: 600 0.75rem var(--font-heading); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-muted); }
+.fx-dialog-invoice { padding: 0.125rem 0.625rem; background: var(--color-accent-100); border: 1px solid var(--color-accent-300); color: var(--color-accent-800); font: 700 1.125rem var(--font-mono); letter-spacing: 0.04em; text-transform: none; }
 .fx-dialog-line { margin: 0; font: 400 0.8125rem var(--font-body); color: var(--color-accent-800); }
 .fx-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.625rem; margin-top: 0.25rem; }
 

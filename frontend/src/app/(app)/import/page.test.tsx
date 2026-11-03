@@ -458,7 +458,11 @@ describe("ImportPage — the exchange-rate prompt after a US import (T-67)", () 
   it("a US import opens the dialog for that invoice, and the invoice is already written", async () => {
     await upload(usImported());
     const dialog = await screen.findByRole("dialog", { name: /Exchange rate/ });
-    expect(dialog.textContent).toContain("Exchange rate (CAD per USD) for 🇺🇸 999210");
+    expect(dialog.textContent).toContain("Exchange rate (CAD per USD)");
+    // The invoice number is its own element, beside the app's US badge — not a flag emoji in the title.
+    expect(screen.getByTestId("fx-dialog-invoice").textContent).toBe("999210");
+    expect(dialog.querySelector(".ss-badge-us")!.textContent).toBe("US");
+    expect(dialog.textContent).not.toContain("🇺🇸");
     expect(screen.getByTestId("reconciliation-preview")).toBeTruthy();
     expect(patchInvoiceFx).not.toHaveBeenCalled();
   });
@@ -488,7 +492,7 @@ describe("ImportPage — the exchange-rate prompt after a US import (T-67)", () 
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("entering 1.3712 PATCHes that invoice, re-reads the weeks, then shows the rate, its time and the week's link; Done closes", async () => {
+  it("entering 1.3712 PATCHes that invoice, re-reads the weeks, and closes — no second screen", async () => {
     patchInvoiceFx.mockResolvedValue({ fx: { rate: 1.3712, enteredAt: "2026-11-02T09:30:00.000Z" } });
     await upload(usImported());
     await screen.findByRole("dialog");
@@ -497,15 +501,10 @@ describe("ImportPage — the exchange-rate prompt after a US import (T-67)", () 
     fireEvent.change(screen.getByLabelText("Exchange rate (CAD per USD)"), { target: { value: "1.3712" } });
     fireEvent.click(screen.getByRole("button", { name: "Save rate" }));
 
-    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-us", 1.3712));
-    await waitFor(() => expect(listPeriods.mock.calls.length).toBeGreaterThan(periodReads));
-    const saved = await screen.findByTestId("fx-dialog-saved");
-    expect(saved.textContent).toContain("1.3712 CAD per USD");
-    expect(saved.textContent).toContain("entered");
-    expect(screen.getByRole("link", { name: /Overview/ }).getAttribute("href")).toBe("/overview?scope=week&w=2026-08-31");
-
-    fireEvent.click(screen.getByRole("button", { name: "Done" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(patchInvoiceFx).toHaveBeenCalledWith("inv-us", 1.3712), { timeout: 3000 });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 3000 });
+    expect(listPeriods.mock.calls.length).toBeGreaterThan(periodReads);
+    expect(screen.queryByTestId("fx-dialog-saved")).toBeNull();
   });
 
   it("a rate saved in the dialog shows in that invoice's history row without a reload", async () => {
