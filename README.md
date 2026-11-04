@@ -66,9 +66,74 @@ npm run verify          # typecheck && lint && test — the CI gate
 npm run test:unit       # backend unit tests only, no database required
 npm test                # full suite, in ch_fuel_test
 npm run db:reset        # drop and recreate ch_fuel_dev only, then seed
+npm run db:backup       # dump the current APP_ENV's database into backups/ (see below)
 ```
 
 See [CLAUDE.md](CLAUDE.md) for the full command list, branch/PR workflow, and the domain rules (unit handling, ingest invariants, invoice parsing quirks) that are easy to get wrong.
+
+## Backups and restores
+
+### Local backups (T-101)
+
+```powershell
+npm run db:backup                                   # the current APP_ENV's database (default: ch_fuel_dev)
+$env:APP_ENV='real'; npm run db:backup              # ch_fuel_real
+npm run db:restore-to-real -- backups/<file>.dump   # replace ch_fuel_real from a dump
+```
+
+- **`db:backup`:**
+  - writes `backups/<env>-<database>-<UTC time>.dump` and a `.counts.json` beside it, holding exact row counts from the same snapshot as the dump;
+  - prints the target first, never the password;
+  - is read-only, so it runs against any environment.
+- **`backups/` is gitignored:** it holds real data.
+- **`pg_dump` runs inside the Docker container,** so PowerShell never re-encodes the binary file.
+- **`db:restore-to-real`** goes through the destructive-operation guard. It:
+  1. checks that the file is a readable `pg_dump -Fc` archive;
+  2. dumps the current `ch_fuel_real` to `backups/` (and stops if that fails);
+  3. recreates `ch_fuel_real` and restores into it;
+  4. fails if the restored row counts differ from the dump's `.counts.json`.
+
+  It lists pending `migrations/real` files but does not apply them.
+
+### Production on Neon
+
+> **Postgres versions must match.**
+> - The Neon project's Postgres major version must be **16**, the same as the local container (`postgis/postgis:16-3.4`).
+> - A dump made by a newer major version (17's `pg_dump`) cannot be restored by an older `pg_restore`.
+> - So a prod dump from a Postgres 17 project could not be restored into `ch_fuel_real` until the local container moves to 17 as well.
+> - Check the version in the Neon console (project settings) before the first deploy.
+
+**Before every prod migration, take a snapshot branch:** create a Neon branch from `production`, named `pre-<ticket>-<date>`.
+
+```bash
+neon branches create --name pre-T-102-2026-11-05 --parent production
+```
+
+(`neon` is Neon's CLI, formerly `neonctl`. The console's *Branches → Create branch* does the same.) The branch is an instant copy of `production` at that moment.
+
+**If the migration or release goes wrong,** restore `production` from that branch. Keep the broken state as its own branch, in case you need to look at it:
+
+```bash
+neon branches restore production pre-T-102-2026-11-05 --preserve-under-name production-broken-2026-11-05
+```
+
+- Then check the app and the data.
+- Delete `production-broken-…` and the `pre-…` branch once you are sure: `neon branches delete <name>`.
+- **Never run `db:reset` or `db:restore-to-real` to fix production.** Both are local-only and refused by the guard.
+
+**What to check on the Neon plan.** These change between plans and over time, so read them in the Neon console and docs rather than assuming them:
+
+- **History / point-in-time restore window:** how far back `production` can be restored without a snapshot branch.
+- **Branch limit:** each `pre-…` branch counts, so delete old ones.
+- **Branch storage:** whether the storage a branch holds onto, as `production` moves away from it, is billed.
+- **Compute:** whether a branch's compute starts and uses compute hours when it isn't queried, and how long until it suspends.
+- **Restoring the default/root branch:** whether `production` can be restored in place on your plan, and whether computes restart during it.
+
+**A local copy of prod as well (unit-tested only, not yet run against a real Neon server).**
+- `$env:APP_ENV='production'; npm run db:backup` would dump prod into `backups/`.
+- **Use the direct URL:** it reads the URL from `.env.production.local`, which must hold the **direct** connection string. A `-pooler` host is refused.
+- **Version-matched:** it runs `pg_dump` from a `postgres:<server major>` container.
+- **No password in arguments:** the connection string is passed to that container through an environment variable, never as an argument.
 
 ## What's in this repo, and what isn't
 

@@ -7,6 +7,11 @@ export const DESTROYABLE_DATABASES = ["ch_fuel_dev", "ch_fuel_test", "ch_fuel_re
 /** IPv6 is compared without brackets: pg-connection-string 2.14.0 kept them, 2.14.1 strips them. */
 const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1"];
 
+/** True for the local Docker database's host, in any case, with or without IPv6 brackets. */
+export function isLocalHost(host: string): boolean {
+  return LOCAL_HOSTS.includes(host.toLowerCase().replace(/^\[(.+)\]$/, "$1"));
+}
+
 /**
  * Throws unless connectionString names a local dev, test or real database and
  * APP_ENV is not production or preview. Call it before anything that drops,
@@ -40,7 +45,7 @@ export function assertSafeToDestroy(
     // pg would fall back to PGHOST, which this check cannot vouch for.
     throw refusal(`the connection string has no host, so pg would use PGHOST (${target})`);
   }
-  if (!LOCAL_HOSTS.includes(host)) {
+  if (!isLocalHost(host)) {
     throw refusal(`${host} is not a local host (${target})`);
   }
   if (host.includes("neon.tech")) {

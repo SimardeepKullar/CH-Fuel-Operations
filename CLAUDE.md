@@ -42,6 +42,9 @@ npm run seed           # truck profiles, product code, dispatcher account
 npm run db:reset       # drop + recreate + migrate ch_fuel_dev, then seed — only ch_fuel_dev
 npm run db:reset:real  # pg_dump ch_fuel_real to backups/, then drop + recreate + migrate it
                         # and rebuild from data/ — only ch_fuel_real
+npm run db:backup      # pg_dump the current APP_ENV's database + .counts.json into backups/
+npm run db:restore-to-real -- backups/<file>.dump
+                        # guard, dump the current ch_fuel_real, replace it, verify row counts
 npm run db:nuke -- --yes-delete-every-local-database
                         # the old `docker compose down -v`: every local database. Never by habit.
 
