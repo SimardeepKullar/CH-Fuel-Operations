@@ -134,6 +134,24 @@ describe("OverviewPage (T-71)", () => {
     expect(panel.getAllByTestId("ov-tile")[1]!.textContent).toContain("/ gal");
   });
 
+  it("only the Total spend tile in each country panel carries the hero class, in both units (T-91)", async () => {
+    mount("all");
+    await screen.findByTestId("invoices-summary");
+    fireEvent.click(screen.getByTestId("breakdown-toggle"));
+    const heroLabels = (panelId: string) =>
+      within(screen.getByTestId(panelId))
+        .getAllByTestId("ov-tile")
+        .filter((t) => t.classList.contains("ov-tile-hero"))
+        .map((t) => t.dataset.label);
+    expect(heroLabels("us-panel")).toEqual(["Total spend"]);
+    expect(heroLabels("ca-panel")).toEqual(["Total spend, with HST"]);
+    fireEvent.click(within(screen.getByTestId("us-panel")).getByRole("button", { name: "CA units" }));
+    expect(heroLabels("us-panel")).toEqual(["Total spend"]);
+    // the figure takes its colour from the stylesheet, not an inline style
+    const num = within(screen.getByTestId("us-panel")).getAllByTestId("ov-tile")[0]!.querySelector(".ov-num") as HTMLElement;
+    expect(num.style.color).toBe("");
+  });
+
   it("all time: both trend charts are drawn", async () => {
     mount("all");
     await screen.findByTestId("invoices-summary");
@@ -149,6 +167,19 @@ describe("OverviewPage (T-71)", () => {
     expect(screen.queryByTestId("trend-chart")).toBeNull();
     expect(tile("us-panel", "Average billed price").textContent).toContain("$5.5479");
     expect(container.textContent).not.toMatch(/NaN|Infinity|undefined/);
+  });
+
+  it("the combined band shows HST in three corners, and none on a US-only week (T-92)", async () => {
+    const { unmount } = mount("all");
+    const panel = await screen.findByTestId("combined-panel");
+    expect(within(panel).getAllByTestId("ov-cb-hst")).toHaveLength(3);
+    expect(within(panel).getByText("Average billed price, with HST")).toBeTruthy();
+    expect(within(panel).getByText(/before HST$/)).toBeTruthy();
+    expect(within(panel).getByText("Discount captured")).toBeTruthy();
+    unmount();
+    mount("usonly", `scope=week&w=${overviewFixture("usonly")[10]!.weekEnd}`);
+    const usOnly = await screen.findByTestId("combined-panel");
+    expect(within(usOnly).queryAllByTestId("ov-cb-hst")).toHaveLength(0);
   });
 
   it("rate missing for some weeks: the notice names them and combined still shows", async () => {

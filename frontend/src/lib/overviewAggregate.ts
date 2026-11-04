@@ -118,11 +118,18 @@ export interface CombinedAggregate {
   /** Scale and express charges, US converted at each week's rate plus CA. */
   other: number;
   disc: number;
+  /** The CA invoice's HST as printed; the US invoice carries none. */
   hst: number;
+  dieselHst: number;
+  defHst: number;
+  /** Covered weeks with a CA invoice — 0 means there is no HST to report, not CA$0.00. */
+  caWeeks: number;
   litres: number;
   defLitres: number;
   /** Σ diesel CAD / Σ litres. */
   pricePerLitre: number | null;
+  /** Before HST: US diesel at each week's rate (it has no HST) plus CA pre-tax diesel, / Σ litres. */
+  pricePreTaxPerLitre: number | null;
 }
 
 export interface FxCoverage {
@@ -248,9 +255,13 @@ function aggregateCombined(covered: readonly WeekFigures[]): CombinedAggregate |
     other: sum(covered, (w) => us(w, (u) => u.other) + ca(w, (c) => c.other)),
     disc: sum(covered, (w) => us(w, (u) => u.disc) + ca(w, (c) => c.disc)),
     hst: sum(covered, (w) => ca(w, (c) => c.dieselWithTax - c.dieselPreTax + c.defWithTax - c.defPreTax)),
+    dieselHst: sum(covered, (w) => ca(w, (c) => c.dieselWithTax - c.dieselPreTax)),
+    defHst: sum(covered, (w) => ca(w, (c) => c.defWithTax - c.defPreTax)),
+    caWeeks: covered.filter((w) => w.ca !== null).length,
     litres,
     defLitres: sum(covered, (w) => (w.us === null ? 0 : w.us.defGal * LITRES_PER_GALLON) + ca(w, (c) => c.defLitres)),
     pricePerLitre: ratio(diesel, litres),
+    pricePreTaxPerLitre: ratio(sum(covered, (w) => us(w, (u) => u.diesel) + ca(w, (c) => c.dieselPreTax)), litres),
   };
 }
 

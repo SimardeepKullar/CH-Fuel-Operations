@@ -5,11 +5,11 @@ import { useState } from "react";
 import type { RegionView, Tile } from "../../lib/overviewView";
 import Corners from "../Corners";
 
-function Money({ tile, big }: { tile: Tile; big?: boolean }) {
+function Money({ tile, big, hero }: { tile: Tile; big?: boolean; hero?: boolean }) {
   return (
     <div className={big ? "ov-tile-num ov-big" : "ov-tile-num"}>
       {tile.cc !== "" && <span className="ov-cc">{tile.cc}</span>}
-      <span className="ov-num" style={{ color: tile.color }}>
+      <span className="ov-num" style={hero ? undefined : { color: tile.color }}>
         {tile.value}
       </span>
       {tile.unit !== "" && <span className="ov-unit">{tile.unit}</span>}
@@ -17,13 +17,14 @@ function Money({ tile, big }: { tile: Tile; big?: boolean }) {
   );
 }
 
-function TileBox({ tile, big }: { tile: Tile; big?: boolean }) {
+function TileBox({ tile, big, hero }: { tile: Tile; big?: boolean; hero?: boolean }) {
+  const cls = hero ? "ov-tile ov-tile-big ov-tile-hero" : big ? "ov-tile ov-tile-big" : "ov-tile";
   return (
-    <div className={big ? "ov-tile ov-tile-big" : "ov-tile"} data-testid="ov-tile" data-label={tile.label}>
+    <div className={cls} data-testid="ov-tile" data-label={tile.label}>
       <div className="ov-tile-top">
         <span className="ov-tile-label">{tile.label}</span>
       </div>
-      <Money tile={tile} big={big} />
+      <Money tile={tile} big={big} hero={hero} />
       <div className="ov-tile-bottom">
         <span className="ov-tile-sub">{tile.sub}</span>
         {tile.link !== null ? <span className="ov-view">{tile.link.text}</span> : <span className="ov-tile-note">{tile.note}</span>}
@@ -73,8 +74,8 @@ export default function RegionCard({ region: native }: { region: RegionView }) {
       {region.present ? (
         <>
           <div className="ov-tiles-big">
-            {region.big.map((t) => (
-              <TileBox key={t.label} tile={t} big />
+            {region.big.map((t, i) => (
+              <TileBox key={t.label} tile={t} big hero={i === 0} />
             ))}
           </div>
           <div className="ov-tiles-small">

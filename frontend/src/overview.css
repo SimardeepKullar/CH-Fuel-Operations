@@ -112,6 +112,8 @@
 .ov-cb-tile { position: relative; display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; padding: 1.125rem 1.25rem; background: #fff; }
 .ov-cb-label { font: 600 0.75rem var(--font-heading); letter-spacing: 0.12em; text-transform: uppercase; color: #5a6377; }
 .ov-cb-note { font: 400 0.8125rem var(--font-body); color: #5a6377; }
+.ov-cb-corner { position: absolute; right: 1.25rem; bottom: 1.125rem; font: 400 0.8125rem var(--font-body); color: #5a6377; font-variant-numeric: tabular-nums; }
+.ov-cb-corner-hero { position: static; align-self: flex-end; margin-top: 0.25rem; color: rgba(255, 255, 255, 0.75); }
 .ov-cb-review { gap: 0.5rem; }
 .ov-cb-review-row { position: relative; display: flex; align-items: center; gap: 0.5rem; }
 .ov-cb-count { font: 600 1.75rem/1.1 var(--font-heading); font-variant-numeric: tabular-nums; }
@@ -224,6 +226,14 @@
 .ov-region .ov-tile-big .ov-tile-note { font: 400 0.8125rem var(--font-body); color: #5a6377; }
 .ov-region .ov-view { font: 600 0.875rem var(--font-body); color: #0874b0; text-decoration: none; }
 .ov-region .ov-tile:has(.ov-tile-cover):hover { background: #f5f8fc; }
+/* Total spend tile: same navy fill and light figure as the combined hero (.ov-cb-hero-top) */
+.ov-region .ov-tile-hero { background: #121852; color: #fff; }
+.ov-region .ov-tile-hero .ov-tile-label { color: #b9c1e6; }
+.ov-region .ov-tile-hero .ov-num { color: #fff; }
+.ov-region .ov-tile-hero .ov-cc,
+.ov-region .ov-tile-hero .ov-unit,
+.ov-region .ov-tile-hero .ov-tile-sub,
+.ov-region .ov-tile-hero .ov-tile-note { color: #b9c1e6; }
 .ov-region .ov-tiles-small { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 640px) {
   .ov-region .ov-big .ov-num { font-size: 2.125rem; }

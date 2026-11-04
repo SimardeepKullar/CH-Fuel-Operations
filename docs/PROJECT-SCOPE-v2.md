@@ -238,6 +238,7 @@ Consistent treatment across table, detail and overview. **Two severity levels at
 | Billed price materially above BVD's published price for that site and date | — (needs the price-file audit, A6.5) | red |
 | DEF ratio well outside normal | 8.8% of diesel gallons against a ~3% norm | amber |
 | Card with charges but no fuel | one card carried only a $15.25 scale charge | amber |
+| DEF bought in Canada (`def_in_canada`, T-90) | a stop on a CAD invoice with at least one `DF` line; flagged once per stop, every purchase (no threshold, config `{}`). Detail carries the DEF `qty` (litres), `amount` (CAD) and `currency`, as printed. Informational: blocks nothing, changes no totals. A US stop with DEF is not flagged | amber |
 
 **"Entered unit ≠ driver's assigned truck" is a driver self-report, not a system guess — the mismatch is (almost) always the driver's, and the flag is the whole point, not a false positive to design away.** The unit number on a BVD invoice is exactly what the driver typed at the pump; two real causes cover most cases, both worth surfacing rather than suppressing:
 - **Wrong number entirely** — e.g. IRIS MAE BENTLEY entered `3224` on a scale transaction, which is a trailer number, not a truck number. The entered value is simply not a unit at all.

@@ -50,6 +50,12 @@ describe("AnomalyFlag", () => {
     expect(FILTERABLE_FLAGS).toContainEqual({ value: "unit_not_entered", label: "Unit not entered" });
   });
 
+  it("renders def_in_canada as 'DEF in Canada' (amber) and offers it as a filterable flag", () => {
+    render(<AnomalyFlag flag={{ rule: "def_in_canada", severity: "amber" }} />);
+    expect(screen.getByText("DEF in Canada").getAttribute("data-severity")).toBe("amber");
+    expect(FILTERABLE_FLAGS).toContainEqual({ value: "def_in_canada", label: "DEF in Canada" });
+  });
+
   it("humanizes an unmapped rule slug rather than rendering nothing", () => {
     render(<AnomalyFlag flag={{ rule: "some_new_rule", severity: "amber" }} />);
     expect(screen.getByText("some new rule")).toBeTruthy();

@@ -1,6 +1,7 @@
 import type { InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
 import { Pool, type PoolClient } from "pg";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "../invoice/productCode.js";
+import { defInCanada, type DefInCanadaConfig, type DefInCanadaStop } from "./rules/defInCanada.js";
 import { chargesNoFuel, type ChargesNoFuelConfig, type ChargesNoFuelStop } from "./rules/chargesNoFuel.js";
 import { noTruckOnFile, type NoTruckOnFileConfig, type NoTruckOnFileStop } from "./rules/noTruckOnFile.js";
 import { notOnRoster, type NotOnRosterConfig, type NotOnRosterStop } from "./rules/notOnRoster.js";
@@ -28,6 +29,7 @@ const RULE_NAMES = [
   "charges_no_fuel",
   "price_above_published",
   "not_on_roster",
+  "def_in_canada",
 ] as const;
 type RuleName = (typeof RULE_NAMES)[number];
 
@@ -300,6 +302,20 @@ async function rebuildFindings(db: Db, invoiceId: string): Promise<RunAnomaliesR
   }));
   for (const finding of chargesNoFuel(chargesNoFuelStops, thresholds.get("charges_no_fuel") as ChargesNoFuelConfig)) {
     findings.push({ rule: "charges_no_fuel", finding });
+  }
+
+  const defInCanadaStops: DefInCanadaStop[] = stops.map((s) => ({
+    id: s.id,
+    lines: (linesByStop.get(s.id) ?? []).map((l) => ({
+      productCode: l.product_code,
+      qty: l.qty,
+      amount: l.amount,
+      currency: l.currency,
+      qtyUnit: l.qty_unit,
+    })),
+  }));
+  for (const finding of defInCanada(defInCanadaStops, thresholds.get("def_in_canada") as DefInCanadaConfig)) {
+    findings.push({ rule: "def_in_canada", finding });
   }
 
   const priceStops: PriceAbovePublishedStop[] = stops.map((s) => ({
