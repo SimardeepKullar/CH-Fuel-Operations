@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregateWeeks, LITRES_PER_GALLON, receiptPercent, trendChange, trendSeries, type WeekFigures } from "./overviewAggregate";
+import { aggregateWeeks, LITRES_PER_GALLON, receiptPercent, trendChange, trendPeriods, trendSeries, type WeekFigures } from "./overviewAggregate";
 import { overviewFixture } from "./overviewFixtures";
 
 const sumOf = (weeks: WeekFigures[], pick: (w: WeekFigures) => number) => weeks.reduce((t, w) => t + pick(w), 0);
@@ -191,5 +191,91 @@ describe("trendSeries / trendChange", () => {
     expect(trendChange([null, 5])?.percent).toBeNull();
     expect(trendChange([null, null])).toBeNull();
     expect(trendChange([])).toBeNull();
+  });
+});
+
+describe("trendPeriods — weekly and monthly billed price (T-89)", () => {
+  const usFig = (gal: number, diesel: number) => ({ invoice: "i", gal, diesel, def: 0, defGal: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0 });
+  const caFig = (litres: number, withTax: number, preTax: number) => ({
+    invoice: "i", litres, dieselWithTax: withTax, dieselPreTax: preTax, defWithTax: 0, defPreTax: 0, defLitres: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0,
+  });
+  const week = (weekEnd: string, start: string, us: ReturnType<typeof usFig> | null, ca: ReturnType<typeof caFig> | null): WeekFigures => ({
+    weekEnd, start, end: weekEnd, fx: null, us, ca, drivers: [],
+  });
+
+  // Sep 2's transactions start Aug 27: it is a September week, because the key is the week end (D26).
+  const weeks = [
+    week("2026-09-02", "2026-08-27", usFig(1000, 5000), caFig(2000, 4600, 4070.8)),
+    week("2026-09-09", "2026-09-03", usFig(3000, 18000), caFig(1000, 2400, 2123.9)),
+    week("2026-10-07", "2026-10-01", usFig(500, 2500), null),
+    week("2026-10-14", "2026-10-08", null, null),
+    week("2026-10-21", "2026-10-15", usFig(0, 0), caFig(1000, 2200, 1946.9)),
+  ];
+
+  it("a week ending Sep 2 counts in September though its transactions start Aug 27", () => {
+    const months = trendPeriods(weeks, "us", "month");
+    expect(months.map((m) => m.key)).toEqual(["2026-09", "2026-10"]);
+    expect(months[0]!.weeks).toBe(2);
+    expect(months[0]!.start).toBe("2026-08-27");
+  });
+
+  it("a month is Σ diesel ÷ Σ quantity, not the mean of the weekly prices, exactly", () => {
+    const [sep] = trendPeriods(weeks, "us", "month");
+    // (5000 + 18000) / (1000 + 3000) = 5.75; the mean of 5.00 and 6.00 would be 5.50.
+    expect(sep!.priceTenThousandths).toBe(57500);
+    expect(sep!.qtyHundredths).toBe(400000);
+  });
+
+  it("CA gives with-HST and before-HST prices over the same litres", () => {
+    const [sep] = trendPeriods(weeks, "ca", "month");
+    // 7000 / 3000 = 2.3333; 6194.7 / 3000 = 2.0649
+    expect(sep!.priceTenThousandths).toBe(23333);
+    expect(sep!.preTaxTenThousandths).toBe(20649);
+    expect(trendPeriods(weeks, "us", "month")[0]!.preTaxTenThousandths).toBeNull();
+  });
+
+  it("a week with no fuel is null, never 0, and does not zero its month", () => {
+    const oct = trendPeriods(weeks, "us", "month")[1]!;
+    expect(oct.weeks).toBe(1);
+    expect(oct.priceTenThousandths).toBe(50000);
+    const weekly = trendPeriods(weeks, "us", "week");
+    expect(weekly[3]!.priceTenThousandths).toBeNull();
+    expect(weekly[4]!.priceTenThousandths).toBeNull();
+  });
+
+  it("a month with no diesel on the side is null", () => {
+    const caOnlyOctWeeks = [weeks[2]!];
+    const [oct] = trendPeriods(caOnlyOctWeeks, "ca", "month");
+    expect(oct!.priceTenThousandths).toBeNull();
+    expect(oct!.preTaxTenThousandths).toBeNull();
+    expect(oct!.weeks).toBe(0);
+  });
+
+  it("week grain is one period per week with T-72's price", () => {
+    const periods = trendPeriods(weeks, "us", "week");
+    expect(periods.map((p) => p.key)).toEqual(weeks.map((w) => w.weekEnd));
+    const series = trendSeries(weeks, "us");
+    periods.forEach((p, i) => {
+      expect(p.priceTenThousandths === null ? null : p.priceTenThousandths / 10000).toBe(series[i] === null ? null : Number(series[i]!.toFixed(4)));
+    });
+  });
+
+  it("change is against the immediately prior period, and — (null) after a no-fuel one", () => {
+    const weekly = trendPeriods(weeks, "ca", "week");
+    // Sep 2 2.3000 → Sep 9 2.4000
+    expect(weekly[0]!.changePercent).toBeNull();
+    expect(weekly[1]!.changePercent).toBeCloseTo(((24000 - 23000) / 23000) * 100, 10);
+    // Oct 7 (no CA) is null, Oct 14 (none) is null, Oct 21 follows a no-fuel period: null.
+    expect(weekly[2]!.changePercent).toBeNull();
+    expect(weekly[4]!.changePercent).toBeNull();
+  });
+
+  it("each side keeps its own unit: quantities are never mixed", () => {
+    expect(trendPeriods(weeks, "us", "week")[0]!.qtyHundredths).toBe(100000);
+    expect(trendPeriods(weeks, "ca", "week")[0]!.qtyHundredths).toBe(200000);
+  });
+
+  it("carries no Usd-keyed field", () => {
+    expect(Object.keys(trendPeriods(weeks, "us", "month")[0]!).some((k) => /usd/i.test(k))).toBe(false);
   });
 });
