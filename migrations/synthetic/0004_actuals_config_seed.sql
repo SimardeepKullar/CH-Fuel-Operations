@@ -24,6 +24,9 @@ INSERT INTO anomaly_thresholds (rule, config) VALUES
   -- on a rule without a row here.
   ('no_truck_on_file', '{}'),
 
+  -- No tunable knob: the driver typed a unit at the pump or did not (T-95).
+  ('unit_not_entered', '{}'),
+
   -- Two fills on the same card at the same station within this many minutes
   -- are implausible back-to-back purchases (§A10: 78 minutes at LOVES #275).
   ('too_close', '{"maxMinutesApart": 120}'),

@@ -41,7 +41,8 @@ export function unitMismatch(
   const findings: AnomalyFinding[] = [];
 
   for (const stop of stops) {
-    if (stop.truckUnitNumber === null) {
+    // A blank entry is `unitNotEntered`'s: nothing was typed, so nothing disagrees.
+    if (stop.truckUnitNumber === null || stop.unitRaw.trim() === "") {
       continue;
     }
     if (!sameUnit(stop.unitRaw, stop.truckUnitNumber)) {

@@ -172,6 +172,14 @@ describe("parseInvoicePdf — edge-case fixtures (T-50)", () => {
     expect(outcome.balanced).toBe(true);
   });
 
+  it("edge-fuel-blank-unit: a fuel line printed with no tractor keeps its driver and reads a blank unit (T-95)", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-fuel-blank-unit"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    const blank = result.lines.find((l) => l.authCode === "B500001-TA");
+    expect(blank).toMatchObject({ driverNameRaw: "DRIVER ONE", unitRaw: "" });
+    expect(result.lines.filter((l) => l.unitRaw === "101").length).toBeGreaterThan(0);
+  });
+
   it("edge-thousands: strips the thousands separators the PDF prints, on lines, totals and express rows", async () => {
     const result = await parseInvoicePdf(edgePdf("edge-thousands"), DEFAULT_INVOICE_PRODUCT_CODES);
     expect(result.rejections).toEqual([]);

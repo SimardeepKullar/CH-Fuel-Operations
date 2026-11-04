@@ -47,6 +47,7 @@ describe("AnomalyFlag", () => {
 
   it("offers No truck as a filterable flag", () => {
     expect(FILTERABLE_FLAGS).toContainEqual({ value: "no_truck_on_file", label: "No truck" });
+    expect(FILTERABLE_FLAGS).toContainEqual({ value: "unit_not_entered", label: "Unit not entered" });
   });
 
   it("humanizes an unmapped rule slug rather than rendering nothing", () => {
