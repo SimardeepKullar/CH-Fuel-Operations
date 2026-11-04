@@ -1,10 +1,14 @@
 node_modules/
 dist/
 .env
-# .env.development, .env.test, .env.real, .env.production.local, … (T-98).
-# Only the template is committed.
+# Every .env.* is ignored except the template and the three local-Docker
+# files (T-100), which hold only a localhost DATABASE_URL. .env.*.local and
+# .env.production* — where a real secret or the Neon URL goes — stay ignored.
 .env.*
 !.env.example
+!.env.development
+!.env.test
+!.env.real
 *.log
 .DS_Store
 scripts/.cache/

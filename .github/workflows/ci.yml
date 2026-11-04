@@ -14,21 +14,27 @@ jobs:
         env:
           POSTGRES_USER: ch_fuel
           POSTGRES_PASSWORD: ch_fuel
-          POSTGRES_DB: ch_fuel_planner
+          POSTGRES_DB: ch_fuel_test
         ports: ['5433:5432']
         # -h 127.0.0.1 forces a TCP check. The unix socket is also answered by
         # the entrypoint's temporary init server, so a socket check reports
         # healthy before the real server is up — and CI always starts from a
         # fresh volume, so it takes that path every run.
         options: >-
-          --health-cmd "pg_isready -h 127.0.0.1 -U ch_fuel -d ch_fuel_planner"
+          --health-cmd "pg_isready -h 127.0.0.1 -U ch_fuel -d ch_fuel_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgres://ch_fuel:ch_fuel@localhost:5433/ch_fuel_planner
+      APP_ENV: test
+      DATABASE_URL: postgres://ch_fuel:ch_fuel@localhost:5433/ch_fuel_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version-file: '.nvmrc', cache: npm }
       - run: npm ci
-      - run: npm run db:migrate
+      # db:create and a reset run for real here (T-100): create finds
+      # ch_fuel_test from POSTGRES_DB and makes the other two; the reset drops,
+      # recreates from template1 and migrates the throwaway service database.
+      - run: npm run db:create
+      - run: npx tsx backend/src/cli/withAppEnv.ts --set test -- tsx backend/src/cli/dbAdmin.ts reset ch_fuel_test
+      - run: npm run db:migrate:test
       - run: npm run verify

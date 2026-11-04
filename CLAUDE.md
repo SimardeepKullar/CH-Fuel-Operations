@@ -33,28 +33,37 @@ Two workspaces: `backend/` (`@ch/core`, framework-free) and `frontend/` (Next.js
 
 ```bash
 npm run db:up          # docker compose up -d      (Postgres+PostGIS on :5433)
-npm run db:migrate     # apply migrations/*.sql via the runner, idempotent
-npm run db:reset       # down -v && up -d && migrate  — destroys local data
-npm run seed           # truck profiles, product code, dispatcher account
-npm run db:migrate:real  # optional: apply migrations/real instead of migrations/synthetic
+npm run db:create      # create ch_fuel_dev, ch_fuel_test, ch_fuel_real if missing (template1)
+npm run db:migrate     # apply migrations/synthetic to ch_fuel_dev, idempotent
+npm run db:migrate:test  # the same, to ch_fuel_test — what `npm test` runs against
+npm run db:migrate:real  # apply migrations/real to ch_fuel_real
                           # (local only — migrations/real is gitignored)
+npm run seed           # truck profiles, product code, dispatcher account
+npm run db:reset       # drop + recreate + migrate ch_fuel_dev, then seed — only ch_fuel_dev
+npm run db:reset:real  # pg_dump ch_fuel_real to backups/, then drop + recreate + migrate it
+                        # and rebuild from data/ — only ch_fuel_real
+npm run db:nuke -- --yes-delete-every-local-database
+                        # the old `docker compose down -v`: every local database. Never by habit.
 
 npm run typecheck
 npm run lint
 npm run test:unit      # no database required
-npm test               # full suite, needs a live database
+npm test               # full suite, in ch_fuel_test
 npm run verify         # typecheck && lint && test — the gate
 
-npm run dev            # Next dev server
+npm run dev            # Next dev server on ch_fuel_dev
+npm run dev:real       # Next dev server on ch_fuel_real
 npm run ingest -- ./data/bvd-prices/pcn-usd-9206810-981.csv
 npm run backfill -- ./data/bvd-prices/2026-01/
 ```
+
+**Every script runs under an `APP_ENV`** (T-100), through `backend/src/cli/withAppEnv.ts` — the Windows-safe stand-in for `cross-env`, which also resolves that environment's `.env` files into the child so the Python scripts get the right `DATABASE_URL`. `dev`, `db:migrate`, `seed`, `serve` and the data CLIs *default* to `development` and keep an `APP_ENV` already set (PowerShell: `$env:APP_ENV='real'; npm run import-invoice -- <file>`); `test`, `test:unit`, `db:migrate:test`, `db:reset*` and `*:real` *force* theirs. A reset drops **one** database through `assertSafeToDestroy`, never the Docker volume.
 
 Migrations apply **only** through the runner. `docker-compose.yml` deliberately does not mount `migrations/` as init scripts — that path fires only on an empty volume and has no Neon equivalent.
 
 Migrations are grouped by domain (planning, actuals), schema apart from seed, and may be squashed **until the first deploy** (D21). From the first deploy they are append-only: a change is a new numbered file, never an edit.
 
-`migrations/` itself has two mirrored subdirectories, not a flat file list: `migrations/synthetic/` (committed — what the runner applies by default, and all of CI) and `migrations/real/` (gitignored — file-for-file identical except `0005`, which carries the real fleet roster instead of a synthetic stand-in). See Data on disk, below.
+`migrations/` itself has two mirrored subdirectories, not a flat file list: `migrations/synthetic/` (committed — what the runner applies by default, to `ch_fuel_dev`, `ch_fuel_test` and all of CI) and `migrations/real/` (gitignored — file-for-file identical except `0005`, which carries the real fleet roster instead of a synthetic stand-in; applied to `ch_fuel_real`). See Data on disk, below.
 
 ---
 
@@ -181,7 +190,7 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
 
 **Engineering**
 - **Parameterised SQL only.** No string interpolation of values, anywhere. There is no query builder to hide behind.
-- **Anything that drops, truncates or resets calls `assertSafeToDestroy(url)` first** (`backend/src/db/guard.ts`, T-99). It allows only `ch_fuel_dev`, `ch_fuel_test` or `ch_fuel_real` on `localhost`, `127.0.0.1` or `::1`, never under `APP_ENV=production` or `preview`, and it judges the host and database `pg-connection-string` parses (so a `?host=` override or an empty host falling back to `PGHOST` cannot slip past). The vitest globalSetup calls it, so the integration suite refuses to start against anything else. `LEGACY_LOCAL_DATABASES` (`ch_fuel_planner`) is a temporary allowance that T-100 removes.
+- **Anything that drops, truncates or resets calls `assertSafeToDestroy(url)` first** (`backend/src/db/guard.ts`, T-99). It allows only `ch_fuel_dev`, `ch_fuel_test` or `ch_fuel_real` on `localhost`, `127.0.0.1` or `::1`, never under `APP_ENV=production` or `preview`, and it judges the host and database `pg-connection-string` parses (so a `?host=` override or an empty host falling back to `PGHOST` cannot slip past). The vitest globalSetup calls it, so the integration suite refuses to start against anything else. The original single database, `ch_fuel_planner`, is refused (T-100).
 - Storage is **miles and gallons**, all the way through: distance columns and fields end in `_miles` / `Miles`, never `_m` / `Meters`. A unit is converted at exactly **four edges**, and nowhere else:
   1. **The ORS adapter** converts the provider's metres on the way in. Never ask ORS for miles with a `units` parameter — it changes the request body and so `routes.request_hash`, the cache key.
   2. **SQL that calls a PostGIS geography function** converts at that call: scale the *parameter* (`ST_DWithin(s.geom, r.line, $2 * 1609.344)`), never the column, so the GIST index still serves it; divide a returned distance by `1609.344`.
@@ -222,9 +231,9 @@ The missing January day and the duplicate file are **correct behaviour to report
 
 `.env` is gitignored and starts empty. Copy from the root `.env.example`: `DATABASE_URL`, `ORS_API_KEY`, `ROUTING_PROVIDER=ors`, `AUTH_SECRET`, `SEED_USER_EMAIL`, `SEED_USER_PASSWORD`, `SEED_USER_DISPLAY_NAME` (optional — defaults to `"Dispatcher"`).
 
-**`APP_ENV` (T-98)** selects the environment: `development | test | real | preview | production`. Any other value fails at startup. `backend/src/config/env.ts` loads `.env.<APP_ENV>.local`, then `.env.<APP_ENV>`, then `.env`, from the repo root. The first file to set a key wins, and a variable already in the shell is never overwritten. Unset loads `.env` alone. **APP_ENV comes from the shell only:** an `APP_ENV=` line in a file is ignored, so `.env.production.local` (the Neon prod URL, on the owner's machine only) is never read unless `APP_ENV=production` is set explicitly. Every `.env.*` except `.env.example` is gitignored. Every CLI, `migrate`, `serve` and the Next server (`frontend/src/instrumentation.ts`) print one stderr line on startup, `env=… db=host/name`, never the credentials. Next.js's own `.env.development` / `.env.production` loading reads only `frontend/`, so it never sees these root files.
+**`APP_ENV` (T-98)** selects the environment: `development | test | real | preview | production`. Any other value fails at startup. `backend/src/config/env.ts` loads `.env.<APP_ENV>.local`, then `.env.<APP_ENV>`, then `.env`, from the repo root. The first file to set a key wins, and a variable already in the shell is never overwritten. Unset loads `.env` alone. **APP_ENV comes from the shell only:** an `APP_ENV=` line in a file is ignored, so `.env.production.local` (the Neon prod URL, on the owner's machine only) is never read unless `APP_ENV=production` is set explicitly. `.env.development`, `.env.test` and `.env.real` are committed (T-100) and hold only the local Docker URL for `ch_fuel_dev`, `ch_fuel_test` and `ch_fuel_real`; `.env`, every `.env.*.local` and `.env.production*` are gitignored. Every CLI, `migrate`, `serve` and the Next server (`frontend/src/instrumentation.ts`) print one stderr line on startup, `env=… db=host/name`, never the credentials. Next.js's own `.env.development` / `.env.production` loading reads only `frontend/`, so it never sees these root files.
 
-Local Postgres runs on **port 5433**, not 5432.
+Local Postgres runs on **port 5433**, not 5432. One container holds `ch_fuel_dev` (day-to-day, synthetic), `ch_fuel_test` (the test suite owns it) and `ch_fuel_real` (real data, from `data/` or a dump). The container's `POSTGRES_DB` is still the original `ch_fuel_planner`, which no script reads or resets.
 
 **Node must be the major `.nvmrc` names (22).** Node 24 on Windows aborted vitest workers natively (exit `0xC0000409`, reported as "Worker exited unexpectedly") on 9 of 13 full backend runs, against 0 of 10 on 22 (T-50). Both git hooks run `scripts/check-node.mjs` first and fail on a mismatch. The dev machine switches with nvm-windows (`nvm use 22.23.3`).
 
