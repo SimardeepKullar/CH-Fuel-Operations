@@ -148,6 +148,30 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
     expect(rows).toContainEqual({ rule: "charges_no_fuel", base_auth_code: "A700000103" });
   });
 
+  it("flags every CAD stop with a DF line as def_in_canada, once, with litres and CAD as printed (T-90)", async () => {
+    await importCa();
+    const expected = await pool.query<{ id: string }>(
+      "SELECT DISTINCT fuel_stop_id AS id FROM fuel_stop_lines WHERE product_code = 'DF'",
+    );
+    expect(expected.rows.length).toBeGreaterThan(0);
+    const { rows } = await pool.query<{ subject_id: string; severity: string; detail: Record<string, unknown> }>(
+      "SELECT subject_id, severity, detail FROM anomalies WHERE rule = 'def_in_canada'",
+    );
+    expect(rows.map((r) => r.subject_id).sort()).toEqual(expected.rows.map((r) => r.id).sort());
+    for (const row of rows) {
+      expect(row.severity).toBe("amber");
+      expect(row.detail).toMatchObject({ qtyUnit: "L", currency: "CAD" });
+      expect(Object.keys(row.detail).some((k) => /usd/i.test(k))).toBe(false);
+    }
+    expect(rows.map((r) => r.detail.qty).sort()).toEqual(["0.01", "20.00"]);
+  });
+
+  it("never flags DEF on a US invoice (T-90)", async () => {
+    const us = await importInvoice(pool, US_PDF(), { sourceFilename: "sample-redacted.pdf" }, { parse: parseInvoicePdf });
+    expect(us.status).toBe("imported");
+    expect((await pool.query("SELECT count(*) FROM anomalies WHERE rule = 'def_in_canada'")).rows[0].count).toBe("0");
+  });
+
   it("raises no price-above-published finding on a CA stop — there is no Canadian published price", async () => {
     await importCa();
     expect((await pool.query("SELECT count(*) FROM anomalies WHERE rule = 'price_above_published'")).rows[0].count).toBe("0");
