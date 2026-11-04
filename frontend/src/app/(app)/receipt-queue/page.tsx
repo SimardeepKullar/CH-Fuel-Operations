@@ -6,6 +6,7 @@ import { ApiError, confirmReceiptStops, getAllReceipts, postReceiptCheck } from 
 import { useApiResource } from "../../../hooks/useApiResource";
 import { useStandingCountsValue } from "../../../hooks/standingCountsContext";
 import PageBanner from "../../../components/PageBanner";
+import { FilterChips, FilterDropdown, FilterSearch, FlagsFilter } from "../../../components/FilterControls";
 import RawResolved from "../../../components/RawResolved";
 import InvoiceTag from "../../../components/InvoiceTag";
 import AnomalyFlag, { describeFlag, flagDescription } from "../../../components/AnomalyFlag";
@@ -16,6 +17,7 @@ import { printedAt } from "../../../lib/wallClock";
 import { productBadgeVariant, productLabel } from "../../../lib/transactionFilterConstants";
 import {
   NO_FILTERS,
+  activeQueueChips,
   driverName,
   hasFilters,
   invoiceOptions,
@@ -80,6 +82,11 @@ export default function ReceiptQueuePage() {
     for (const r of rows) byDay.set(printedAt(r.occurredAt).dayKey, printedAt(r.occurredAt).date);
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [rows]);
+
+  const invoiceChoices = useMemo(() => invoices.map((i) => ({ value: i.number, label: `${SIDE_LABELS[i.currency]} ${i.number}` })), [invoices]);
+  const driverChoices = useMemo(() => driverOptions.map((d) => ({ value: d, label: d })), [driverOptions]);
+  const dayChoices = useMemo(() => dayOptions.map(([value, label]) => ({ value, label })), [dayOptions]);
+  const chips = useMemo(() => activeQueueChips(filters, { invoices, days: dayOptions }), [filters, invoices, dayOptions]);
 
   // Any change to the view or a filter lets this session's decided rows leave a "To check" list.
   const changeView = (v: QueueView) => {
@@ -189,71 +196,22 @@ export default function ReceiptQueuePage() {
       />
       <div className="tx-page">
         <div className="tx-toolbar" role="search" aria-label="Filters">
-          <div className="tx-toolbar-row">
-            <input
-              type="search"
-              className="input tx-search"
+          <div className="tx-bar">
+            <FilterSearch
               value={filters.q}
+              onChange={(v) => changeFilters({ q: v })}
               placeholder="Search driver, truck, station, or a date like Oct 21, 2026"
-              aria-label="Search fuel purchases"
-              onChange={(e) => changeFilters({ q: e.target.value })}
+              ariaLabel="Search fuel purchases"
             />
-            <span className="tx-filter">
-              <span className="tx-filter-label">Invoice</span>
-              <select
-                className="input tx-filter-select"
-                aria-label="Invoice"
-                value={filters.invoice}
-                onChange={(e) => changeFilters({ invoice: e.target.value })}
-              >
-                <option value="">All</option>
-                {invoices.map((i) => (
-                  <option key={i.number} value={i.number}>
-                    {SIDE_LABELS[i.currency]} {i.number}
-                  </option>
-                ))}
-              </select>
-            </span>
-            <span className="tx-filter">
-              <span className="tx-filter-label">Driver</span>
-              <select
-                className="input tx-filter-select"
-                aria-label="Driver"
-                value={filters.driver}
-                onChange={(e) => changeFilters({ driver: e.target.value })}
-              >
-                <option value="">All</option>
-                {driverOptions.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </span>
-            <span className="tx-filter">
-              <span className="tx-filter-label">Day</span>
-              <select className="input tx-filter-select" aria-label="Day" value={filters.day} onChange={(e) => changeFilters({ day: e.target.value })}>
-                <option value="">Any</option>
-                {dayOptions.map(([key, text]) => (
-                  <option key={key} value={key}>
-                    {text}
-                  </option>
-                ))}
-              </select>
-            </span>
-            <label className={`tx-anomaly-toggle${filters.flaggedOnly ? " active" : ""}`}>
-              <input type="checkbox" checked={filters.flaggedOnly} onChange={(e) => changeFilters({ flaggedOnly: e.target.checked })} />
-              <span className="tx-anomaly-toggle-label">Flagged only</span>
-            </label>
-            <span className="tx-toolbar-meta">
-              <span className="tx-count">
-                {shown.length} of {total}
-              </span>
-              <button className="tx-clear" type="button" onClick={() => changeFilters(NO_FILTERS)}>
-                Clear
-              </button>
+            <FilterDropdown label="Invoice" value={filters.invoice} options={invoiceChoices} onChange={(v) => changeFilters({ invoice: v })} />
+            <FilterDropdown label="Driver" value={filters.driver} options={driverChoices} onChange={(v) => changeFilters({ driver: v })} />
+            <FilterDropdown label="Day" value={filters.day} options={dayChoices} onChange={(v) => changeFilters({ day: v })} />
+            <FlagsFilter flags={filters.flags} anomalyOnly={filters.flaggedOnly} onChange={(p) => changeFilters({ flags: p.flags, flaggedOnly: p.anomalyOnly })} />
+            <span className="tx-bar-count">
+              <strong>{shown.length}</strong> of {total}
             </span>
           </div>
+          <FilterChips chips={chips} onRemove={changeFilters} onClearAll={() => changeFilters(NO_FILTERS)} />
           <div className="tx-legend">
             <span className="tx-legend-label">Reading the columns</span>
             <span className="tx-legend-item">

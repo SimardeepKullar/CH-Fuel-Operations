@@ -19,6 +19,7 @@ vi.mock("../../../lib/api", async () => {
 
 const { default: ReceiptQueuePage } = await import("./page");
 const { StandingCountsProvider } = await import("../../../hooks/standingCountsContext");
+const { FILTERABLE_FLAGS } = await import("../../../components/AnomalyFlag");
 const { productLabel } = await import("../../../lib/transactionFilterConstants");
 
 function item(id: string, o: Partial<ReceiptQueueItem> = {}): ReceiptQueueItem {
@@ -115,7 +116,7 @@ describe("Receipt Queue — table", () => {
     expect([...invoice.options].map((o) => o.textContent)).toEqual(["All", "CA 1030440", "US 1030434", "US 999210"]);
     fireEvent.change(invoice, { target: { value: "1030440" } });
     expect(within(screen.getByTestId("queue-row")).getByTestId("tx-invoice-tag").textContent).toBe("🇨🇦 1030440");
-    expect(screen.getByText("1 of 3")).toBeTruthy();
+    expect(document.querySelector(".tx-bar-count")?.textContent).toBe("1 of 3");
   });
 
   it("names the invoice filter in a batch confirm, which writes only what is shown", async () => {
@@ -217,5 +218,76 @@ describe("Receipt Queue — table", () => {
     const tip = screen.getByTestId("queue-flag-tip");
     expect(tip.textContent).toContain("Unit mismatch");
     expect(tip.textContent).toContain("does not match the truck assigned to the card");
+  });
+
+  describe("filter bar (T-93)", () => {
+    const flagged = (rule: string) => ({ hasException: true, flags: [{ rule, severity: "amber" as const }] });
+    const rowsShown = () => screen.getAllByTestId("queue-row").length;
+    const chipGroup = () => screen.queryByRole("group", { name: "Active filters" });
+
+    it("shows no chip row until a filter is on, then one chip per filter with Clear all", async () => {
+      await renderPage([item("a"), item("b", { invoiceNumber: "1030434", driver: { resolved: "DRIVER B", raw: "DRIVER B", agrees: true } })]);
+      expect(chipGroup()).toBeNull();
+      expect(screen.queryByText("Clear")).toBeNull();
+      fireEvent.change(screen.getByLabelText("Driver"), { target: { value: "DRIVER B" } });
+      fireEvent.change(screen.getByLabelText("Invoice"), { target: { value: "1030434" } });
+      fireEvent.change(screen.getByLabelText("Search fuel purchases"), { target: { value: "dallas" } });
+      const chips = within(chipGroup()!);
+      expect(chips.getByText("DRIVER B")).toBeTruthy();
+      expect(chips.getByText("US 1030434")).toBeTruthy();
+      expect(chips.getByText("dallas")).toBeTruthy();
+      expect(rowsShown()).toBe(1);
+
+      fireEvent.click(chips.getByLabelText("Remove driver filter"));
+      expect(chips.queryByText("DRIVER B")).toBeNull();
+      expect((screen.getByLabelText("Driver") as HTMLSelectElement).value).toBe("");
+
+      fireEvent.click(chips.getByText("Clear all"));
+      expect(chipGroup()).toBeNull();
+      expect((screen.getByLabelText("Invoice") as HTMLSelectElement).value).toBe("");
+      expect((screen.getByLabelText("Search fuel purchases") as HTMLInputElement).value).toBe("");
+      expect(rowsShown()).toBe(2);
+    });
+
+    it("filters by Day and marks the active dropdown", async () => {
+      await renderPage([item("a"), item("b", { occurredAt: "2026-10-22T15:30:00.000Z" })]);
+      const day = screen.getByLabelText("Day") as HTMLSelectElement;
+      expect(day.closest("label")!.className).not.toContain("on");
+      fireEvent.change(day, { target: { value: "2026-10-22" } });
+      expect(rowsShown()).toBe(1);
+      expect(day.closest("label")!.className).toContain("on");
+    });
+
+    it("offers All, Flagged and each rule in Flags, and narrows by them", async () => {
+      await renderPage([
+        item("a", flagged("unit_mismatch")),
+        item("b", flagged("sub_gallon")),
+        item("c"),
+      ]);
+      fireEvent.click(screen.getByRole("button", { name: /Flags/ }));
+      const menu = within(screen.getByRole("dialog", { name: "Filter by flag" }));
+      // The per-rule options come from the one list the Transactions bar uses, so a new rule appears here too.
+      for (const label of ["All", "Flagged", ...FILTERABLE_FLAGS.map((f) => f.label)]) expect(menu.getByLabelText(label)).toBeTruthy();
+
+      fireEvent.click(menu.getByLabelText("Flagged"));
+      expect(rowsShown()).toBe(2);
+      expect(within(chipGroup()!).getByText("Flagged")).toBeTruthy();
+
+      fireEvent.click(menu.getByLabelText("Unit mismatch"));
+      expect(rowsShown()).toBe(1);
+      expect(within(screen.getByTestId("queue-row")).getByTestId("queue-flag-tip").textContent).toContain("Unit mismatch");
+
+      fireEvent.click(within(chipGroup()!).getByLabelText(/Remove Unit mismatch flag filter/));
+      expect(rowsShown()).toBe(3);
+    });
+
+    it("still gates batch confirm on a driver or day filter", async () => {
+      await renderPage([item("a", flagged("unit_mismatch")), item("b", { occurredAt: "2026-10-22T15:30:00.000Z", ...flagged("unit_mismatch") })]);
+      fireEvent.click(screen.getByRole("button", { name: /Flags/ }));
+      fireEvent.click(screen.getByLabelText("Flagged"));
+      expect(screen.queryByRole("region", { name: "Batch confirm" })).toBeNull();
+      fireEvent.change(screen.getByLabelText("Day"), { target: { value: "2026-10-22" } });
+      expect(screen.getByRole("region", { name: "Batch confirm" })).toBeTruthy();
+    });
   });
 });

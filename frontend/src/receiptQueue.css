@@ -99,5 +99,4 @@
 @media (max-width: 700px) {
   .rq-yes, .rq-no { height: 2.125rem; min-width: 4rem; }
   .rq-batch-go { margin-left: 0; width: 100%; }
-  .tx-search { max-width: none; }
 }
