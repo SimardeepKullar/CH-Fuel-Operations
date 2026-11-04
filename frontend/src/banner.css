@@ -34,6 +34,7 @@
   cursor: pointer;
 }
 .seg-btn:last-child { border-right: none; }
+.seg-btn:disabled { color: #a3adc2; cursor: not-allowed; }
 .seg-btn[aria-pressed="true"] { background: #16205c; color: #fff; }
 .seg-compact .seg-btn { padding: 0.4375rem 0.75rem; font-size: 0.65625rem; }
 

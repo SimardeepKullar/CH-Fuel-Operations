@@ -3,9 +3,9 @@
  * and the stacked top-spend-by-driver columns. Pure. Geometry that the SVG and
  * the columns need (y scale, "nice" axis steps) lives here so it is testable.
  */
-import { aggregateWeeks, ratio, trendChange, trendSeries, type WeekFigures } from "./overviewAggregate";
+import { aggregateWeeks, periodPrice, ratio, trendChange, trendPeriods, type TrendGrain, type TrendPeriod, type WeekFigures } from "./overviewAggregate";
 import type { Scope } from "./overviewScope";
-import { formatDay } from "./weeks";
+import { formatCompactRange, formatDay, formatMonthYear } from "./weeks";
 import { weeksInScope, type Side } from "./overviewView";
 
 const NAVY = "#16205c";
@@ -31,17 +31,50 @@ export interface TrendView {
   value: string;
   unit: string;
   delta: string;
-  /** One value per week in scope when a chart is drawn. */
-  chart: { values: (number | null)[]; labels: string[] } | null;
+  /** The grain the chart is drawn at; Month falls back to Week when the scope has fewer than two months. */
+  grain: TrendGrain;
+  /** The scope spans two or more months, so Month can be chosen. */
+  canMonth: boolean;
+  /** One value, label and tooltip per period in scope when a chart is drawn. */
+  chart: { values: (number | null)[]; labels: string[]; tips: TrendTip[] } | null;
   note: string | null;
   /** `[filled, total]` ticks when fewer than four weeks exist in the whole dataset. */
   progress: { filled: number; total: number } | null;
 }
 
+/** What hovering, focusing or tapping a point shows. `text` is the same figures as one line, for assistive tech. */
+export interface TrendTip {
+  title: string;
+  rows: { key: string; value: string }[];
+  text: string;
+}
+
+const qty2 = (hundredths: number): string => (hundredths / 100).toLocaleString("en-US", TWO);
+
+function trendTip(p: TrendPeriod, side: Side, grain: TrendGrain): TrendTip {
+  const us = side === "us";
+  const cc = us ? "US" : "CA";
+  const per = us ? "gal" : "L";
+  const price = (tt: number | null) => (tt === null ? "—" : `${cc}$${(tt / 10000).toFixed(4)} / ${per}`);
+  const fuel = p.priceTenThousandths !== null;
+  const rows = us
+    ? [{ key: "Billed", value: price(p.priceTenThousandths) }]
+    : [
+        { key: "With HST", value: price(p.priceTenThousandths) },
+        { key: "Before HST", value: price(p.preTaxTenThousandths) },
+      ];
+  rows.push({ key: "Quantity", value: fuel ? `${qty2(p.qtyHundredths)} ${per}` : "—" });
+  rows.push({ key: "Change", value: p.changePercent === null ? "—" : signed(p.changePercent) });
+  const title = grain === "week" ? formatCompactRange(p.start, p.end) : `${formatMonthYear(p.key)} · ${p.weeks} wk${p.weeks === 1 ? "" : "s"}`;
+  return { title, rows, text: `${title}. ${rows.map((r) => `${r.key} ${r.value}`).join(". ")}` };
+}
+
 const signed = (pct: number): string => `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}%`;
 
-function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[], side: Side, spanLabel: string): TrendView {
+function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[], side: Side, spanLabel: string, wanted: TrendGrain): TrendView {
   const us = side === "us";
+  const canMonth = new Set(scopeWeeks.map((w) => w.weekEnd.slice(0, 7))).size >= 2;
+  const grain: TrendGrain = wanted === "month" && canMonth ? "month" : "week";
   const base = {
     side,
     code: us ? ("US" as const) : ("CA" as const),
@@ -50,16 +83,20 @@ function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[
     cc: us ? "US" : "CA",
     unit: us ? "/ gal" : "/ L",
     delta: "",
+    grain,
+    canMonth,
     chart: null,
     note: null,
     progress: null,
   };
-  const series = trendSeries(scopeWeeks, side);
+  // One series feeds the line, the headline and the tooltip, so they cannot disagree.
+  const periods = trendPeriods(scopeWeeks, side, grain);
+  const series = periods.map((p) => periodPrice(p.priceTenThousandths));
   const change = trendChange(series);
   if (change === null) {
     return { ...base, label: "Billed price", none: `No ${us ? "US" : "Canadian"} fuel in this scope.`, hasValue: false, value: "" };
   }
-  const labels = scopeWeeks.map((w) => formatDay(w.start));
+  const labels = periods.map((p) => (grain === "week" ? formatDay(p.start) : formatMonthYear(p.key)));
   if (scopeWeeks.length >= MIN_TREND_WEEKS) {
     return {
       ...base,
@@ -68,7 +105,7 @@ function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[
       hasValue: true,
       value: "$" + change.latest.toFixed(2),
       delta: change.percent === null ? "" : `${signed(change.percent)} since ${labels[change.firstIndex]}`,
-      chart: { values: series, labels },
+      chart: { values: series, labels, tips: periods.map((p) => trendTip(p, side, grain)) },
     };
   }
 
@@ -88,10 +125,10 @@ function trendFor(all: readonly WeekFigures[], scopeWeeks: readonly WeekFigures[
   };
 }
 
-/** Both trend cards for a scope. `spanLabel` is the view's span (`Aug 4 – Nov 9`). */
-export function buildTrends(all: readonly WeekFigures[], scope: Scope, spanLabel: string): [TrendView, TrendView] {
+/** Both trend cards for a scope. `spanLabel` is the view's span (`Aug 4 – Nov 9`); `grain` is Week unless Month is chosen. */
+export function buildTrends(all: readonly WeekFigures[], scope: Scope, spanLabel: string, grain: TrendGrain = "week"): [TrendView, TrendView] {
   const weeks = weeksInScope(all, scope);
-  return [trendFor(all, weeks, "us", spanLabel), trendFor(all, weeks, "ca", spanLabel)];
+  return [trendFor(all, weeks, "us", spanLabel, grain), trendFor(all, weeks, "ca", spanLabel, grain)];
 }
 
 export interface ChartGeometry {

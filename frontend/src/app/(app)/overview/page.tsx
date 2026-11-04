@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useOverviewScope } from "../../../hooks/useOverviewScope";
 import { useOverviewWeeks } from "../../../hooks/useOverviewWeeks";
+import { useTrendGrain } from "../../../hooks/useTrendGrain";
 import { useWeek } from "../../../hooks/useWeek";
 import { buildDriverView, buildTrends } from "../../../lib/overviewCharts";
 import { buildOverviewView, rangeLabel, type Side } from "../../../lib/overviewView";
@@ -32,6 +33,7 @@ export default function OverviewPage() {
   const { weeks: periods, reloadPeriods } = useWeek();
   const weekEnds = useMemo(() => weeks.map((w) => w.weekEnd), [weeks]);
   const { scope, setScope } = useOverviewScope(weekEnds);
+  const { grain, setGrain } = useTrendGrain();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -51,7 +53,7 @@ export default function OverviewPage() {
     () => buildOverviewView(weeks, scope, (side: Side | "all") => anomaliesLink(scope, side === "us" ? "USD" : side === "ca" ? "CAD" : "all")),
     [weeks, scope],
   );
-  const trends = useMemo(() => buildTrends(weeks, scope, view.span), [weeks, scope, view.span]);
+  const trends = useMemo(() => buildTrends(weeks, scope, view.span, grain), [weeks, scope, view.span, grain]);
   const splitPossible = useMemo(() => buildDriverView(weeks, scope, "us").split, [weeks, scope]);
   const buildDrivers = useCallback((v: "us" | "ca") => buildDriverView(weeks, scope, v), [weeks, scope]);
   const scopeWeeks = useMemo(() => weeks.map((w) => ({ weekEnd: w.weekEnd, label: rangeLabel(w.start, w.end) })), [weeks]);
@@ -124,8 +126,8 @@ export default function OverviewPage() {
         </BreakdownByCountry>
         {view.showTrend && (
           <div className="ov-trends">
-            <TrendCard trend={trends[0]} />
-            <TrendCard trend={trends[1]} />
+            <TrendCard trend={trends[0]} onGrainChange={setGrain} />
+            <TrendCard trend={trends[1]} onGrainChange={setGrain} />
           </div>
         )}
         <DriverSpend build={buildDrivers} splitPossible={splitPossible} />

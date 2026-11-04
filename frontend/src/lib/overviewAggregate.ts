@@ -316,3 +316,84 @@ export function trendChange(series: readonly (number | null)[]): TrendChange | n
     percent: points.length > 1 && first.value !== 0 ? ((latest.value - first.value) / first.value) * 100 : null,
   };
 }
+
+// ---------------------------------------------------------------- trend periods (T-89)
+
+export type TrendGrain = "week" | "month";
+
+/** One point of a side's billed-price history: a billing week, or the billing weeks ending in a month. */
+export interface TrendPeriod {
+  /** The week's `weekEnd`, or the month as `YYYY-MM` (keyed on `weekEnd`, D26 — never on transaction dates). */
+  key: string;
+  /** Billing weeks that bought diesel on this side; 0 for a period with no fuel. */
+  weeks: number;
+  /** The first week's start and the last week's end, `YYYY-MM-DD`. */
+  start: string;
+  end: string;
+  /** Diesel quantity in hundredths of a gallon (US) or litre (CA). */
+  qtyHundredths: number;
+  /** Billed price in ten-thousandths: US USD/gal, CA CAD/L with HST. `null` for a period with no fuel. */
+  priceTenThousandths: number | null;
+  /** CA before HST, in ten-thousandths; always `null` on the US side. */
+  preTaxTenThousandths: number | null;
+  /** Percent change of the price against the immediately prior period; `null` when either has no fuel. */
+  changePercent: number | null;
+}
+
+const hundredths = (n: number): number => Math.round(n * 100);
+
+/** Σ$ ÷ Σqty in ten-thousandths, from integer cents and hundredths, divided once. */
+const tenThousandths = (cents: number, qtyHundredths: number): number | null =>
+  qtyHundredths > 0 ? Math.round((cents * 10000) / qtyHundredths) : null;
+
+/** The price as a number for the chart and the headline: the ten-thousandths over 10,000. */
+export const periodPrice = (tenThousandthsValue: number | null): number | null => (tenThousandthsValue === null ? null : tenThousandthsValue / 10000);
+
+/**
+ * One period per billing week, or per month of `weekEnd`, ascending. A month is
+ * Σ diesel ÷ Σ quantity over its weeks, never a mean of weekly prices; money and quantity
+ * are summed as integers (cents, hundredths) and divided once. A period whose side bought
+ * no diesel has `null` prices, never 0, and a week with no fuel does not zero its month.
+ */
+export function trendPeriods(weeks: readonly WeekFigures[], side: TrendSide, grain: TrendGrain): TrendPeriod[] {
+  const groups = new Map<string, WeekFigures[]>();
+  for (const w of weeks) {
+    const key = grain === "week" ? w.weekEnd : w.weekEnd.slice(0, 7);
+    const group = groups.get(key);
+    if (group === undefined) groups.set(key, [w]);
+    else group.push(w);
+  }
+
+  const periods: TrendPeriod[] = [];
+  let prior: number | null = null;
+  for (const [key, group] of groups) {
+    let cents = 0;
+    let preCents = 0;
+    let qty = 0;
+    let bought = 0;
+    for (const w of group) {
+      const q = side === "us" ? (w.us === null ? 0 : hundredths(w.us.gal)) : w.ca === null ? 0 : hundredths(w.ca.litres);
+      if (q <= 0) continue;
+      bought += 1;
+      qty += q;
+      if (side === "us") cents += hundredths(w.us!.diesel);
+      else {
+        cents += hundredths(w.ca!.dieselWithTax);
+        preCents += hundredths(w.ca!.dieselPreTax);
+      }
+    }
+    const price = tenThousandths(cents, qty);
+    periods.push({
+      key,
+      weeks: bought,
+      start: group[0]!.start,
+      end: group[group.length - 1]!.end,
+      qtyHundredths: qty,
+      priceTenThousandths: price,
+      preTaxTenThousandths: side === "ca" ? tenThousandths(preCents, qty) : null,
+      changePercent: price !== null && prior !== null && prior !== 0 ? ((price - prior) / prior) * 100 : null,
+    });
+    prior = price;
+  }
+  return periods;
+}

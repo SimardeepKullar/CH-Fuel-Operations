@@ -45,6 +45,12 @@ export function formatDayYear(iso: string): string {
   return `${formatDay(iso)}, ${parts(iso).year}`;
 }
 
+/** `2026-10` -> `"Oct 2026"`. */
+export function formatMonthYear(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return `${MONTHS[m! - 1]} ${y}`;
+}
+
 /** `Sep 3–9` within a month, `Aug 30–Sep 5` across one — the strip's compact range. */
 export function formatCompactRange(start: string, end: string): string {
   const s = parts(start);

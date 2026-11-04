@@ -126,7 +126,7 @@
 /* Trend */
 .ov-trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(27.5rem, 100%), 1fr)); gap: 0.875rem; }
 .ov-trend { padding: 0.75rem 1rem 0.875rem; }
-.ov-trend-head { display: flex; align-items: center; gap: 0.5625rem; }
+.ov-trend-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5625rem; }
 .ov-trend-badge { padding: 2px 0.375rem; font: 700 0.6875rem var(--font-heading); letter-spacing: 0.08em; color: #fff; }
 .ov-trend-unit { margin-left: auto; font: 500 0.71875rem var(--font-body); color: #7b869e; }
 .ov-trend-headline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.25rem 0.875rem; margin-top: 0.625rem; }
@@ -137,6 +137,16 @@
 .ov-trend-delta { font: 600 0.8125rem var(--font-body); color: #3c4866; }
 .ov-trend-chart { margin-top: 0.75rem; }
 .ov-trend-svg { width: 100%; height: auto; overflow: visible; }
+.ov-trend-plot { position: relative; }
+.ov-trend-hit { cursor: pointer; outline: none; }
+.ov-trend-hit:focus-visible { stroke: #0874b0; stroke-width: 2; }
+.ov-trend-tip { position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 0.75rem)); display: grid; gap: 0.1875rem; min-width: 11rem; padding: 0.5rem 0.625rem; background: #fff; border: 1px solid #cdd6e5; box-shadow: 0 0.25rem 0.75rem rgba(22, 32, 92, 0.18); font: 500 0.75rem var(--font-body); color: #16205c; pointer-events: none; }
+.ov-trend-tip-start { transform: translate(-1rem, calc(-100% - 0.75rem)); }
+.ov-trend-tip-end { transform: translate(calc(-100% + 1rem), calc(-100% - 0.75rem)); }
+.ov-trend-tip b { font: 700 0.75rem var(--font-heading); letter-spacing: 0.04em; }
+.ov-trend-tip span { display: flex; justify-content: space-between; gap: 1rem; }
+.ov-trend-tip i { font-style: normal; color: #5b6a8c; }
+.ov-trend-tip em { font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ov-trend-note { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.875rem; padding-top: 0.75rem; border-top: 1px solid #eef1f6; font: 400 0.8125rem var(--font-body); color: #5b6a8c; }
 .ov-trend-ticks { display: flex; gap: 0.25rem; }
 .ov-trend-ticks i { display: block; width: 1.375rem; height: 0.375rem; }
