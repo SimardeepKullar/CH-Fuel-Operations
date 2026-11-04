@@ -46,6 +46,7 @@
     "db:reset:real": "tsx backend/src/cli/withAppEnv.ts --set real -- npm run _db:reset:real",
     "_db:reset:real": "docker compose up -d --wait && tsx backend/src/cli/dbAdmin.ts reset ch_fuel_real && npm run seed && python scripts/load_gazetteer.py && npm run ingest -- data/bvd-prices/pcn-usd-9206810-981.csv && npm run backfill -- data/bvd-prices/2026-01/ && python scripts/resolve_from_operator.py && npm run resolve -- gazetteer && npm run import-invoice -- ./data/bvd-invoices/BVD_invoice_999210.pdf && npm run import-invoice -- ./data/bvd-invoices/BVD_invoice_999217.pdf",
     "db:nuke": "tsx backend/src/cli/dbNuke.ts",
+    "db:migrate:prod": "tsx backend/src/cli/migrateProd.ts",
     "db:backup": "tsx backend/src/cli/withAppEnv.ts --default development -- tsx backend/src/cli/dbBackup.ts",
     "db:restore-to-real": "tsx backend/src/cli/withAppEnv.ts --set real -- tsx backend/src/cli/restoreToReal.ts",
     "db:logs": "docker compose logs -f db",

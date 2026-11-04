@@ -37,6 +37,9 @@ npm run db:create      # create ch_fuel_dev, ch_fuel_test, ch_fuel_real if missi
 npm run db:migrate     # apply migrations/synthetic to ch_fuel_dev, idempotent
 npm run db:migrate:test  # the same, to ch_fuel_test — what `npm test` runs against
 npm run db:migrate:real  # apply migrations/real to ch_fuel_real
+$env:APP_ENV='production'; npm run db:migrate:prod [-- --confirm]
+                          # preview (target, PG version, pending files), or apply with --confirm,
+                          # migrations/real to the Neon prod DB. Never resets (T-103). Not run by Claude.
                           # (local only — migrations/real is gitignored)
 npm run seed           # truck profiles, product code, dispatcher account
 npm run db:reset       # drop + recreate + migrate ch_fuel_dev, then seed — only ch_fuel_dev
