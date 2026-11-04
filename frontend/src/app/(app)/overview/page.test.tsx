@@ -151,6 +151,19 @@ describe("OverviewPage (T-71)", () => {
     expect(container.textContent).not.toMatch(/NaN|Infinity|undefined/);
   });
 
+  it("the combined band shows HST in three corners, and none on a US-only week (T-92)", async () => {
+    const { unmount } = mount("all");
+    const panel = await screen.findByTestId("combined-panel");
+    expect(within(panel).getAllByTestId("ov-cb-hst")).toHaveLength(3);
+    expect(within(panel).getByText("Average billed price, with HST")).toBeTruthy();
+    expect(within(panel).getByText(/before HST$/)).toBeTruthy();
+    expect(within(panel).getByText("Discount captured")).toBeTruthy();
+    unmount();
+    mount("usonly", `scope=week&w=${overviewFixture("usonly")[10]!.weekEnd}`);
+    const usOnly = await screen.findByTestId("combined-panel");
+    expect(within(usOnly).queryAllByTestId("ov-cb-hst")).toHaveLength(0);
+  });
+
   it("rate missing for some weeks: the notice names them and combined still shows", async () => {
     mount("fxpartial");
     expect(await screen.findByText("3 of 14 weeks have no exchange rate. Converted figures cover 11 weeks.")).toBeTruthy();

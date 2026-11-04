@@ -193,3 +193,40 @@ describe("trendSeries / trendChange", () => {
     expect(trendChange([])).toBeNull();
   });
 });
+
+describe("aggregateWeeks â€” HST on the combined band (T-92)", () => {
+  /** One week with round figures: US 1000 gal at $5 diesel; CA 2000 L, diesel 1130 with tax / 1000 pre-tax, DEF 113 / 100. */
+  function week(): WeekFigures {
+    const base = overviewFixture("all")[0]!;
+    return {
+      ...base,
+      fx: 1.5,
+      us: { ...base.us!, gal: 1000, diesel: 5000, def: 0, defGal: 0, other: 0 },
+      ca: { ...base.ca!, litres: 2000, dieselWithTax: 1130, dieselPreTax: 1000, defWithTax: 113, defPreTax: 100, defLitres: 10, other: 0 },
+    };
+  }
+
+  it("diesel and DEF HST are the CA side's, and the US side adds none", () => {
+    const c = aggregateWeeks([week()]).combined!;
+    expect(c.dieselHst).toBe(130);
+    expect(c.defHst).toBe(13);
+    expect(c.hst).toBe(143);
+    expect(c.caWeeks).toBe(1);
+  });
+
+  it("pre-tax price is (US diesel x rate + CA diesel pre-tax) / litres", () => {
+    const c = aggregateWeeks([week()]).combined!;
+    const litres = 1000 * LITRES_PER_GALLON + 2000;
+    expect(c.pricePreTaxPerLitre).toBe((5000 * 1.5 + 1000) / litres);
+    expect(c.pricePreTaxPerLitre!).toBeLessThan(c.pricePerLitre!);
+  });
+
+  it("a US-only week has no CA weeks and no HST", () => {
+    const w = { ...week(), ca: null };
+    const c = aggregateWeeks([w]).combined!;
+    expect(c.caWeeks).toBe(0);
+    expect(c.hst).toBe(0);
+    expect(c.pricePreTaxPerLitre).toBe(c.pricePerLitre);
+  });
+});
+
