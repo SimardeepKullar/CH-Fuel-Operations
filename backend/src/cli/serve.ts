@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "../api/app.js";
+import { currentTarget } from "../db/pool.js";
 
 const DEFAULT_PORT = 3001;
 
@@ -72,6 +73,7 @@ async function handleRequest(
 const isMainModule = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
   startServeCli(port);
 }

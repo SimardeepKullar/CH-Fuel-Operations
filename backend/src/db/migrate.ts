@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
-import { getPool } from "./pool.js";
+import { getPool, currentTarget } from "./pool.js";
 
 const DEFAULT_MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -92,6 +92,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   const dirArg = process.argv[2] ? path.resolve(process.argv[2]) : undefined;
   runMigrations(pool, dirArg)

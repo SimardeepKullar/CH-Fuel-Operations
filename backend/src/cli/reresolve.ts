@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
-import { getPool } from "../db/pool.js";
+import { getPool, currentTarget } from "../db/pool.js";
 import { reresolve, type FlagChange, type ReresolveReport } from "../resolve/reresolve.js";
 
 function printReport(report: ReresolveReport): void {
@@ -65,6 +65,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   runReresolveCli(process.argv.slice(2), pool)
     .then(async (exitCode) => {
