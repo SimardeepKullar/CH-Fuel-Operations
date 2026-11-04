@@ -500,6 +500,15 @@ export const EDGE_CASES = {
     }],
     [["2026-01-05 08:00:00", "9000001", "E1000001", "101", "", "DRIVER ONE", "", "", "1,200.00", "3", "1,203.00", "US", "repairs", ""]],
   ),
+  /** A fuel line printed with no tractor — the driver typed no unit at the
+   * pump — between lines that carry one (T-95). */
+  "edge-fuel-blank-unit": edge([{
+    card: "1000001",
+    rows: [
+      ...US_ROWS["1000001"],
+      usRow("B500001-TA", "DRIVER ONE", "", "2026-01-06 10:00:00", "1", "TA", "100.00", "5.5000", "5.1234"),
+    ],
+  }]),
   /** One fuel line under a product code no mapping knows: quarantined as
    * UNMAPPED_PRODUCT, never default-mapped. */
   "edge-unmapped-product": edge([{

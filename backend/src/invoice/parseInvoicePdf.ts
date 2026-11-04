@@ -152,7 +152,10 @@ function readFuelLine(tokens: readonly string[], rawLine: string): FuelLineCells
   i = dateIndex;
 
   i--;
-  const unit = tokens[i--] ?? "";
+  // The tractor cell can print blank (real CA invoice 1026203). A unit always
+  // carries a digit and a driver name never does, so a digit-free token ahead
+  // of the timestamp is the driver and the unit is blank, not the name.
+  const unit = /\d/.test(tokens[i] ?? "") ? tokens[i--]! : "";
   const authCode = tokens[0] ?? "";
   const driverName = tokens.slice(1, i + 1).join(" ");
   if (driverName === "") {
