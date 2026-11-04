@@ -26,6 +26,9 @@ INSERT INTO anomaly_thresholds (rule, config) VALUES
 
   -- No tunable knob: the driver typed a unit at the pump or did not (T-95).
   ('unit_not_entered', '{}'),
+  -- No tunable knob: every DEF line on a CAD invoice is flagged (T-90). A
+  -- "flag only above N L" threshold would go in this config (D16).
+  ('def_in_canada', '{}'),
 
   -- Two fills on the same card at the same station within this many minutes
   -- are implausible back-to-back purchases (§A10: 78 minutes at LOVES #275).
