@@ -201,3 +201,36 @@ describe("New Plan page — solve-in-flight spinner (T-23 step 23.3, §8)", () =
     expect(screen.getByRole("button", { name: /Plan route/ })).toBeTruthy();
   });
 });
+
+describe("New Plan page — Dev Tools hidden in production and preview (T-104)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  for (const appEnv of ["production", "preview"]) {
+    it(`shows no Dev Tools toggle when APP_ENV=${appEnv}`, async () => {
+      vi.stubEnv("APP_ENV", appEnv);
+      setup();
+      render(<NewPlanPage />);
+      await waitFor(() => expect((screen.getByLabelText("Truck") as HTMLSelectElement).options).toHaveLength(2));
+      expect(screen.queryByRole("button", { name: "Dev Tools" })).toBeNull();
+      expect(screen.queryByLabelText("Max detour per stop (mi)")).toBeNull();
+      expect(screen.getByRole("button", { name: /Plan route/ })).toBeTruthy();
+    });
+  }
+
+  for (const appEnv of ["development", "real", "test", ""]) {
+    it(`keeps the Dev Tools toggle when APP_ENV=${appEnv || "(unset)"}`, async () => {
+      vi.stubEnv("APP_ENV", appEnv);
+      setup();
+      render(<NewPlanPage />);
+      await waitFor(() => expect((screen.getByLabelText("Truck") as HTMLSelectElement).options).toHaveLength(2));
+      expect(screen.getByRole("button", { name: "Dev Tools" })).toBeTruthy();
+    });
+  }
+
+  it("is rendered per request, never prerendered with a build-time APP_ENV", async () => {
+    const page = await import("./page");
+    expect(page.dynamic).toBe("force-dynamic");
+  });
+});
