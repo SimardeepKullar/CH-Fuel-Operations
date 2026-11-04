@@ -21,7 +21,22 @@ import { isLocalHost } from "./guard.js";
  */
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-export const BACKUPS_DIR = path.join(ROOT_DIR, "backups");
+
+/**
+ * Where dumps go: BACKUP_DIR (set through the T-98 env files or the shell), a
+ * relative value resolved against the repo root, default `backups/`. Lets dumps
+ * live outside a synced folder such as OneDrive.
+ */
+export function resolveBackupsDir(env: Readonly<Record<string, string | undefined>>, rootDir: string = ROOT_DIR): string {
+  const configured = env.BACKUP_DIR?.trim();
+  return configured ? path.resolve(rootDir, configured) : path.join(rootDir, "backups");
+}
+
+/** A path inside the repo relative to it; one outside it (a BACKUP_DIR elsewhere) in full. */
+export function displayPath(file: string): string {
+  const relative = path.relative(ROOT_DIR, file);
+  return relative.startsWith("..") || path.isAbsolute(relative) ? file : relative;
+}
 
 export interface Queryable {
   query(text: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
@@ -33,6 +48,8 @@ export interface BackupDeps {
   /** Runs `docker <args>`, adding `env` to its environment; throws on a non-zero exit. */
   runDocker(args: string[], env?: Record<string, string>): void;
   backupsDir: string;
+  /** Creates the directory (and parents) if missing. */
+  ensureDir(dir: string): void;
   now(): Date;
   /** 0 when the file does not exist. */
   fileSize(file: string): number;
@@ -100,6 +117,7 @@ export async function backupDatabase(
   const file = path.join(deps.backupsDir, fileName);
   const takenAt = deps.now().toISOString();
 
+  deps.ensureDir(deps.backupsDir);
   const client = await deps.connect(url);
   let counts: TableCounts;
   try {
@@ -192,7 +210,13 @@ export const realBackupDeps: BackupDeps = {
       throw new Error(`docker ${args.slice(0, 4).join(" ")} … exited ${result.status}: ${result.stderr.trim()}`);
     }
   },
-  backupsDir: BACKUPS_DIR,
+  // A getter, read when used: this module can load before the env files do.
+  get backupsDir() {
+    return resolveBackupsDir(process.env);
+  },
+  ensureDir: (dir) => {
+    mkdirSync(dir, { recursive: true });
+  },
   now: () => new Date(),
   fileSize: (file) => {
     try {

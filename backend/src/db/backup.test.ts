@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { backupDatabase, backupFileName, type BackupDeps } from "./backup.js";
+import path from "node:path";
+import { backupDatabase, backupFileName, displayPath, realBackupDeps, resolveBackupsDir, ROOT_DIR, type BackupDeps } from "./backup.js";
 
 const LOCAL = "postgres://ch_fuel:ch_fuel@localhost:5433/ch_fuel_test";
 const NEON_DIRECT = "postgresql://neondb_owner:npg_S3cretPw@ep-cool-a1b2.us-east-1.aws.neon.tech/neondb?sslmode=require";
@@ -34,6 +35,9 @@ function fakeDeps(options: { serverVersionNum?: number; dumpSize?: number } = {}
       dockerCalls.push({ args, env });
     },
     backupsDir: "/repo/backups",
+    ensureDir: (dir) => {
+      log.push(`mkdir ${dir}`);
+    },
     now: () => NOW,
     fileSize: () => options.dumpSize ?? 2048,
     writeFile: (file, contents) => {
@@ -57,7 +61,7 @@ describe("backupDatabase — local (the compose container)", () => {
 
     await backupDatabase(LOCAL, "test", deps);
 
-    expect(log.slice(0, 2)).toEqual([
+    expect(log.filter((l) => !l.startsWith("mkdir")).slice(0, 2)).toEqual([
       "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY",
       "SELECT pg_export_snapshot() AS snapshot",
     ]);
@@ -145,5 +149,64 @@ describe("backupDatabase — remote (unit-tested only, not yet run against a rea
     const { deps } = fakeDeps();
     const url = `postgres://u:p@localhost/ch_fuel_dev?host=ep-x-pooler.us-east-1.aws.neon.tech`;
     await expect(backupDatabase(url, "production", deps)).rejects.toThrow(/pooler/);
+  });
+});
+
+describe("resolveBackupsDir (BACKUP_DIR)", () => {
+  const root = path.resolve("/repo");
+
+  it("defaults to backups/ under the repo root when BACKUP_DIR is unset or blank", () => {
+    expect(resolveBackupsDir({}, root)).toBe(path.join(root, "backups"));
+    expect(resolveBackupsDir({ BACKUP_DIR: "" }, root)).toBe(path.join(root, "backups"));
+    expect(resolveBackupsDir({ BACKUP_DIR: "   " }, root)).toBe(path.join(root, "backups"));
+  });
+
+  it("uses an absolute BACKUP_DIR as given", () => {
+    const outside = path.resolve("/elsewhere/ch-dumps");
+    expect(resolveBackupsDir({ BACKUP_DIR: outside }, root)).toBe(outside);
+  });
+
+  it("resolves a relative BACKUP_DIR against the repo root, not the working directory", () => {
+    expect(resolveBackupsDir({ BACKUP_DIR: "../dumps" }, root)).toBe(path.resolve(root, "../dumps"));
+  });
+});
+
+describe("realBackupDeps.backupsDir", () => {
+  it("is read from BACKUP_DIR when used, so the T-98 env files have been loaded by then", () => {
+    const before = process.env.BACKUP_DIR;
+    try {
+      delete process.env.BACKUP_DIR;
+      expect(realBackupDeps.backupsDir).toBe(path.join(ROOT_DIR, "backups"));
+      process.env.BACKUP_DIR = path.resolve("/elsewhere/ch-dumps");
+      expect(realBackupDeps.backupsDir).toBe(path.resolve("/elsewhere/ch-dumps"));
+    } finally {
+      if (before === undefined) delete process.env.BACKUP_DIR;
+      else process.env.BACKUP_DIR = before;
+    }
+  });
+});
+
+describe("backupDatabase — BACKUP_DIR", () => {
+  it("dumps into the configured directory, creating it first, and bind-mounts it for a remote dump", async () => {
+    const local = fakeDeps();
+    local.deps.backupsDir = "/outside/dumps";
+    const result = await backupDatabase(LOCAL, "test", local.deps);
+    expect(result.file.replaceAll(path.sep, "/")).toBe("/outside/dumps/test-ch_fuel_test-2026-11-04T19-30-05Z.dump");
+    const mkdir = local.log.indexOf("mkdir /outside/dumps");
+    expect(mkdir).toBeGreaterThanOrEqual(0);
+    expect(mkdir).toBeLessThan(local.log.findIndex((l) => l.startsWith("docker")));
+
+    const remote = fakeDeps({ serverVersionNum: 160004 });
+    remote.deps.backupsDir = "/outside/dumps";
+    await backupDatabase(NEON_DIRECT, "production", remote.deps);
+    expect(remote.dockerCalls[0]!.args).toContain("/outside/dumps:/backups");
+  });
+});
+
+describe("displayPath", () => {
+  it("shows a path inside the repo relative to it, and one outside it in full", () => {
+    expect(displayPath(path.join(ROOT_DIR, "backups", "a.dump"))).toBe(path.join("backups", "a.dump"));
+    const outside = path.resolve(ROOT_DIR, "..", "..", "elsewhere", "a.dump");
+    expect(displayPath(outside)).toBe(outside);
   });
 });
