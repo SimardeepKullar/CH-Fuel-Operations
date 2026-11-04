@@ -51,9 +51,17 @@ export function childEnv(
   return env;
 }
 
-/** Quotes an argument for the shell the command runs in (cmd.exe or sh). */
-export function quoteArg(arg: string): string {
-  return /[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg;
+/**
+ * Quotes an argument for the shell the command runs in. Anything beyond a
+ * plain path or flag is quoted — not just spaces: sh rejects a bare `(`, which
+ * a real file name like the January corpus's "…-981 (1).csv" contains. sh
+ * takes single quotes (nothing expands inside them); cmd.exe only knows double.
+ */
+export function quoteArg(arg: string, platform: NodeJS.Platform = process.platform): string {
+  if (/^[\w./:=@%+,-]+$/.test(arg)) {
+    return arg;
+  }
+  return platform === "win32" ? `"${arg.replace(/"/g, '\\"')}"` : `'${arg.replace(/'/g, "'\\''")}'`;
 }
 
 /** Resolves to the child's exit code; 1 if it was killed by a signal. */
@@ -63,7 +71,7 @@ export function runWithAppEnv(argv: readonly string[]): Promise<number> {
   console.error(formatTarget(describeTarget(resolveAppEnv(env), env.DATABASE_URL)));
 
   // shell: npm, npx and tsx are .cmd shims on Windows.
-  const child = spawn(args.command.map(quoteArg).join(" "), { env, shell: true, stdio: "inherit" });
+  const child = spawn(args.command.map((arg) => quoteArg(arg)).join(" "), { env, shell: true, stdio: "inherit" });
   return new Promise((resolve, reject) => {
     child.on("error", reject);
     child.on("exit", (code) => resolve(code ?? 1));

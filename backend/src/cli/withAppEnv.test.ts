@@ -79,9 +79,26 @@ describe("childEnv", () => {
 });
 
 describe("quoteArg", () => {
-  it("leaves plain arguments alone and quotes ones with spaces", () => {
-    expect(quoteArg("./data/bvd-prices/x.csv")).toBe("./data/bvd-prices/x.csv");
-    expect(quoteArg("./data/my file.pdf")).toBe('"./data/my file.pdf"');
+  it("leaves plain arguments alone", () => {
+    for (const platform of ["linux", "win32"] as const) {
+      expect(quoteArg("./data/bvd-prices/x.csv", platform)).toBe("./data/bvd-prices/x.csv");
+      expect(quoteArg("--workspace", platform)).toBe("--workspace");
+    }
+  });
+
+  // CI (T-100): `process.exit(3)` reached sh unquoted — "Syntax error: "(" unexpected".
+  // The same would break a real path like the January corpus's "…-981 (1).csv".
+  it("quotes shell metacharacters as well as spaces, for sh", () => {
+    expect(quoteArg("process.exit(3)", "linux")).toBe("'process.exit(3)'");
+    expect(quoteArg("./data/x-981 (1).csv", "linux")).toBe("'./data/x-981 (1).csv'");
+    expect(quoteArg("$HOME", "linux")).toBe("'$HOME'");
+    expect(quoteArg("it's", "linux")).toBe("'it'\\''s'");
+  });
+
+  it("quotes with double quotes for cmd.exe", () => {
+    expect(quoteArg("process.exit(3)", "win32")).toBe('"process.exit(3)"');
+    expect(quoteArg("./data/my file.pdf", "win32")).toBe('"./data/my file.pdf"');
+    expect(quoteArg('say "hi"', "win32")).toBe('"say \\"hi\\""');
   });
 });
 
