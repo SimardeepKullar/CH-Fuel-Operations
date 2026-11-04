@@ -4,13 +4,6 @@ import { resolveAppEnv } from "../config/env.js";
 /** The only databases anything destructive may touch (PLAN-dev-prod-environments §2). */
 export const DESTROYABLE_DATABASES = ["ch_fuel_dev", "ch_fuel_test", "ch_fuel_real"] as const;
 
-/**
- * TEMPORARY. Local dev and CI still run on the original single database until
- * T-100 (Ticket C) creates the three above. Every other rule still applies to
- * it. T-100 deletes this constant and flips its test to expect a rejection.
- */
-export const LEGACY_LOCAL_DATABASES = ["ch_fuel_planner"] as const;
-
 /** IPv6 is compared without brackets: pg-connection-string 2.14.0 kept them, 2.14.1 strips them. */
 const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1"];
 
@@ -53,7 +46,7 @@ export function assertSafeToDestroy(
   if (host.includes("neon.tech")) {
     throw refusal(`${host} is a Neon host (${target})`);
   }
-  const allowed: readonly string[] = [...DESTROYABLE_DATABASES, ...LEGACY_LOCAL_DATABASES];
+  const allowed: readonly string[] = DESTROYABLE_DATABASES;
   if (!allowed.includes(database)) {
     throw refusal(`database "${database}" is not one of ${allowed.join(", ")} (${target})`);
   }

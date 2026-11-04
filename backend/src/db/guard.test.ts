@@ -1,7 +1,7 @@
 import { Client } from "pg";
 import { parse } from "pg-connection-string";
 import { describe, expect, it } from "vitest";
-import { assertSafeToDestroy, LEGACY_LOCAL_DATABASES } from "./guard.js";
+import { assertSafeToDestroy } from "./guard.js";
 
 const NEON_POOLED =
   "postgresql://neondb_owner:npg_S3cretPw@ep-cool-name-a1b2c3-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require";
@@ -38,13 +38,6 @@ describe("assertSafeToDestroy — accepts a local dev, test or real database", (
     const url = `${local("ch_fuel_test")}?options=${encodeURIComponent("-c search_path=test_x_1,public")}`;
     expect(() => assertSafeToDestroy(url, { APP_ENV: "test" })).not.toThrow();
   });
-
-  // Temporary, until T-100: local dev and CI still run on ch_fuel_planner.
-  // T-100 deletes LEGACY_LOCAL_DATABASES and flips this test to expect a rejection.
-  it("accepts ch_fuel_planner on localhost (temporary, until T-100)", () => {
-    expect(LEGACY_LOCAL_DATABASES).toEqual(["ch_fuel_planner"]);
-    expect(() => assertSafeToDestroy(local("ch_fuel_planner"), {})).not.toThrow();
-  });
 });
 
 describe("assertSafeToDestroy — rejects", () => {
@@ -78,6 +71,12 @@ describe("assertSafeToDestroy — rejects", () => {
 
   it.each(["postgres", "neondb", "ch_fuel_dev_old", "CH_FUEL_DEV", ""])("an unknown database (%s)", (db) => {
     expect(() => assertSafeToDestroy(local(db), {})).toThrow(/database/);
+  });
+
+  // T-99 allowed ch_fuel_planner on localhost while dev and CI still ran on
+  // it; T-100 moved them to ch_fuel_dev / ch_fuel_test and removed it.
+  it("ch_fuel_planner, even on localhost (allowed until T-100)", () => {
+    expect(() => assertSafeToDestroy(local("ch_fuel_planner"), {})).toThrow(/database "ch_fuel_planner"/);
   });
 
   it("ch_fuel_planner on a remote host", () => {

@@ -2,6 +2,8 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
+import { describeTarget, formatTarget, resolveAppEnv } from "../config/env.js";
+import { assertSafeToDestroy } from "./guard.js";
 import { getPool, currentTarget } from "./pool.js";
 
 const DEFAULT_MIGRATIONS_DIR = path.resolve(
@@ -50,11 +52,7 @@ export async function runMigrations(
   const onDisk = new Set(filenames);
   const orphaned = [...applied].filter((filename) => !onDisk.has(filename)).sort();
   if (orphaned.length > 0) {
-    throw new Error(
-      `schema_migrations records ${orphaned.length} migration(s) with no file in ${migrationsDir}: ` +
-        `${orphaned.join(", ")}. This database predates the current migration history — ` +
-        `run \`npm run db:reset\` to rebuild it.`,
-    );
+    throw new Error(orphanedMigrationsMessage(orphaned, migrationsDir, pool.options.connectionString ?? ""));
   }
 
   const results: MigrationResult[] = [];
@@ -85,6 +83,35 @@ export async function runMigrations(
   }
 
   return results;
+}
+
+/**
+ * The error for a database that recorded migrations this directory no longer
+ * has. Suggests `db:reset` only where the T-99 guard would allow one; anywhere
+ * else — production, preview, Neon, an unknown database — a reset would
+ * destroy real data, so it says not to.
+ */
+export function orphanedMigrationsMessage(
+  orphaned: readonly string[],
+  migrationsDir: string,
+  connectionString: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  const head =
+    `schema_migrations records ${orphaned.length} migration(s) with no file in ${migrationsDir}: ` +
+    `${orphaned.join(", ")}. This database predates the current migration history — `;
+  try {
+    assertSafeToDestroy(connectionString, env);
+    return head + "run `npm run db:reset` (or `db:reset:real`) to rebuild it.";
+  } catch {
+    let target: string;
+    try {
+      target = formatTarget(describeTarget(resolveAppEnv(env), connectionString));
+    } catch {
+      target = formatTarget(describeTarget(undefined, connectionString));
+    }
+    return head + `and ${target} is not a database a reset may touch. Do not reset it: restore from a backup or investigate.`;
+  }
 }
 
 const isMainModule =
