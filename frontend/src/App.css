@@ -1762,7 +1762,9 @@ a.kpi-tile-link:hover .kpi-card-link-hint { text-decoration: underline; }
 .import-history-entry:last-child { border-bottom: none; }
 .import-history-row {
   display: grid;
-  grid-template-columns: 6.25rem minmax(11.875rem, 1.4fr) 7.5rem 6.25rem 10.3125rem minmax(13.75rem, 1fr) 13.5rem;
+  /* Every track can shrink (minmax(0, …)) and the week/rate cells already wrap,
+     so the row fits the viewport instead of widening the page. */
+  grid-template-columns: 5.5rem minmax(0, 1.3fr) minmax(5.5rem, 0.8fr) 5.5rem minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1.2fr);
   gap: 0.625rem;
   align-items: center;
   padding: 0.5rem 1.125rem;
