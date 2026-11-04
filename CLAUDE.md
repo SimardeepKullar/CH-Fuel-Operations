@@ -181,6 +181,7 @@ Each of these is a silent-corruption bug, not a crash. They are scattered across
 
 **Engineering**
 - **Parameterised SQL only.** No string interpolation of values, anywhere. There is no query builder to hide behind.
+- **Anything that drops, truncates or resets calls `assertSafeToDestroy(url)` first** (`backend/src/db/guard.ts`, T-99). It allows only `ch_fuel_dev`, `ch_fuel_test` or `ch_fuel_real` on `localhost`, `127.0.0.1` or `::1`, never under `APP_ENV=production` or `preview`, and it judges the host and database `pg-connection-string` parses (so a `?host=` override or an empty host falling back to `PGHOST` cannot slip past). The vitest globalSetup calls it, so the integration suite refuses to start against anything else. `LEGACY_LOCAL_DATABASES` (`ch_fuel_planner`) is a temporary allowance that T-100 removes.
 - Storage is **miles and gallons**, all the way through: distance columns and fields end in `_miles` / `Miles`, never `_m` / `Meters`. A unit is converted at exactly **four edges**, and nowhere else:
   1. **The ORS adapter** converts the provider's metres on the way in. Never ask ORS for miles with a `units` parameter — it changes the request body and so `routes.request_hash`, the cache key.
   2. **SQL that calls a PostGIS geography function** converts at that call: scale the *parameter* (`ST_DWithin(s.geom, r.line, $2 * 1609.344)`), never the column, so the GIST index still serves it; divide a returned distance by `1609.344`.

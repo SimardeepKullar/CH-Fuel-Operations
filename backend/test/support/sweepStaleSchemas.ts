@@ -2,6 +2,7 @@ import { Pool } from "pg";
 // Side effect: loads the root .env into process.env, exactly as the
 // integration tests get DATABASE_URL.
 import "../../src/db/pool.js";
+import { assertSafeToDestroy } from "../../src/db/guard.js";
 
 /** Every throwaway test schema is named `<prefix>_<Date.now()>_<base36>` —
  * `test_drivers_…`, `plan_actual_…` — so the shape, not the prefix, marks one. */
@@ -22,10 +23,16 @@ export function staleTestSchemas(names: readonly string[], nowMs: number, minAge
   });
 }
 
-/** Vitest globalSetup: sweep stale test schemas once, before any file runs. */
+/**
+ * Vitest globalSetup: refuse a non-local target, then sweep stale test schemas
+ * once, before any file runs. The guard (T-99) runs before connecting and
+ * outside the catch below, so a production, preview, Neon or unknown database
+ * stops the whole run — 38 integration files drop schemas in DATABASE_URL.
+ */
 export default async function setup(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return;
+  assertSafeToDestroy(connectionString);
   const pool = new Pool({ connectionString });
   try {
     const { rows } = await pool.query<{ nspname: string }>("SELECT nspname FROM pg_namespace");
