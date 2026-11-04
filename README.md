@@ -50,7 +50,9 @@ cd CH-Fuel-Operations
 npm install
 cp .env.example .env              # fill in ORS_API_KEY, AUTH_SECRET, SEED_USER_*
 npm run db:up                     # Postgres+PostGIS via Docker, on :5433
-npm run db:migrate                # applies migrations/synthetic (see below)
+npm run db:create                 # ch_fuel_dev, ch_fuel_test, ch_fuel_real
+npm run db:migrate                # applies migrations/synthetic to ch_fuel_dev (see below)
+npm run db:migrate:test           # and to ch_fuel_test, which `npm test` uses
 npm run seed                      # truck profiles, product code, dispatcher account
 npm run dev
 ```
@@ -62,8 +64,8 @@ Requires Docker (for Postgres) and a free [OpenRouteService](https://openroutese
 ```bash
 npm run verify          # typecheck && lint && test — the CI gate
 npm run test:unit       # backend unit tests only, no database required
-npm test                # full suite, needs a live database
-npm run db:reset        # destroy and recreate the local database
+npm test                # full suite, in ch_fuel_test
+npm run db:reset        # drop and recreate ch_fuel_dev only, then seed
 ```
 
 See [CLAUDE.md](CLAUDE.md) for the full command list, branch/PR workflow, and the domain rules (unit handling, ingest invariants, invoice parsing quirks) that are easy to get wrong.
@@ -82,7 +84,7 @@ This is a real operating company's fuel and invoice data pipeline, so the repo i
 - `data/bvd-prices/` and `data/bvd-invoices/` — the real supplier price sheets and invoices (real contract pricing, real per-driver fuel purchases).
 - `migrations/real/` — the real fleet roster (real employee names, real fuel-card numbers), mirroring `migrations/synthetic/` file-for-file so schema and test behavior are identical either way.
 - `docs/design/*.dc.html` — exported design mockups that embed real invoice figures as sample data.
-- `.env` and every `.env.*` except `.env.example` — local secrets (database URL, API keys, auth secret), one file per `APP_ENV`.
+- `.env`, `.env.*.local` and `.env.production*` — local secrets (API keys, auth secret, the production database URL). `.env.development`, `.env.test` and `.env.real` are committed: they hold only the local Docker database URL.
 
 A small number of tests assert exact figures from the real supplier invoice; they're gated behind `describe.skipIf(!hasRealFixture)` and simply skip when the underlying file isn't present — which is always the case in CI and on a fresh clone.
 
