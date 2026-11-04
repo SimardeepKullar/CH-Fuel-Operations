@@ -214,6 +214,14 @@
 .ov-region .ov-tile-big .ov-tile-note { font: 400 0.8125rem var(--font-body); color: #5a6377; }
 .ov-region .ov-view { font: 600 0.875rem var(--font-body); color: #0874b0; text-decoration: none; }
 .ov-region .ov-tile:has(.ov-tile-cover):hover { background: #f5f8fc; }
+/* Total spend tile: same navy fill and light figure as the combined hero (.ov-cb-hero-top) */
+.ov-region .ov-tile-hero { background: #121852; color: #fff; }
+.ov-region .ov-tile-hero .ov-tile-label { color: #b9c1e6; }
+.ov-region .ov-tile-hero .ov-num { color: #fff; }
+.ov-region .ov-tile-hero .ov-cc,
+.ov-region .ov-tile-hero .ov-unit,
+.ov-region .ov-tile-hero .ov-tile-sub,
+.ov-region .ov-tile-hero .ov-tile-note { color: #b9c1e6; }
 .ov-region .ov-tiles-small { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 640px) {
   .ov-region .ov-big .ov-num { font-size: 2.125rem; }
