@@ -33,6 +33,11 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
               </div>
               <Figure tile={total} size="xl" />
               <div className="ov-cb-hero-sub ov-cb-hero-sub-main">{total.sub}</div>
+              {total.note !== "" && (
+                <div className="ov-cb-corner ov-cb-corner-hero" data-testid="ov-cb-hst">
+                  {total.note}
+                </div>
+              )}
               <div className="ov-cb-hero-sub">
                 {view.sub} · <span data-testid="combined-rate">{view.rate}</span> {view.rateLabel}
               </div>
@@ -81,6 +86,11 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
             <div className="ov-cb-label">{k.label}</div>
             <Figure tile={k} size="md" />
             {k.sub !== "" && <div className="ov-cb-note">{k.sub}</div>}
+            {k.note !== "" && (
+              <div className="ov-cb-corner" data-testid="ov-cb-hst">
+                {k.note}
+              </div>
+            )}
           </div>
         ))}
         <div className="ov-cb-tile ov-cb-review" data-testid="combined-attention">

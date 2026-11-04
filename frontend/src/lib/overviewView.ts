@@ -95,6 +95,8 @@ export interface CombinedTile {
   value: string;
   unit: string;
   sub: string;
+  /** Bottom-right corner note, `HST CA$…`; empty when the week has no Canadian invoice. */
+  note: string;
 }
 
 /** One side's share of the combined total, in CAD. */
@@ -284,13 +286,15 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
     (partial ? ` · covers ${fx.covered} of ${fx.weeksWithData} weeks` : "") +
     (single && !hasCa ? " · US only this week" : "") +
     (single && !hasUs ? " · Canada only this week" : "");
+  // A US-only scope has no HST to report, so it shows no note rather than `HST CA$0.00`.
+  const hst = (n: number): string => (combined !== null && combined.caWeeks > 0 ? `HST CA${usd(n)}` : "");
   return {
     show: combined !== null,
     none,
     sub,
     rate: fx.meanRate === null ? "—" : fx.meanRate.toFixed(2),
     rateLabel: single ? "CAD per USD" : fx.covered > 0 ? `CAD per USD · avg of ${fx.covered} wk${fx.covered > 1 ? "s" : ""}` : "CAD per USD",
-    total: combined === null ? null : { label: "Total Spend - Combined", cc: "CA", value: usd(combined.total), unit: "", sub: TOTAL_SUB },
+    total: combined === null ? null : { label: "Total Spend - Combined", cc: "CA", value: usd(combined.total), unit: "", sub: TOTAL_SUB, note: hst(combined.hst) },
     shares:
       combined === null || !hasUs || !hasCa || combined.total <= 0
         ? null
@@ -303,16 +307,17 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
         ? []
         : [
             {
-              label: "Average billed price",
+              label: "Average billed price, with HST",
               cc: "CA",
               value: combined.pricePerLitre === null ? "—" : price4(combined.pricePerLitre),
               unit: "/ L",
-              sub: `With HST · ${qty(combined.litres)} L`,
+              sub: combined.pricePreTaxPerLitre === null ? "" : `CA${price4(combined.pricePreTaxPerLitre)} / L before HST`,
+              note: "",
             },
-            { label: "Diesel", cc: "CA", value: usd(combined.diesel), unit: "", sub: `${qty(combined.litres)} L` },
-            { label: "DEF", cc: "CA", value: usd(combined.def), unit: "", sub: `${qty(combined.defLitres)} L` },
-            { label: "Other charges", cc: "CA", value: usd(combined.other), unit: "", sub: OTHER_SUB },
-            { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "" },
+            { label: "Diesel", cc: "CA", value: usd(combined.diesel), unit: "", sub: `${qty(combined.litres)} L`, note: hst(combined.dieselHst) },
+            { label: "DEF", cc: "CA", value: usd(combined.def), unit: "", sub: `${qty(combined.defLitres)} L`, note: hst(combined.defHst) },
+            { label: "Other charges", cc: "CA", value: usd(combined.other), unit: "", sub: OTHER_SUB, note: "" },
+            { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "", note: "" },
           ],
     attention: {
       anomalies: { count: anomalies, link: { text: "View →", href: anomaliesHref } },

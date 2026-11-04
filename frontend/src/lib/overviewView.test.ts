@@ -50,7 +50,7 @@ describe("1a all time", () => {
   });
   it("has the combined headline, split, price, discount and attention counts", () => {
     expect(v.combined.total!.label).toBe("Total Spend - Combined");
-    expect(v.combined.kpis.map((k) => k.label)).toEqual(["Average billed price", "Diesel", "DEF", "Other charges", "Discount captured"]);
+    expect(v.combined.kpis.map((k) => k.label)).toEqual(["Average billed price, with HST", "Diesel", "DEF", "Other charges", "Discount captured"]);
     const [us, ca] = v.combined.shares!;
     expect(us.pct + ca.pct).toBe(100);
     expect(v.combined.attention.anomalies.count).toBe(v.agg.us!.anomalies + v.agg.ca!.anomalies);
@@ -268,3 +268,32 @@ describe("driver columns", () => {
     expect(niceStep(9000)).toBe(2500);
   });
 });
+
+describe("T-92 HST on the combined band", () => {
+  const find = (v: ReturnType<typeof view>, label: string) => v.combined.kpis.find((k) => k.label === label)!;
+  const money = (n: number) => "HST CA$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  it("labels the price with HST and shows the pre-HST price beneath", () => {
+    const v = view("all");
+    const price = find(v, "Average billed price, with HST");
+    expect(price.sub).toBe(`CA$${v.agg.combined!.pricePreTaxPerLitre!.toFixed(4)} / L before HST`);
+    expect(price.sub).toMatch(/^CA\$\d\.\d{4} \/ L before HST$/);
+  });
+
+  it("puts HST in the Diesel, DEF and Total spend corners and keeps Discount captured", () => {
+    const v = view("all");
+    const c = v.agg.combined!;
+    expect(find(v, "Diesel").note).toBe(money(c.dieselHst));
+    expect(find(v, "DEF").note).toBe(money(c.defHst));
+    expect(v.combined.total!.note).toBe(money(c.hst));
+    expect(find(v, "Discount captured").value).toMatch(/^\$/);
+  });
+
+  it("shows no HST note at all on a US-only week", () => {
+    const v = view("usonly");
+    expect(v.combined.total!.note).toBe("");
+    expect(v.combined.kpis.every((k) => k.note === "")).toBe(true);
+    expect(JSON.stringify(v.combined)).not.toContain("HST CA");
+  });
+});
+
