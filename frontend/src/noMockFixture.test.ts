@@ -15,6 +15,7 @@ const COMPONENT_FILES = [
   "components/RecentTab.tsx",
   "components/DevToolsTab.tsx",
   "components/RouteMap.tsx",
+  "components/NewPlanView.tsx",
   "app/(app)/page.tsx",
 ];
 
