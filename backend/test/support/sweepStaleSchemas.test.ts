@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { MIN_STALE_AGE_MS, staleTestSchemas } from "./sweepStaleSchemas.js";
+import { Pool } from "pg";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import setup, { MIN_STALE_AGE_MS, staleTestSchemas } from "./sweepStaleSchemas.js";
+
+// Pool is mocked so a test can prove setup() refused before connecting.
+vi.mock("pg", () => ({ Pool: vi.fn() }));
 
 const NOW = Date.UTC(2026, 9, 7, 12, 0, 0);
 const at = (msAgo: number) => String(NOW - msAgo);
@@ -31,5 +35,32 @@ describe("staleTestSchemas (T-50)", () => {
       `test_drivers_${at(MIN_STALE_AGE_MS)}_K3J9`,
     ];
     expect(staleTestSchemas(names, NOW)).toEqual([]);
+  });
+});
+
+describe("globalSetup refuses a non-local target (T-99)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.mocked(Pool).mockClear();
+  });
+
+  it("throws before connecting when DATABASE_URL is not a local dev/test/real database", async () => {
+    vi.stubEnv("APP_ENV", "");
+    vi.stubEnv("DATABASE_URL", "postgresql://u:p@ep-x.us-east-1.aws.neon.tech/neondb?sslmode=require");
+    await expect(setup()).rejects.toThrow(/refusing/);
+    expect(Pool).not.toHaveBeenCalled();
+  });
+
+  it("throws before connecting under APP_ENV=production, even with a local URL", async () => {
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "postgres://ch_fuel:ch_fuel@localhost:5433/ch_fuel_test");
+    await expect(setup()).rejects.toThrow(/APP_ENV/);
+    expect(Pool).not.toHaveBeenCalled();
+  });
+
+  it("skips without connecting when DATABASE_URL is unset — unit tests need no database", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    await expect(setup()).resolves.toBeUndefined();
+    expect(Pool).not.toHaveBeenCalled();
   });
 });
