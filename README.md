@@ -122,6 +122,19 @@ neon branches restore production pre-T-102-2026-11-05 --preserve-under-name prod
 - Delete `production-broken-…` and the `pre-…` branch once you are sure: `neon branches delete <name>`.
 - **Never run `db:reset` or `db:restore-to-real` to fix production.** Both are local-only and refused by the guard.
 
+**Applying a migration to production (`db:migrate:prod`, T-103).** It is unit-tested against a fake pool only, not yet run against a real Neon server.
+
+```powershell
+$env:APP_ENV='production'; npm run db:migrate:prod              # preview: applies nothing
+$env:APP_ENV='production'; npm run db:migrate:prod -- --confirm # apply
+```
+
+- **Needs `APP_ENV=production` set in the shell,** and a `.env.production.local` that you create yourself, holding the Neon **direct** connection string. A `-pooler` host is refused.
+- **Without `--confirm` it only previews:** the target (environment, host, database; never the password), the server's Postgres version, and the pending `migrations/real` files. It reminds you to create the `pre-<ticket>-<date>` snapshot branch first.
+- **It warns, and does not block,** when the server's Postgres major version is not 16.
+- **It applies `migrations/real` and nothing else.** It never resets, seeds or drops, and a test proves there is no code path from it to a reset. It runs from your machine because `migrations/real` is gitignored.
+- **It refuses to run** if `migrations/synthetic` and `migrations/real` do not have identical filenames; a test checks the same on every run where `migrations/real` exists.
+
 **What to check on the Neon plan.** These change between plans and over time, so read them in the Neon console and docs rather than assuming them:
 
 - **History / point-in-time restore window:** how far back `production` can be restored without a snapshot branch.
