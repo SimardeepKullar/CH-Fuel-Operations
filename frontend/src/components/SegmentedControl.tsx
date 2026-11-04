@@ -3,6 +3,9 @@ interface SegmentedOption<T extends string> {
   label: string;
   /** A dropdown option shows ` ▾` after its label. */
   dropdown?: boolean;
+  /** Not selectable; `title` says why. */
+  disabled?: boolean;
+  title?: string;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -19,7 +22,7 @@ export default function SegmentedControl<T extends string>({ options, value, onC
   return (
     <div className={compact ? "seg seg-compact" : "seg"} role="group" aria-label={ariaLabel}>
       {options.map((o) => (
-        <button key={o.value} type="button" className="seg-btn" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
+        <button key={o.value} type="button" className="seg-btn" aria-pressed={o.value === value} disabled={o.disabled} title={o.title} onClick={() => onChange(o.value)}>
           {o.label}
           {o.dropdown ? " ▾" : ""}
         </button>
