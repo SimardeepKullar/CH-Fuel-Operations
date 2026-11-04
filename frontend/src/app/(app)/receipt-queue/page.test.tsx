@@ -281,6 +281,15 @@ describe("Receipt Queue — table", () => {
       expect(rowsShown()).toBe(3);
     });
 
+    it("narrows to the stops flagged DEF in Canada (T-97)", async () => {
+      await renderPage([item("a", flagged("def_in_canada")), item("b", flagged("unit_mismatch")), item("c")]);
+      fireEvent.click(screen.getByRole("button", { name: /Flags/ }));
+      fireEvent.click(within(screen.getByRole("dialog", { name: "Filter by flag" })).getByLabelText("DEF in Canada"));
+      expect(rowsShown()).toBe(1);
+      expect(within(screen.getByTestId("queue-row")).getByTestId("queue-flag-tip").textContent).toContain("DEF in Canada");
+      expect(within(chipGroup()!).getByText("DEF in Canada")).toBeTruthy();
+    });
+
     it("still gates batch confirm on a driver or day filter", async () => {
       await renderPage([item("a", flagged("unit_mismatch")), item("b", { occurredAt: "2026-10-22T15:30:00.000Z", ...flagged("unit_mismatch") })]);
       fireEvent.click(screen.getByRole("button", { name: /Flags/ }));
