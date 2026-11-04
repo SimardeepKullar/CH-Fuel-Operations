@@ -134,6 +134,24 @@ describe("OverviewPage (T-71)", () => {
     expect(panel.getAllByTestId("ov-tile")[1]!.textContent).toContain("/ gal");
   });
 
+  it("only the Total spend tile in each country panel carries the hero class, in both units (T-91)", async () => {
+    mount("all");
+    await screen.findByTestId("invoices-summary");
+    fireEvent.click(screen.getByTestId("breakdown-toggle"));
+    const heroLabels = (panelId: string) =>
+      within(screen.getByTestId(panelId))
+        .getAllByTestId("ov-tile")
+        .filter((t) => t.classList.contains("ov-tile-hero"))
+        .map((t) => t.dataset.label);
+    expect(heroLabels("us-panel")).toEqual(["Total spend"]);
+    expect(heroLabels("ca-panel")).toEqual(["Total spend, with HST"]);
+    fireEvent.click(within(screen.getByTestId("us-panel")).getByRole("button", { name: "CA units" }));
+    expect(heroLabels("us-panel")).toEqual(["Total spend"]);
+    // the figure takes its colour from the stylesheet, not an inline style
+    const num = within(screen.getByTestId("us-panel")).getAllByTestId("ov-tile")[0]!.querySelector(".ov-num") as HTMLElement;
+    expect(num.style.color).toBe("");
+  });
+
   it("all time: both trend charts are drawn", async () => {
     mount("all");
     await screen.findByTestId("invoices-summary");
