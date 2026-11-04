@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "pg";
 import { parse } from "pg-connection-string";
-import { backupDatabase, countTables, realBackupDeps, ROOT_DIR, type TableCounts } from "../db/backup.js";
+import { backupDatabase, countTables, displayPath, realBackupDeps, ROOT_DIR, type TableCounts } from "../db/backup.js";
 import { assertSafeToDestroy } from "../db/guard.js";
 import { currentTarget } from "../db/pool.js";
 import { databaseExists, maintenanceUrl, migrationsDirFor, recreateDatabase, type Queryable } from "./dbAdmin.js";
@@ -190,7 +190,7 @@ if (isMainModule) {
   } else {
     restoreToReal(path.resolve(ROOT_DIR, file), url, process.env, realDeps)
       .then((result) => {
-        if (result.rollback) console.log(`previous ch_fuel_real dumped to ${path.relative(ROOT_DIR, result.rollback)}`);
+        if (result.rollback) console.log(`previous ch_fuel_real dumped to ${displayPath(result.rollback)}`);
         for (const [table, n] of Object.entries(result.counts)) console.log(`${String(n).padStart(10)}  ${table}`);
         console.log(
           result.verified

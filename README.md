@@ -86,6 +86,7 @@ npm run db:restore-to-real -- backups/<file>.dump   # replace ch_fuel_real from 
   - prints the target first, never the password;
   - is read-only, so it runs against any environment.
 - **`backups/` is gitignored:** it holds real data.
+- **`BACKUP_DIR` moves the dumps out of the repo** (for example out of a OneDrive-synced folder). Set it in `.env`, any `.env.<APP_ENV>.local`, or the shell; a relative value is resolved against the repo root, and the directory is created if missing. It applies to `db:backup`, the dump `db:restore-to-real` takes before replacing `ch_fuel_real`, and the dump `db:reset:real` takes first. `db:restore-to-real -- <file>` still takes the file's path as given. Unset means `backups/`.
 - **`pg_dump` runs inside the Docker container,** so PowerShell never re-encodes the binary file.
 - **`db:restore-to-real`** goes through the destructive-operation guard. It:
   1. checks that the file is a readable `pg_dump -Fc` archive;

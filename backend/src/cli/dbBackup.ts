@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describeTarget, formatTarget, resolveAppEnv } from "../config/env.js";
-import { backupDatabase, realBackupDeps, ROOT_DIR } from "../db/backup.js";
+import { backupDatabase, displayPath, realBackupDeps } from "../db/backup.js";
 import "../db/pool.js";
 
 /**
@@ -26,8 +26,8 @@ if (isMainModule) {
     console.error(`backing up ${formatTarget(describeTarget(appEnv, url))}`);
     backupDatabase(url, appEnv, realBackupDeps)
       .then(({ file, countsFile, counts }) => {
-        console.log(`dump    ${path.relative(ROOT_DIR, file)}`);
-        console.log(`counts  ${path.relative(ROOT_DIR, countsFile)} (${Object.keys(counts).length} tables)`);
+        console.log(`dump    ${displayPath(file)}`);
+        console.log(`counts  ${displayPath(countsFile)} (${Object.keys(counts).length} tables)`);
       })
       .catch((err: unknown) => {
         console.error(err instanceof Error ? err.message : err);
