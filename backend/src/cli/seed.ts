@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { Pool } from "pg";
 import { hashPassword } from "../domain/password.js";
-import { getPool } from "../db/pool.js";
+import { getPool, currentTarget } from "../db/pool.js";
 
 const REQUIRED_KEYS = ["SEED_USER_EMAIL", "SEED_USER_PASSWORD"] as const;
 
@@ -59,6 +59,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   seedDispatcher(pool, process.env)
     .then(async (result) => {

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
 import { backfillDirectory, type BackfillResult } from "../ingest/backfill.js";
 import { findGaps } from "../ingest/gapReport.js";
-import { getPool } from "../db/pool.js";
+import { getPool, currentTarget } from "../db/pool.js";
 
 function printResult(result: BackfillResult): void {
   const completed = result.files.filter((f) => f.status === "completed").length;
@@ -64,6 +64,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   runBackfillCli(process.argv.slice(2), pool)
     .then(async (exitCode) => {

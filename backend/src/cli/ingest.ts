@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
 import { ingestFile } from "../ingest/ingestFile.js";
 import type { IngestReport } from "../ingest/report.js";
-import { getPool } from "../db/pool.js";
+import { getPool, currentTarget } from "../db/pool.js";
 
 function printReport(report: IngestReport): void {
   if (report.deduped) {
@@ -69,6 +69,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   runIngestCli(process.argv.slice(2), pool)
     .then(async (exitCode) => {

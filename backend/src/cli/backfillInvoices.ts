@@ -6,7 +6,7 @@ import {
   type BackfillInvoicesResult,
 } from "../invoice/backfillInvoices.js";
 import { invoiceGapsByCurrency } from "../invoice/invoiceGapReport.js";
-import { getPool } from "../db/pool.js";
+import { getPool, currentTarget } from "../db/pool.js";
 
 function printResult(result: BackfillInvoicesResult): void {
   const imported = result.files.filter((f) => f.status === "imported").length;
@@ -84,6 +84,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   runBackfillInvoicesCli(process.argv.slice(2), pool)
     .then(async (exitCode) => {

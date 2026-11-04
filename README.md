@@ -48,7 +48,7 @@ Next.js app (Auth.js credentials login, JWT sessions, single seeded user) with a
 git clone https://github.com/SimardeepKullar/CH-Fuel-Operations.git
 cd CH-Fuel-Operations
 npm install
-cp backend/.env.example .env      # fill in ORS_API_KEY, AUTH_SECRET, SEED_USER_*
+cp .env.example .env              # fill in ORS_API_KEY, AUTH_SECRET, SEED_USER_*
 npm run db:up                     # Postgres+PostGIS via Docker, on :5433
 npm run db:migrate                # applies migrations/synthetic (see below)
 npm run seed                      # truck profiles, product code, dispatcher account
@@ -82,7 +82,7 @@ This is a real operating company's fuel and invoice data pipeline, so the repo i
 - `data/bvd-prices/` and `data/bvd-invoices/` — the real supplier price sheets and invoices (real contract pricing, real per-driver fuel purchases).
 - `migrations/real/` — the real fleet roster (real employee names, real fuel-card numbers), mirroring `migrations/synthetic/` file-for-file so schema and test behavior are identical either way.
 - `docs/design/*.dc.html` — exported design mockups that embed real invoice figures as sample data.
-- `.env` — local secrets (database URL, API keys, auth secret).
+- `.env` and every `.env.*` except `.env.example` — local secrets (database URL, API keys, auth secret), one file per `APP_ENV`.
 
 A small number of tests assert exact figures from the real supplier invoice; they're gated behind `describe.skipIf(!hasRealFixture)` and simply skip when the underlying file isn't present — which is always the case in CI and on a fresh clone.
 

@@ -219,7 +219,9 @@ The missing January day and the duplicate file are **correct behaviour to report
 
 ## Environment
 
-`.env` is gitignored and starts empty. Copy from `backend/.env.example`: `DATABASE_URL`, `ORS_API_KEY`, `ROUTING_PROVIDER=ors`, `AUTH_SECRET`, `SEED_USER_EMAIL`, `SEED_USER_PASSWORD`, `SEED_USER_DISPLAY_NAME` (optional — defaults to `"Dispatcher"`).
+`.env` is gitignored and starts empty. Copy from the root `.env.example`: `DATABASE_URL`, `ORS_API_KEY`, `ROUTING_PROVIDER=ors`, `AUTH_SECRET`, `SEED_USER_EMAIL`, `SEED_USER_PASSWORD`, `SEED_USER_DISPLAY_NAME` (optional — defaults to `"Dispatcher"`).
+
+**`APP_ENV` (T-98)** selects the environment: `development | test | real | preview | production`. Any other value fails at startup. `backend/src/config/env.ts` loads `.env.<APP_ENV>.local`, then `.env.<APP_ENV>`, then `.env`, from the repo root. The first file to set a key wins, and a variable already in the shell is never overwritten. Unset loads `.env` alone. **APP_ENV comes from the shell only:** an `APP_ENV=` line in a file is ignored, so `.env.production.local` (the Neon prod URL, on the owner's machine only) is never read unless `APP_ENV=production` is set explicitly. Every `.env.*` except `.env.example` is gitignored. Every CLI, `migrate`, `serve` and the Next server (`frontend/src/instrumentation.ts`) print one stderr line on startup, `env=… db=host/name`, never the credentials. Next.js's own `.env.development` / `.env.production` loading reads only `frontend/`, so it never sees these root files.
 
 Local Postgres runs on **port 5433**, not 5432.
 

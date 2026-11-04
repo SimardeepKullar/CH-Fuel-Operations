@@ -1,11 +1,17 @@
 node_modules/
 dist/
 .env
-.env.local
+# .env.development, .env.test, .env.real, .env.production.local, … (T-98).
+# Only the template is committed.
+.env.*
+!.env.example
 *.log
 .DS_Store
 scripts/.cache/
 __pycache__/
+
+# Database dumps (Ticket D) — real data, never committed.
+backups/
 
 # graphify: regenerable output (run `graphify update .` to rebuild), also
 # embeds converted operator-export data that shouldn't be checked in

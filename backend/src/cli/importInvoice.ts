@@ -6,7 +6,7 @@ import { detectInvoiceFormat } from "../invoice/detectFormat.js";
 import { importInvoice } from "../invoice/importInvoice.js";
 import { parseInvoicePdf } from "../invoice/parseInvoicePdf.js";
 import type { ImportReport } from "../invoice/report.js";
-import { getPool } from "../db/pool.js";
+import { getPool, currentTarget } from "../db/pool.js";
 
 function printReport(report: ImportReport): void {
   console.log(`invoice:             ${report.invoiceNumber}`);
@@ -129,6 +129,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   runImportInvoiceCli(process.argv.slice(2), pool)
     .then(async (exitCode) => {

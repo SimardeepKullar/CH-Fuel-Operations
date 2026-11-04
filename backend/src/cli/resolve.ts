@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pool } from "pg";
 import { matchStationsToGazetteer, type PlaceCentroid, type StationForGazetteerMatch } from "../resolution/gazetteer.js";
-import { getPool } from "../db/pool.js";
+import { getPool, currentTarget } from "../db/pool.js";
 import type { TruckAccessible } from "../db/types.js";
 
 const DEFAULT_SUPPLIER = "BVD";
@@ -223,6 +223,7 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
+  console.error(currentTarget());
   const pool = getPool();
   runResolveCli(process.argv.slice(2), pool)
     .then(async (exitCode) => {
