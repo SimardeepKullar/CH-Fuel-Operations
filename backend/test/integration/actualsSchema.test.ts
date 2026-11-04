@@ -124,10 +124,14 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
     ).rejects.toThrow();
 
     // Two open-ended ranges always overlap, so the EXCLUDE above rejects this
-    // too; the partial unique index states the rule on its own and names it.
+    // too; the partial unique index states the rule on its own and names it. Scoped to this
+    // schema: parallel files hold the same index, and pg_get_indexdef on one being dropped
+    // fails with "could not open relation with OID" (T-96).
     const { rows } = await scopedPool.query<{ indexdef: string }>(
       `SELECT indexdef FROM pg_indexes
-       WHERE tablename = 'truck_assignments' AND indexname = 'truck_assignments_one_open_per_driver'`,
+       WHERE schemaname = $1 AND tablename = 'truck_assignments'
+         AND indexname = 'truck_assignments_one_open_per_driver'`,
+      [schema],
     );
     expect(rows[0]?.indexdef).toMatch(/UNIQUE.*\(driver_id\).*WHERE.*effective_to IS NULL/);
   });

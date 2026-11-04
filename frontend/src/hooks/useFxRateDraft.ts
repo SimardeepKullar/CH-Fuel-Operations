@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { InvoiceFx } from "@ch/core/api/routes/invoices";
 import { ApiError, patchInvoiceFx } from "../lib/api";
 
@@ -30,15 +30,18 @@ export function useFxRateDraft({ invoiceId, fx: fxProp, onSaved }: UseFxRateDraf
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // The invoice re-read with another rate (a save elsewhere, a reload): follow it.
+  // The invoice re-read with another rate (a save elsewhere, a reload): follow it. Adjusted during
+  // render when the rate's value changes, never on mount — an effect here also ran on mount and
+  // wiped a keystroke that landed before it (T-96). Keyed on the value, not the object's identity.
   const propRate = fxProp?.rate ?? null;
   const propEnteredAt = fxProp?.enteredAt ?? null;
-  useEffect(() => {
+  const [seen, setSeen] = useState({ rate: propRate, enteredAt: propEnteredAt });
+  if (seen.rate !== propRate || seen.enteredAt !== propEnteredAt) {
+    setSeen({ rate: propRate, enteredAt: propEnteredAt });
     setFx(fxProp);
     setDraft(textOf(fxProp));
     setError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the rate's value, not the object's identity
-  }, [propRate, propEnteredAt]);
+  }
 
   const dirty = draft.trim() !== textOf(fx);
 

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { useLayoutEffect } from "react";
+import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InvoiceFx } from "@ch/core/api/routes/invoices";
 
@@ -98,5 +99,27 @@ describe("useFxRateDraft (T-67)", () => {
     rerender();
     expect(result.current.draft).toBe("1.3712");
     expect(result.current.fx).toEqual(FX);
+  });
+
+  // T-96: the follow-the-prop step ran on mount too, and a keystroke landing before it was wiped —
+  // the post-import dialog's flaky "entering 1.3712 PATCHes that invoice". A layout effect types
+  // before the mount's passive effects run, so the race is deterministic here.
+  it("keeps text typed before the mount has settled", () => {
+    function TypesAtOnce() {
+      const { draft, setDraft } = useFxRateDraft({ invoiceId: "inv-1", fx: null, onSaved: vi.fn() });
+      useLayoutEffect(() => setDraft("1.3712"), [setDraft]);
+      return <span data-testid="draft">{draft}</span>;
+    }
+    render(<TypesAtOnce />);
+    expect(screen.getByTestId("draft").textContent).toBe("1.3712");
+  });
+
+  it("a re-read with the same rate, as a new object, keeps the draft", () => {
+    let fx: InvoiceFx | null = FX;
+    const { result, rerender } = renderHook(() => useFxRateDraft({ invoiceId: "inv-1", fx, onSaved: vi.fn() }));
+    act(() => result.current.setDraft("1.40"));
+    fx = { ...FX };
+    rerender();
+    expect(result.current.draft).toBe("1.40");
   });
 });
