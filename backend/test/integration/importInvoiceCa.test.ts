@@ -206,6 +206,19 @@ describe.skipIf(!hasDatabase)("importInvoice — a CA invoice (integration, T-61
       expect(ca.rows.every((r) => r.currency === "CAD" && r.qtyUnit === "L")).toBe(true);
     });
 
+    it("?flags=def_in_canada narrows /transactions to exactly the stops carrying it (T-97)", async () => {
+      await importCa();
+      const flagged = await pool.query<{ id: string }>("SELECT subject_id AS id FROM anomalies WHERE rule = 'def_in_canada'");
+      expect(flagged.rows.length).toBeGreaterThan(0);
+      const body = (await (
+        await app().handle(new Request("http://localhost/api/v1/transactions?week=2026-09-09&currency=CAD&flags=def_in_canada&pageSize=200"))
+      ).json()) as ListTransactionsResult;
+      expect(body.total).toBe(flagged.rows.length);
+      expect(body.total).toBeLessThan(8);
+      expect(body.rows.map((r) => r.id).sort()).toEqual(flagged.rows.map((r) => r.id).sort());
+      expect(body.rows.every((r) => r.flags.some((f) => f.rule === "def_in_canada"))).toBe(true);
+    });
+
     it("with a US invoice beside it, /overview and /transactions for the US week carry US figures only", async () => {
       // The US fixture's own cards and units, as importInvoice.test.ts seeds them.
       await pool.query("INSERT INTO fuel_cards (card_number) VALUES ('1000001'), ('1000002'), ('1000003') ON CONFLICT DO NOTHING");
