@@ -128,19 +128,19 @@ From the invoice side (new):
 
 ## A7. Information architecture
 
-Persistent left sidebar, three groups plus Settings. Supersedes v1's tab bar.
+Persistent left sidebar, three groups plus Settings. Supersedes v1's tab bar. **Amended 2026-11-04 (T-107):** Actuals leads, and `/` redirects to Overview (All time) — New Plan lives at `/plans/new`.
 
 ```
-PLAN
-  New Plan
-  Plans
-
 ACTUALS
   Overview
   Transactions
   Receipt Queue        [badge: count pending]
   Other Charges
   Import
+
+PLAN
+  New Plan
+  Plans
 
 ANALYSIS
   Drivers

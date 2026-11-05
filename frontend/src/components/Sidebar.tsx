@@ -33,13 +33,6 @@ interface NavGroup {
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
-    group: "Plan",
-    items: [
-      { label: "New Plan", href: "/", built: true },
-      { label: "Plans", href: "/plans", built: true },
-    ],
-  },
-  {
     group: "Actuals",
     items: [
       { label: "Overview", href: "/overview", built: true },
@@ -47,6 +40,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Receipt Queue", href: "/receipt-queue", built: true, badge: true },
       { label: "Other Charges", href: "/other-charges", built: false },
       { label: "Import", href: "/import", built: true },
+    ],
+  },
+  {
+    group: "Plan",
+    items: [
+      { label: "New Plan", href: "/plans/new", built: true },
+      { label: "Plans", href: "/plans", built: true },
     ],
   },
   {
@@ -61,8 +61,14 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+/** The item whose `href` equals the path or is its longest prefix ending at a
+ * `/` — so `/plans/new` lights New Plan, not Plans. */
+function activeHref(pathname: string, groups: NavGroup[]): string | null {
+  let best: string | null = null;
+  for (const g of groups)
+    for (const { href } of g.items)
+      if ((pathname === href || pathname.startsWith(`${href}/`)) && (best === null || href.length > best.length)) best = href;
+  return best;
 }
 
 interface SidebarProps {
@@ -74,6 +80,7 @@ interface SidebarProps {
 export default function Sidebar({ pendingReceipts, groups = NAV_GROUPS }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const activeItem = activeHref(pathname, groups);
   const { data: session } = useSession();
   const displayName = session?.user?.name ?? "…";
   const role = session?.user?.role ?? "";
@@ -90,7 +97,7 @@ export default function Sidebar({ pendingReceipts, groups = NAV_GROUPS }: Sideba
           <div className="sidebar-group" key={g.group}>
             <div className="sidebar-group-label">{g.group}</div>
             {g.items.map((item) => {
-              const active = isActive(pathname, item.href);
+              const active = item.href === activeItem;
               const badgeVal = item.badge ? pendingReceipts : null;
               return (
                 <a

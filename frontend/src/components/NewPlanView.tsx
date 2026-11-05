@@ -39,7 +39,7 @@ export default function NewPlanView({ showDevTools }: { showDevTools: boolean })
     const planId = searchParams.get("planId");
     if (planId) {
       void loadPlan(planId);
-      router.replace("/");
+      router.replace("/plans/new");
     }
     // Intentionally runs once per navigation into this page with a
     // `planId`, not on every `loadPlan`/`router` identity change.

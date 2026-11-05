@@ -58,6 +58,28 @@ describe("Sidebar (T-39 step 39.1, A7)", () => {
     expect(screen.getByText("New Plan").closest("a")!.className).not.toContain("active");
   });
 
+  it("lists the groups Actuals, Plan, Analysis, in that order (T-107)", () => {
+    useSession.mockReturnValue({ data: { user: { name: "M. Hodson", role: "Dispatch" } } });
+    render(<Sidebar pendingReceipts={null} />);
+    const labels = [...document.querySelectorAll(".sidebar-group-label")].map((n) => n.textContent);
+    expect(labels).toEqual(["Actuals", "Plan", "Analysis"]);
+  });
+
+  it("highlights only the longest matching href (T-107)", () => {
+    useSession.mockReturnValue({ data: { user: { name: "M. Hodson", role: "Dispatch" } } });
+    for (const [path, expected] of [
+      ["/plans/new", "New Plan"],
+      ["/plans", "Plans"],
+      ["/transactions", "Transactions"],
+    ] as const) {
+      pathname = path;
+      const { unmount } = render(<Sidebar pendingReceipts={null} />);
+      const active = [...document.querySelectorAll("a.active .sidebar-item-label")].map((n) => n.textContent);
+      expect(active).toEqual([expected]);
+      unmount();
+    }
+  });
+
   it("the Receipt Queue badge comes from the pendingReceipts prop, not a constant", () => {
     useSession.mockReturnValue({ data: { user: { name: "M. Hodson", role: "Dispatch" } } });
     const { rerender } = render(<Sidebar pendingReceipts={12} />);

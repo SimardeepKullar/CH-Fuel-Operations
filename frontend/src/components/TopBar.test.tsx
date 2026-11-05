@@ -42,7 +42,7 @@ function setup() {
 describe("TopBar — the default page banner (T-75)", () => {
   it("draws nothing over screens that render their own banner", () => {
     setup();
-    for (const route of ["/", "/plans", "/overview", "/transactions", "/import", "/plan-actual", "/receipt-queue"]) {
+    for (const route of ["/plans/new", "/plans", "/overview", "/transactions", "/import", "/plan-actual", "/receipt-queue"]) {
       pathname = route;
       const { container, unmount } = render(<TopBar />);
       expect(container.innerHTML).toBe("");

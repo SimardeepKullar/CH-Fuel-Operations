@@ -26,9 +26,9 @@ export default function ScreenStub({ title, ticket }: ScreenStubProps) {
         <p className="screen-stub-body">
           Not built yet — see <strong>{ticket}</strong> on the project board.
         </p>
-        <button className="btn btn-primary blueprint" onClick={() => router.push("/")}>
+        <button className="btn btn-primary blueprint" onClick={() => router.push("/overview")}>
           <Corners />
-          Back to New Plan
+          Back to Overview
         </button>
       </div>
     </div>
