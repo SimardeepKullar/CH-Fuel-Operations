@@ -164,15 +164,34 @@ function dumpInComposeContainer(deps: BackupDeps, user: string, database: string
   }
 }
 
+/** The major of the compose `db` image (`postgis/postgis:16-…`); backup.test.ts keeps the two in step. */
+export const LOCAL_PG_MAJOR = 16;
+
 /**
- * Unit-tested only, not yet run against a real Neon server.
+ * On the local major, pg_dump runs in the compose `db` container: the same
+ * binary as the pg_restore db:restore-to-real uses. A newer minor's pg_dump
+ * (`postgres:16` is 16.15, the container 16.4) can write an archive format the
+ * older pg_restore rejects.
  *
- * pg_dump refuses a server of a newer major version, so it runs from a
- * throwaway `postgres:<server major>` container, writing into a bind-mounted
- * backups/. The URL goes in as DUMP_URL, passed by name (`-e DUMP_URL`), so the
- * password is never in any process's argument list.
+ * On a newer major, pg_dump refuses the server, so it runs from a throwaway
+ * `postgres:<server major>` container, writing into a bind-mounted backups/;
+ * that dump cannot be restored locally either way.
+ *
+ * Either way the URL goes in as DUMP_URL, passed by name (`-e DUMP_URL`), so
+ * the password is never in any process's argument list.
  */
 function dumpRemote(deps: BackupDeps, url: string, major: number, snapshot: string, fileName: string): void {
+  const command = `pg_dump -d "$DUMP_URL" -Fc --snapshot=${snapshot} -f`;
+  if (major === LOCAL_PG_MAJOR) {
+    const inContainer = `/tmp/${assertShellSafe(fileName)}`;
+    deps.runDocker(["compose", "exec", "-T", "-e", "DUMP_URL", "db", "sh", "-c", `${command} ${inContainer}`], { DUMP_URL: url });
+    try {
+      deps.runDocker(["compose", "cp", `db:${inContainer}`, path.join(deps.backupsDir, fileName)]);
+    } finally {
+      deps.runDocker(["compose", "exec", "-T", "db", "rm", "-f", inContainer]);
+    }
+    return;
+  }
   deps.runDocker(
     [
       "run",
@@ -184,7 +203,7 @@ function dumpRemote(deps: BackupDeps, url: string, major: number, snapshot: stri
       `postgres:${major}`,
       "sh",
       "-c",
-      `pg_dump -d "$DUMP_URL" -Fc --snapshot=${snapshot} -f /backups/${assertShellSafe(fileName)}`,
+      `${command} /backups/${assertShellSafe(fileName)}`,
     ],
     { DUMP_URL: url },
   );
