@@ -9,15 +9,16 @@ import { assertMigrationParity } from "../db/migrationParity.js";
 import "../db/pool.js";
 
 /**
- * `APP_ENV=production npm run db:migrate:prod [-- --confirm]` (T-103).
+ * `APP_ENV=production npm run db:migrate:prod [-- --confirm]` (T-103) and
+ * `APP_ENV=preview npm run db:migrate:preview [-- --confirm]` (T-106).
  *
- * Applies migrations/real to the production database — and nothing else. It
- * never resets, seeds, drops or truncates: this module reaches only
- * runMigrations, and migrateProd.test.ts proves there is no import path from
- * here to a reset. Without --confirm it prints what it would do and applies
- * nothing.
- *
- * Unit-tested against a fake pool only; not yet run against a real Neon server.
+ * Applies migrations/real to one remote Neon database — production or the
+ * long-lived `preview` branch — and nothing else. Each script passes its own
+ * target, and the target must equal APP_ENV, so neither command can reach the
+ * other's database. It never resets, seeds, drops or truncates: this module
+ * reaches only runMigrations, and migrateProd.test.ts proves there is no import
+ * path from here to a reset. Without --confirm it prints what it would do and
+ * applies nothing.
  */
 
 const RECOMMENDED_MAJOR = 18;
@@ -33,6 +34,19 @@ export interface MigrateProdDeps {
   now(): Date;
 }
 
+/** The remote databases this command migrates; each has its own npm script. */
+export type MigrateTarget = "production" | "preview";
+
+const SCRIPT: Record<MigrateTarget, string> = {
+  production: "db:migrate:prod",
+  preview: "db:migrate:preview",
+};
+
+export function parseTarget(value: string | undefined): MigrateTarget {
+  if (value === "production" || value === "preview") return value;
+  throw new Error(`migrateProd.ts needs its target as the first argument, production or preview (got ${value ?? "nothing"})`);
+}
+
 export interface MigrateProdResult {
   pending: string[];
   applied: string[];
@@ -44,19 +58,22 @@ export async function migrateProd(
   env: Readonly<Record<string, string | undefined>>,
   argv: readonly string[],
   deps: MigrateProdDeps,
+  target: MigrateTarget = "production",
 ): Promise<MigrateProdResult> {
+  const script = SCRIPT[target];
   const appEnv = resolveAppEnv(env);
-  if (appEnv !== "production") {
+  if (appEnv !== target) {
     throw new Error(
-      `db:migrate:prod requires APP_ENV=production (got ${appEnv ?? "unset"}); PowerShell: $env:APP_ENV='production'; npm run db:migrate:prod`,
+      `${script} requires APP_ENV=${target} (got ${appEnv ?? "unset"}); PowerShell: $env:APP_ENV='${target}'; npm run ${script}`,
     );
   }
   if (argv.some((arg) => arg !== "--confirm")) {
-    throw new Error("usage: npm run db:migrate:prod [-- --confirm]; --confirm is the only argument");
+    throw new Error(`usage: npm run ${script} [-- --confirm]; --confirm is the only argument`);
   }
   const confirmed = argv.includes("--confirm");
   if (!url) {
-    throw new Error("DATABASE_URL is not set; create .env.production.local with the Neon direct connection string (it is yours to create)");
+    const which = target === "preview" ? "the Neon preview branch's direct connection string" : "the Neon direct connection string";
+    throw new Error(`DATABASE_URL is not set; create .env.${target}.local with ${which} (it is yours to create)`);
   }
   const host = parse(url).host ?? "";
   if (host.includes("-pooler")) {
@@ -89,6 +106,13 @@ export async function migrateProd(
       for (const file of pending) deps.log(`  ${file}`);
     }
 
+    if (!confirmed && target === "preview") {
+      deps.log(
+        "Nothing applied. Preview is a throwaway copy of production: to undo a migration there, " +
+          "use Reset from parent on the preview branch in Neon.\nRe-run with --confirm to apply.",
+      );
+      return { pending, applied: [], confirmed: false };
+    }
     if (!confirmed) {
       const branch = `pre-<ticket>-${deps.now().toISOString().slice(0, 10)}`;
       deps.log(
@@ -143,8 +167,13 @@ const isMainModule =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isMainModule) {
-  migrateProd(process.env.DATABASE_URL, process.env, process.argv.slice(2), realDeps).catch((err: unknown) => {
-    console.error(err instanceof Error ? err.message : err);
-    process.exitCode = 1;
-  });
+  // package.json passes the target first (db:migrate:prod → production,
+  // db:migrate:preview → preview); whatever the user adds after `--` follows it.
+  const [targetArg, ...rest] = process.argv.slice(2);
+  Promise.resolve()
+    .then(() => migrateProd(process.env.DATABASE_URL, process.env, rest, realDeps, parseTarget(targetArg)))
+    .catch((err: unknown) => {
+      console.error(err instanceof Error ? err.message : err);
+      process.exitCode = 1;
+    });
 }

@@ -2,11 +2,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { migrateProd, type MigrateProdDeps } from "./migrateProd.js";
+import { migrateProd, parseTarget, type MigrateProdDeps } from "./migrateProd.js";
 
 const DIRECT = "postgresql://neondb_owner:npg_S3cretPw@ep-cool-a1b2.us-east-1.aws.neon.tech/neondb?sslmode=require";
 const POOLED = "postgresql://neondb_owner:npg_S3cretPw@ep-cool-a1b2-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require";
 const PROD = { APP_ENV: "production" };
+const PREVIEW = { APP_ENV: "preview" };
 const TODAY = new Date(Date.UTC(2026, 10, 5, 12));
 
 const made: string[] = [];
@@ -246,6 +247,69 @@ describe("migrateProd — no path to a reset", () => {
     const allowed =
       /^(SHOW |SELECT |-- |CREATE TABLE IF NOT EXISTS schema_migrations|BEGIN|COMMIT|INSERT INTO schema_migrations)/;
     for (const statement of statements) expect(statement).toMatch(allowed);
+  });
+});
+
+describe("migrateProd — the preview target (T-106)", () => {
+  it("db:migrate:preview requires APP_ENV=preview, and refuses production and every other value", async () => {
+    for (const env of [{}, PROD, { APP_ENV: "real" }, { APP_ENV: "development" }, { APP_ENV: "test" }]) {
+      const { deps, connected } = fakeDeps();
+      await expect(migrateProd(DIRECT, env, ["--confirm"], deps, "preview")).rejects.toThrow(
+        /db:migrate:preview requires APP_ENV=preview/,
+      );
+      expect(connected).toEqual([]);
+    }
+  });
+
+  it("db:migrate:prod still refuses APP_ENV=preview", async () => {
+    const { deps, connected } = fakeDeps();
+    await expect(migrateProd(DIRECT, PREVIEW, ["--confirm"], deps, "production")).rejects.toThrow(
+      /db:migrate:prod requires APP_ENV=production/,
+    );
+    expect(connected).toEqual([]);
+  });
+
+  it("names .env.preview.local when DATABASE_URL is missing", async () => {
+    const { deps } = fakeDeps();
+    await expect(migrateProd(undefined, PREVIEW, [], deps, "preview")).rejects.toThrow(/\.env\.preview\.local/);
+  });
+
+  it("refuses a pooled host under preview", async () => {
+    const { deps, connected } = fakeDeps();
+    await expect(migrateProd(POOLED, PREVIEW, ["--confirm"], deps, "preview")).rejects.toThrow(/pooler.*direct/s);
+    expect(connected).toEqual([]);
+  });
+
+  it("refuses a parity mismatch under preview", async () => {
+    const { deps, connected } = fakeDeps({ real: ["0001_a.sql", "0002_b.sql"] });
+    await expect(migrateProd(DIRECT, PREVIEW, ["--confirm"], deps, "preview")).rejects.toThrow(/0003_c\.sql/);
+    expect(connected).toEqual([]);
+  });
+
+  it("without --confirm prints env=preview and the pending list, applies nothing, and says undo is Reset from parent", async () => {
+    const { deps, out, statements } = fakeDeps();
+    const result = await migrateProd(DIRECT, PREVIEW, [], deps, "preview");
+    const text = out.join("\n");
+    expect(text).toContain("env=preview db=ep-cool-a1b2.us-east-1.aws.neon.tech/neondb");
+    expect(text).toContain("0002_b.sql");
+    expect(text).toMatch(/Reset from parent/);
+    expect(text).not.toMatch(/snapshot/i);
+    expect(result).toEqual({ pending: ["0002_b.sql", "0003_c.sql"], applied: [], confirmed: false });
+    expect(statements.some((s) => /^(CREATE|INSERT|BEGIN|ALTER|DROP)/.test(s))).toBe(false);
+  });
+
+  it("with --confirm applies the pending files through runMigrations", async () => {
+    const { deps, statements, ended } = fakeDeps();
+    const result = await migrateProd(DIRECT, PREVIEW, ["--confirm"], deps, "preview");
+    expect(result).toEqual({ pending: ["0002_b.sql", "0003_c.sql"], applied: ["0002_b.sql", "0003_c.sql"], confirmed: true });
+    expect(statements.filter((s) => s.startsWith("INSERT INTO schema_migrations"))).toHaveLength(2);
+    expect(ended()).toBe(1);
+  });
+
+  it("parseTarget accepts only production and preview", () => {
+    expect(parseTarget("production")).toBe("production");
+    expect(parseTarget("preview")).toBe("preview");
+    for (const bad of [undefined, "--confirm", "real", "prod"]) expect(() => parseTarget(bad)).toThrow(/production or preview/);
   });
 });
 
