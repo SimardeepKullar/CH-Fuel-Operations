@@ -41,6 +41,8 @@ $env:APP_ENV='production'; npm run db:migrate:prod [-- --confirm]
                           # preview (target, PG version, pending files), or apply with --confirm,
                           # migrations/real to the Neon prod DB. Never resets (T-103). Not run by Claude.
                           # (local only — migrations/real is gitignored)
+$env:APP_ENV='preview'; npm run db:migrate:preview [-- --confirm]
+                          # the same, to the Neon `preview` branch (T-106); undo is Reset from parent
 npm run seed           # truck profiles, product code, dispatcher account
 npm run db:reset       # drop + recreate + migrate ch_fuel_dev, then seed — only ch_fuel_dev
 npm run db:reset:real  # pg_dump ch_fuel_real to backups/, then drop + recreate + migrate it
