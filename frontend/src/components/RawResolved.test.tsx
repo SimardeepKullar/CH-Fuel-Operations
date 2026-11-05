@@ -54,10 +54,17 @@ describe("RawResolved", () => {
     expect(document.querySelector(".rr-disagree-raw")?.textContent).toBe("≠072");
   });
 
-  it('primary="raw" does not change the unmatched state (raw alone either way)', () => {
-    render(<RawResolved value={{ resolved: null, raw: "J SMITH", agrees: null }} primary="raw" />);
-    const el = screen.getByText("J SMITH");
-    expect(el.getAttribute("data-state")).toBe("unmatched");
+  it('primary="raw", no truck assigned: the entered unit is bold, as the key says, not grey', () => {
+    render(<RawResolved value={{ resolved: null, raw: "072", agrees: null }} primary="raw" />);
+    const el = screen.getByText("072");
+    expect(el.className).toContain("rr-value");
+    expect(document.querySelector(".rr-unmatched")).toBeNull();
+  });
+
+  it('primary="raw", nothing entered: the assigned truck shows grey, "resolved from the card assignment"', () => {
+    render(<RawResolved value={{ resolved: "072", raw: "", agrees: false }} primary="raw" />);
+    const el = screen.getByText("072");
+    expect(el.className).toContain("rr-unmatched");
   });
 
   it("primary defaults to resolved, leaving the Driver column's rendering unchanged", () => {

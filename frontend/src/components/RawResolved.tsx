@@ -58,6 +58,26 @@ export default function RawResolved({
 }: RawResolvedProps) {
   const state = rawOnly ? "unmatched" : stateOf(value);
 
+  // The Unit column's key: bold = as entered at the pump, grey dotted = resolved
+  // from the card assignment. Nothing assigned, so the entered unit stands alone
+  // in bold; nothing entered (a CSV import), so the assigned one shows in grey.
+  if (primary === "raw" && !rawOnly) {
+    if (value.resolved === null) {
+      return (
+        <span className="rr rr-resolved" data-state="entered">
+          <span className="rr-value">{value.raw}</span>
+        </span>
+      );
+    }
+    if (!value.raw) {
+      return (
+        <span className="rr rr-unmatched" data-state="assigned" title="From the card's truck assignment; no unit was entered">
+          {value.resolved}
+        </span>
+      );
+    }
+  }
+
   if (state === "unmatched") {
     return (
       <span className="rr rr-unmatched" data-state="unmatched" title="Unmatched invoice text: check this">
