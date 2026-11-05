@@ -26,7 +26,7 @@ export function decideAuthorization(
   const isSignInPage = pathname === SIGNIN_PATH;
 
   if (isLoggedIn) {
-    return isSignInPage ? { redirectTo: "/" } : null;
+    return isSignInPage ? { redirectTo: "/overview" } : null;
   }
 
   if (isSignInPage) {

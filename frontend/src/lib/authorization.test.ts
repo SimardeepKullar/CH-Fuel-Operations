@@ -27,6 +27,6 @@ describe("decideAuthorization", () => {
   });
 
   it("redirects an authenticated visit to /signin back to /", () => {
-    expect(decideAuthorization("/signin", true)).toEqual({ redirectTo: "/" });
+    expect(decideAuthorization("/signin", true)).toEqual({ redirectTo: "/overview" });
   });
 });

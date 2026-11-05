@@ -16,7 +16,7 @@ export default function PlansPage() {
   const [filter, setFilter] = useState<PlanFilter>("all");
 
   function openPlan(planId: string) {
-    router.push(`/?planId=${planId}`);
+    router.push(`/plans/new?planId=${planId}`);
   }
 
   return (

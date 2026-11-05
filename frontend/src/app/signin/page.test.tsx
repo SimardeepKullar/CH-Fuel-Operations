@@ -42,7 +42,7 @@ describe("SignInPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/overview"));
 
     expect(signIn).toHaveBeenCalledWith(
       "credentials",

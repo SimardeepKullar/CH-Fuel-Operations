@@ -1,10 +1,7 @@
-import NewPlanView from "../../components/NewPlanView";
-import { devToolsEnabled } from "../../lib/devTools";
+import { redirect } from "next/navigation";
 
-// APP_ENV is read per request, never baked in at build time: Vercel can
-// promote a preview build to production without rebuilding it (T-104).
-export const dynamic = "force-dynamic";
-
-export default function NewPlanPage() {
-  return <NewPlanView showDevTools={devToolsEnabled(process.env.APP_ENV)} />;
+// Overview is the landing screen (A8.1); with no query string its scope is
+// All time. New Plan lives at /plans/new (T-107).
+export default function Home() {
+  redirect("/overview");
 }

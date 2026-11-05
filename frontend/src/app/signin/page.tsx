@@ -28,7 +28,7 @@ export default function SignInPage() {
       return;
     }
 
-    router.push("/");
+    router.push("/overview");
     router.refresh();
   }
 
