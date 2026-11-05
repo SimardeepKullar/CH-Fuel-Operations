@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareCounts, restoreToReal, type RestoreDeps } from "./restoreToReal.js";
+import { compareCounts, pgRestoreArgs, restoreToReal, type RestoreDeps } from "./restoreToReal.js";
 
 const REAL = "postgres://ch_fuel:ch_fuel@localhost:5433/ch_fuel_real";
 const FILE = "backups/test-ch_fuel_test-2026-11-04T19-30-05Z.dump";
@@ -152,5 +152,18 @@ describe("compareCounts", () => {
       "d: expected (none), restored 4",
     ]);
     expect(compareCounts({ a: 1 }, { a: 1 })).toEqual([]);
+  });
+});
+
+describe("pgRestoreArgs", () => {
+  // A Neon dump grants to neon_superuser and sets default privileges for
+  // cloud_admin; neither role exists locally, so --exit-on-error stopped on
+  // the first ALTER DEFAULT PRIVILEGES. Locally there is one role, ch_fuel.
+  it("restores without owners or privileges, and stops on the first error", () => {
+    const args = pgRestoreArgs("/tmp/restore-a.dump", "ch_fuel_real");
+    expect(args).toEqual(expect.arrayContaining(["--no-owner", "--no-privileges", "--exit-on-error"]));
+    expect(args.slice(0, 5)).toEqual(["compose", "exec", "-T", "db", "pg_restore"]);
+    expect(args).toEqual(expect.arrayContaining(["-d", "ch_fuel_real"]));
+    expect(args.at(-1)).toBe("/tmp/restore-a.dump");
   });
 });

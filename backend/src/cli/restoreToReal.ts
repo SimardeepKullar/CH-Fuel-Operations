@@ -16,7 +16,7 @@ import { databaseExists, maintenanceUrl, migrationsDirFor, recreateDatabase, typ
  *   2. the file exists, starts PGDMP, and `pg_restore --list` reads it
  *   3. the current ch_fuel_real is dumped to backups/ — abort if that fails
  *   4. DROP … WITH (FORCE), CREATE … TEMPLATE template1
- *   5. pg_restore --no-owner --exit-on-error, inside the compose container
+ *   5. pg_restore --no-owner --no-privileges --exit-on-error, inside the compose container
  *   6. row counts checked against the dump's .counts.json sidecar, exactly
  *
  * Pending migrations/real files are listed, never applied.
@@ -115,6 +115,15 @@ export async function restoreToReal(
 // Output is captured, not printed: `pg_restore --list` would print the whole TOC.
 const docker = (args: string[]): void => realBackupDeps.runDocker(args);
 
+/**
+ * `--no-privileges` because a Neon dump grants to `neon_superuser` and sets
+ * default privileges for `cloud_admin`, roles that exist only on Neon; locally
+ * there is one role, ch_fuel, so the ACLs carry no meaning here.
+ */
+export function pgRestoreArgs(containerPath: string, database: string): string[] {
+  return ["compose", "exec", "-T", "db", "pg_restore", "-U", "ch_fuel", "-d", database, "--no-owner", "--no-privileges", "--exit-on-error", containerPath];
+}
+
 const realDeps: RestoreDeps = {
   readHeader: (file) => {
     if (!existsSync(file)) return null;
@@ -145,7 +154,7 @@ const realDeps: RestoreDeps = {
   },
   backup: async (url) => (await backupDatabase(url, "real", realBackupDeps)).file,
   restore: (containerPath, database) =>
-    docker(["compose", "exec", "-T", "db", "pg_restore", "-U", "ch_fuel", "-d", database, "--no-owner", "--exit-on-error", containerPath]),
+    docker(pgRestoreArgs(containerPath, database)),
   countRestored: async (url) => {
     const client = new Client({ connectionString: url });
     await client.connect();

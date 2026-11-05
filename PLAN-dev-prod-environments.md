@@ -7,7 +7,7 @@ This plan is written against the repo as it is today. Read `CLAUDE.md` first; th
 
 ## 1. What exists today
 
-- **Stack:** Next.js frontend and API mount (`frontend/`) and `@ch/core` (`backend/`), Postgres 16 + PostGIS with raw `pg`, and its own migration runner (`backend/src/db/migrate.ts`, `schema_migrations` table).
+- **Stack:** Next.js frontend and API mount (`frontend/`) and `@ch/core` (`backend/`), Postgres 18 + PostGIS with raw `pg`, and its own migration runner (`backend/src/db/migrate.ts`, `schema_migrations` table).
 - **Planned hosting** (PROJECT-SCOPE §10): Vercel + Neon. Not deployed yet. No `vercel.json`. The first deploy is T-49.
 - **One local database for everything:** `ch_fuel_planner` in the Docker volume `db-data`, on port 5433. The same database is used for:
   - day-to-day dev (synthetic migrations)

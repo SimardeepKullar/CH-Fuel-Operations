@@ -164,13 +164,13 @@ function dumpInComposeContainer(deps: BackupDeps, user: string, database: string
   }
 }
 
-/** The major of the compose `db` image (`postgis/postgis:16-…`); backup.test.ts keeps the two in step. */
-export const LOCAL_PG_MAJOR = 16;
+/** The major of the compose `db` image (`postgis/postgis:18-…`); backup.test.ts keeps the two in step. */
+export const LOCAL_PG_MAJOR = 18;
 
 /**
  * On the local major, pg_dump runs in the compose `db` container: the same
  * binary as the pg_restore db:restore-to-real uses. A newer minor's pg_dump
- * (`postgres:16` is 16.15, the container 16.4) can write an archive format the
+ * (e.g. `postgres:16` at 16.15 against a 16.4 container) can write an archive format the
  * older pg_restore rejects.
  *
  * On a newer major, pg_dump refuses the server, so it runs from a throwaway

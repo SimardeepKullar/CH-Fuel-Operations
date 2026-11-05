@@ -64,7 +64,7 @@ export async function databaseExists(client: Queryable, database: string): Promi
   return rows.length > 0;
 }
 
-/** DROP … WITH (FORCE) — Postgres 16 closes other sessions itself — then CREATE from template1. */
+/** DROP … WITH (FORCE) — Postgres 13+ closes other sessions itself — then CREATE from template1. */
 export async function recreateDatabase(client: Queryable, database: string): Promise<void> {
   await client.query(`DROP DATABASE IF EXISTS ${ident(database)} WITH (FORCE)`);
   await client.query(`CREATE DATABASE ${ident(database)} TEMPLATE ${CREATE_TEMPLATE}`);
