@@ -56,6 +56,6 @@
     "test": "tsx backend/src/cli/withAppEnv.ts --set test -- npm run test --workspace backend && npm run test --workspace frontend",
     "test:unit": "tsx backend/src/cli/withAppEnv.ts --set test -- npm run test:unit --workspace backend && npm run test --workspace frontend",
     "verify": "npm run typecheck && npm run lint && npm test",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "node -e \"try { require('child_process').execSync('git config core.hooksPath .githooks', { stdio: 'ignore' }) } catch {}\""
   }
 }
