@@ -1022,8 +1022,8 @@ select.input { width: 100%; }
 }
 .rr-unmatched {
   font: 400 0.6875rem var(--font-mono);
-  color: var(--color-muted-2);
-  border-bottom: 1px dotted var(--color-muted-2);
+  /* Faded red, no underline: text the invoice printed that nothing resolved (T-108). */
+  color: color-mix(in srgb, var(--color-error) 60%, white);
 }
 .rr-disagree {
   align-items: center;
