@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import path from "node:path";
-import { backupDatabase, backupFileName, displayPath, realBackupDeps, resolveBackupsDir, ROOT_DIR, type BackupDeps } from "./backup.js";
+import {
+  backupDatabase,
+  backupFileName,
+  displayPath,
+  LOCAL_PG_MAJOR,
+  realBackupDeps,
+  resolveBackupsDir,
+  ROOT_DIR,
+  type BackupDeps,
+} from "./backup.js";
 
 const LOCAL = "postgres://ch_fuel:ch_fuel@localhost:5433/ch_fuel_test";
 const NEON_DIRECT = "postgresql://neondb_owner:npg_S3cretPw@ep-cool-a1b2.us-east-1.aws.neon.tech/neondb?sslmode=require";
@@ -109,9 +119,32 @@ describe("backupDatabase — local (the compose container)", () => {
   });
 });
 
-// Unit-tested only, not yet run against a real Neon server.
-describe("backupDatabase — remote (unit-tested only, not yet run against a real Neon server)", () => {
-  it("runs pg_dump from a container matching the server's major version, into a bind-mounted backups/", async () => {
+describe("LOCAL_PG_MAJOR", () => {
+  it("is the major of the compose db image", () => {
+    const compose = readFileSync(path.join(ROOT_DIR, "docker-compose.yml"), "utf8");
+    expect(compose).toMatch(new RegExp(`image:\\s*postgis/postgis:${LOCAL_PG_MAJOR}-`));
+  });
+});
+
+describe("backupDatabase — remote", () => {
+  // The first real Neon backup was written by postgres:16 (16.15), whose
+  // archive format 1.16 the compose container's pg_restore (16.4) rejects.
+  it("on the local major, dumps with the compose container's own pg_dump, so db:restore-to-real can read the file", async () => {
+    const { deps, dockerCalls } = fakeDeps({ serverVersionNum: LOCAL_PG_MAJOR * 10000 + 9 });
+
+    const result = await backupDatabase(NEON_DIRECT, "production", deps);
+
+    expect(dockerCalls.map((c) => c.args.slice(0, 2).join(" "))).toEqual(["compose exec", "compose cp", "compose exec"]);
+    const dump = dockerCalls[0]!.args;
+    expect(dump.slice(0, 3)).toEqual(["compose", "exec", "-T"]);
+    expect(dump).not.toContain(`postgres:${LOCAL_PG_MAJOR}`);
+    expect(dump.at(-1)).toContain("pg_dump");
+    expect(dump.at(-1)).toContain("--snapshot=00000003-0000001B-1");
+    expect(dockerCalls[1]!.args.at(-1)).toBe(result.file);
+    expect(dockerCalls[2]!.args).toEqual(expect.arrayContaining(["rm", "-f"]));
+  });
+
+  it("on a newer major, runs pg_dump from a container matching it, into a bind-mounted backups/", async () => {
     const { deps, dockerCalls } = fakeDeps({ serverVersionNum: 170002 });
 
     await backupDatabase(NEON_DIRECT, "production", deps);
@@ -124,19 +157,23 @@ describe("backupDatabase — remote (unit-tested only, not yet run against a rea
     expect(args.at(-1)).toContain("--snapshot=00000003-0000001B-1");
   });
 
-  it("never puts the password, or the URL, in an argument — the URL goes in by environment variable name", async () => {
-    const { deps, dockerCalls } = fakeDeps({ serverVersionNum: 160004 });
+  it.each([LOCAL_PG_MAJOR * 10000 + 4, 170002])(
+    "never puts the password, or the URL, in an argument — the URL goes in by environment variable name (server %i)",
+    async (serverVersionNum) => {
+      const { deps, dockerCalls } = fakeDeps({ serverVersionNum });
 
-    await backupDatabase(NEON_DIRECT, "production", deps);
+      await backupDatabase(NEON_DIRECT, "production", deps);
 
-    const { args, env } = dockerCalls[0]!;
-    for (const arg of args) {
-      expect(arg).not.toContain("npg_S3cretPw");
-      expect(arg).not.toContain("neondb_owner");
-    }
-    expect(args).toEqual(expect.arrayContaining(["-e", "DUMP_URL"]));
-    expect(env).toEqual({ DUMP_URL: NEON_DIRECT });
-  });
+      for (const { args } of dockerCalls) {
+        for (const arg of args) {
+          expect(arg).not.toContain("npg_S3cretPw");
+          expect(arg).not.toContain("neondb_owner");
+        }
+      }
+      expect(dockerCalls[0]!.args).toEqual(expect.arrayContaining(["-e", "DUMP_URL"]));
+      expect(dockerCalls[0]!.env).toEqual({ DUMP_URL: NEON_DIRECT });
+    },
+  );
 
   it("refuses a pooler host before connecting — PgBouncer cannot hold an exported snapshot", async () => {
     const { deps, log, dockerCalls } = fakeDeps();
@@ -196,7 +233,7 @@ describe("backupDatabase — BACKUP_DIR", () => {
     expect(mkdir).toBeGreaterThanOrEqual(0);
     expect(mkdir).toBeLessThan(local.log.findIndex((l) => l.startsWith("docker")));
 
-    const remote = fakeDeps({ serverVersionNum: 160004 });
+    const remote = fakeDeps({ serverVersionNum: 170002 });
     remote.deps.backupsDir = "/outside/dumps";
     await backupDatabase(NEON_DIRECT, "production", remote.deps);
     expect(remote.dockerCalls[0]!.args).toContain("/outside/dumps:/backups");
