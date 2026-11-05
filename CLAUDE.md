@@ -23,7 +23,7 @@ The scope marks claims as **Verified** (measured against `data/`), **Decided** (
 
 ## Stack
 
-Node 22 · TypeScript · Next.js (frontend + API mount) · Postgres 16 + PostGIS · raw `pg`, **no ORM or query builder** · Zod · vitest · MapLibre GL JS · OpenRouteService.
+Node 22 · TypeScript · Next.js (frontend + API mount) · Postgres 18 + PostGIS · raw `pg`, **no ORM or query builder** · Zod · vitest · MapLibre GL JS · OpenRouteService.
 
 Two workspaces: `backend/` (`@ch/core`, framework-free) and `frontend/` (Next.js, the Vercel root directory).
 

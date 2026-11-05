@@ -20,7 +20,7 @@ import "../db/pool.js";
  * Unit-tested against a fake pool only; not yet run against a real Neon server.
  */
 
-const RECOMMENDED_MAJOR = 16;
+const RECOMMENDED_MAJOR = 18;
 
 /** The slice of pg's Pool this command uses. */
 export type ProdPool = Pick<Pool, "query" | "connect" | "end">;

@@ -36,7 +36,7 @@ function fakeDeps(options: { version?: string; applied?: string[] | null; synthe
   const query = async (text: string, params: unknown[] = []) => {
     statements.push(text.trim().replace(/\s+/g, " "));
     if (state.failOn && text.includes(state.failOn)) throw new Error("boom");
-    if (text.startsWith("SHOW server_version")) return { rows: [{ server_version: options.version ?? "16.4" }] };
+    if (text.startsWith("SHOW server_version")) return { rows: [{ server_version: options.version ?? "18.6" }] };
     if (text.includes("to_regclass")) return { rows: [{ present: applied !== null }] };
     if (text.startsWith("SELECT filename FROM schema_migrations")) {
       return { rows: [...recorded].map((filename) => ({ filename })) };
@@ -114,7 +114,7 @@ describe("migrateProd — preview (no --confirm)", () => {
 
     const text = out.join("\n");
     expect(text).toContain("env=production db=ep-cool-a1b2.us-east-1.aws.neon.tech/neondb");
-    expect(text).toContain("16.4");
+    expect(text).toContain("18.6");
     expect(text).toContain("0002_b.sql");
     expect(text).toContain("0003_c.sql");
     expect(text).not.toContain("0001_a.sql");
@@ -157,17 +157,17 @@ describe("migrateProd — preview (no --confirm)", () => {
 });
 
 describe("migrateProd — Postgres version", () => {
-  it("warns, without blocking, when the major version is not 16", async () => {
+  it("warns, without blocking, when the major version is not 18", async () => {
     const { deps, out } = fakeDeps({ version: "17.2" });
     const result = await migrateProd(DIRECT, PROD, ["--confirm"], deps);
     const text = out.join("\n");
-    expect(text).toMatch(/WARNING.*17.*16/s);
+    expect(text).toMatch(/WARNING.*17.*18/s);
     expect(text).toMatch(/restore/i);
     expect(result.applied).toEqual(["0002_b.sql", "0003_c.sql"]);
   });
 
-  it("prints no warning on 16", async () => {
-    const { deps, out } = fakeDeps({ version: "16.9" });
+  it("prints no warning on 18", async () => {
+    const { deps, out } = fakeDeps({ version: "18.1" });
     await migrateProd(DIRECT, PROD, [], deps);
     expect(out.join("\n")).not.toMatch(/WARNING/);
   });

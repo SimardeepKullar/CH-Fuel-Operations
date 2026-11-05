@@ -10,14 +10,14 @@ Single supplier (BVD), single fuel product (ULSD), US lanes only, a handful of n
 ## How it's built
 
 ```
-Next.js (frontend, MapLibre GL) ──▶ Next.js API route ──▶ @ch/core (backend, framework-free) ──▶ Postgres 16 + PostGIS
+Next.js (frontend, MapLibre GL) ──▶ Next.js API route ──▶ @ch/core (backend, framework-free) ──▶ Postgres 18 + PostGIS
                                                               │
                                                               ▼
                                                     OpenRouteService (routing/geocoding)
 ```
 
 - **Node 22, TypeScript, two npm workspaces**: `backend/` (`@ch/core` — pure Node, no HTTP framework, testable without a server) and `frontend/` (Next.js, also where the API mounts).
-- **Postgres 16 + PostGIS**, raw `pg` — no ORM, no query builder, parameterized SQL only.
+- **Postgres 18 + PostGIS**, raw `pg` — no ORM, no query builder, parameterized SQL only.
 - **Zod** for validation, **vitest** for tests, **MapLibre GL JS** for the map, **OpenRouteService** for routing/geocoding.
 - Distances are stored and returned in **miles and gallons** throughout; the metric/imperial conversion happens at exactly four defined boundaries (see [CLAUDE.md](CLAUDE.md)).
 
@@ -99,10 +99,9 @@ npm run db:restore-to-real -- backups/<file>.dump   # replace ch_fuel_real from 
 ### Production on Neon
 
 > **Postgres versions must match.**
-> - The Neon project's Postgres major version must be **16**, the same as the local container (`postgis/postgis:16-3.4`).
-> - A dump made by a newer major version (17's `pg_dump`) cannot be restored by an older `pg_restore`.
-> - So a prod dump from a Postgres 17 project could not be restored into `ch_fuel_real` until the local container moves to 17 as well.
-> - Check the version in the Neon console (project settings) before the first deploy.
+> - The Neon project runs Postgres **18** (18.6, read from a prod dump on 2026-11-05), and the local container and CI match it (`postgis/postgis:18-3.6`).
+> - A dump made by a newer major version's `pg_dump` cannot be restored by an older `pg_restore`, which is why they are kept in step: a prod dump restores into `ch_fuel_real` with `db:restore-to-real`.
+> - If Neon's major ever moves ahead of the container, move `docker-compose.yml`, `ci.yml`, `LOCAL_PG_MAJOR` (`backend/src/db/backup.ts`) and `RECOMMENDED_MAJOR` (`backend/src/cli/migrateProd.ts`) with it.
 
 **Before every prod migration, take a snapshot branch:** create a Neon branch from `production`, named `pre-<ticket>-<date>`.
 
@@ -131,7 +130,7 @@ $env:APP_ENV='production'; npm run db:migrate:prod -- --confirm # apply
 
 - **Needs `APP_ENV=production` set in the shell,** and a `.env.production.local` that you create yourself, holding the Neon **direct** connection string. A `-pooler` host is refused.
 - **Without `--confirm` it only previews:** the target (environment, host, database; never the password), the server's Postgres version, and the pending `migrations/real` files. It reminds you to create the `pre-<ticket>-<date>` snapshot branch first.
-- **It warns, and does not block,** when the server's Postgres major version is not 16.
+- **It warns, and does not block,** when the server's Postgres major version is not 18.
 - **It applies `migrations/real` and nothing else.** It never resets, seeds or drops, and a test proves there is no code path from it to a reset. It runs from your machine because `migrations/real` is gitignored.
 - **It refuses to run** if `migrations/synthetic` and `migrations/real` do not have identical filenames; a test checks the same on every run where `migrations/real` exists.
 

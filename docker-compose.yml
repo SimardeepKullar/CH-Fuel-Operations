@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:18-3.6
     restart: unless-stopped
     environment:
       POSTGRES_USER: ch_fuel
@@ -9,7 +9,11 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - db-data:/var/lib/postgresql/data
+      # Postgres 18+ images keep PGDATA at /var/lib/postgresql/18/docker and
+      # refuse a mount at the old /var/lib/postgresql/data. db-data-18 is a new
+      # volume because 18 cannot open a 16 data directory; the old `db-data`
+      # volume (Postgres 16) is left in place, unreferenced, as a fallback.
+      - db-data-18:/var/lib/postgresql
     healthcheck:
       # -h 127.0.0.1 forces a TCP check. Without it pg_isready uses the unix
       # socket, which the entrypoint's temporary init server also answers — so
@@ -23,4 +27,4 @@ services:
       retries: 10
 
 volumes:
-  db-data:
+  db-data-18:

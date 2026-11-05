@@ -28,7 +28,7 @@ function fakeDeps(options: { serverVersionNum?: number; dumpSize?: number } = {}
       query: async (text: string) => {
         log.push(text);
         if (text.includes("pg_export_snapshot")) return { rows: [{ snapshot: "00000003-0000001B-1" }] };
-        if (text.includes("server_version_num")) return { rows: [{ major: Math.floor((options.serverVersionNum ?? 160004) / 10000) }] };
+        if (text.includes("server_version_num")) return { rows: [{ major: Math.floor((options.serverVersionNum ?? 180004) / 10000) }] };
         if (text.includes("FROM pg_tables")) {
           return { rows: [{ schemaname: "public", tablename: "invoices" }, { schemaname: "public", tablename: "schema_migrations" }] };
         }
@@ -145,19 +145,19 @@ describe("backupDatabase — remote", () => {
   });
 
   it("on a newer major, runs pg_dump from a container matching it, into a bind-mounted backups/", async () => {
-    const { deps, dockerCalls } = fakeDeps({ serverVersionNum: 170002 });
+    const { deps, dockerCalls } = fakeDeps({ serverVersionNum: 190002 });
 
     await backupDatabase(NEON_DIRECT, "production", deps);
 
     expect(dockerCalls).toHaveLength(1);
     const { args } = dockerCalls[0]!;
     expect(args.slice(0, 2)).toEqual(["run", "--rm"]);
-    expect(args).toContain("postgres:17");
+    expect(args).toContain("postgres:19");
     expect(args).toContain("/repo/backups:/backups");
     expect(args.at(-1)).toContain("--snapshot=00000003-0000001B-1");
   });
 
-  it.each([LOCAL_PG_MAJOR * 10000 + 4, 170002])(
+  it.each([LOCAL_PG_MAJOR * 10000 + 4, 190002])(
     "never puts the password, or the URL, in an argument — the URL goes in by environment variable name (server %i)",
     async (serverVersionNum) => {
       const { deps, dockerCalls } = fakeDeps({ serverVersionNum });
@@ -233,7 +233,7 @@ describe("backupDatabase — BACKUP_DIR", () => {
     expect(mkdir).toBeGreaterThanOrEqual(0);
     expect(mkdir).toBeLessThan(local.log.findIndex((l) => l.startsWith("docker")));
 
-    const remote = fakeDeps({ serverVersionNum: 170002 });
+    const remote = fakeDeps({ serverVersionNum: 190002 });
     remote.deps.backupsDir = "/outside/dumps";
     await backupDatabase(NEON_DIRECT, "production", remote.deps);
     expect(remote.dockerCalls[0]!.args).toContain("/outside/dumps:/backups");
