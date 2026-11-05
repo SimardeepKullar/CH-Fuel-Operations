@@ -148,6 +148,32 @@ $env:APP_ENV='production'; npm run db:migrate:prod -- --confirm # apply
 - **Version-matched:** it runs `pg_dump` from a `postgres:<server major>` container.
 - **No password in arguments:** the connection string is passed to that container through an environment variable, never as an argument.
 
+### Preview on Neon (T-106)
+
+Vercel preview deployments run against their own Neon branch, `preview`, a child of `production`. It starts as a copy of production (schema, users, fleet, invoices), and nothing written on it reaches production. So a change can be tried on prod-shaped data before it ships, never on production itself.
+
+**One-time setup (owner):**
+- **Neon:** a branch named `preview`, parent `production`.
+- **`.env.preview.local`** at the repo root (gitignored), holding the preview branch's **direct** connection string. It is used only by `db:migrate:preview`.
+- **Vercel, Preview scope only:** `DATABASE_URL` (the preview branch's **pooled** string), `APP_ENV=preview`, `AUTH_SECRET` (**different** from production's, so a production session is never valid on a preview), `ORS_API_KEY`, `ROUTING_PROVIDER=ors`. No `AUTH_URL`. Production's variables are not touched.
+- **Vercel Deployment Protection stays on for previews:** the branch holds real driver names and card numbers.
+
+**Applying a migration to preview (`db:migrate:preview`).**
+
+```powershell
+$env:APP_ENV='preview'; npm run db:migrate:preview              # dry run: applies nothing
+$env:APP_ENV='preview'; npm run db:migrate:preview -- --confirm # apply
+```
+
+It is `db:migrate:prod` with the target swapped, and keeps all of its guards: direct host only, `migrations/real` required, parity check, nothing applied without `--confirm`, never a reset. Each command refuses the other's `APP_ENV`, so neither can reach the other's database. The undo on preview is Neon's **Reset from parent**, not a snapshot branch.
+
+**The loop, per ticket:**
+1. **Start of a ticket:** Neon → `preview` → *Reset from parent*, so it matches production.
+2. **If the ticket adds a migration:** `$env:APP_ENV='preview'; npm run db:migrate:preview -- --confirm`.
+3. **Push the branch.** The Vercel preview builds against `preview`. Test there.
+4. **Before merge:** snapshot and `$env:APP_ENV='production'; npm run db:migrate:prod -- --confirm` (above), then merge, and production deploys.
+5. **PR abandoned:** *Reset from parent*, which drops any half-applied schema.
+
 ## What's in this repo, and what isn't
 
 This is a real operating company's fuel and invoice data pipeline, so the repo is deliberately split between what's safe to publish and what stays local-only:

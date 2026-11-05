@@ -29,7 +29,7 @@ The migration runner's orphan error message also tells you to run `npm run db:re
 | **dev** | your machine | `ch_fuel_dev` (Docker) | `migrations/synthetic` | Yes, freely |
 | **test** | your machine and CI | `ch_fuel_test` (Docker / CI service) | `migrations/synthetic` | Yes, tests own it |
 | **real-local** | your machine | `ch_fuel_real` (Docker) | `migrations/real` | Yes, rebuilt from `data/` or from a prod dump |
-| **preview** | Vercel preview deployments (PR branches) | Neon branch `preview` | `migrations/real` | Yes, re-branch from prod |
+| **preview** | Vercel preview deployments (PR branches) | Neon branch `preview` | `migrations/real` | Yes, Reset from parent — **done (T-106)** |
 | **prod** | Vercel production (`main`) | Neon `production` branch | `migrations/real` | **Never** |
 
 Key ideas:
@@ -111,7 +111,7 @@ Tests (written first, per CLAUDE.md):
 - **Vercel:**
   - Production branch = `main`.
   - Set env vars per Vercel environment. **Production** gets the Neon `production` branch URL, `APP_ENV=production`, and its own `AUTH_SECRET` and `AUTH_URL`. **Preview** gets the Neon `preview` branch URL and `APP_ENV=preview` (treat it like production for the guard). Never reuse the prod URL in Preview.
-- **Neon:** create the `preview` branch from `production` after the first prod migration, and re-create it whenever you want fresh prod-shaped data.
+- **Neon:** create the `preview` branch from `production` after the first prod migration, and re-create it whenever you want fresh prod-shaped data. **Done in T-106:** T-49 shipped without it; the branch, Preview-scoped Vercel variables, `db:migrate:preview` and the per-ticket loop are in the README's *Preview on Neon* section.
 - Check what `DevToolsTab` exposes and hide it when `APP_ENV=production` if it can change data.
 
 ---

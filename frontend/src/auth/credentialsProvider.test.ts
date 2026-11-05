@@ -46,4 +46,15 @@ describe("authorize()", () => {
   it("returns null when credentials are missing, without throwing", async () => {
     await expect(authorize({})).resolves.toBeNull();
   });
+
+  // T-106: a database failure must throw, not return null. Null is Auth.js's
+  // CredentialsSignin — "Incorrect email or password." — while a throw becomes
+  // Configuration, which the sign-in page reports as the server being unreachable.
+  it("lets a database failure throw rather than reading it as wrong credentials", async () => {
+    const { authenticateUser } = await import("@ch/core/catalog/users");
+    vi.mocked(authenticateUser).mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+    await expect(
+      authorize({ email: "dispatch@ch-logistics.example", password: "correct horse battery staple" }),
+    ).rejects.toThrow("ECONNREFUSED");
+  });
 });
