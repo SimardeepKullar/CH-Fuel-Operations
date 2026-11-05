@@ -5,6 +5,18 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import "../../App.css";
 
+/**
+ * Only Auth.js's `CredentialsSignin` means the email or password was wrong.
+ * Anything else — `Configuration` when authorize() throws because the database
+ * is unreachable, or signIn itself failing — is the server's fault, and must
+ * not send the dispatcher hunting for a typo (T-106).
+ */
+function signInErrorMessage(error: string): string {
+  return error === "CredentialsSignin"
+    ? "Incorrect email or password."
+    : "Sign-in is unavailable — the server could not be reached.";
+}
+
 export default function SignInPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -16,15 +28,21 @@ export default function SignInPage() {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
-    const result = await signIn("credentials", {
-      email: formData.get("email"),
-      password: formData.get("password"),
-      redirect: false,
-    });
+    let error: string | undefined;
+    try {
+      const result = await signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        redirect: false,
+      });
+      error = result?.error ?? undefined;
+    } catch {
+      error = "Unreachable";
+    }
 
-    if (result?.error) {
+    if (error) {
       setSubmitting(false);
-      setError("Incorrect email or password.");
+      setError(signInErrorMessage(error));
       return;
     }
 

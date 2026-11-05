@@ -72,4 +72,38 @@ describe("SignInPage", () => {
     expect(alert.textContent).toMatch(/incorrect/i);
     expect(push).not.toHaveBeenCalled();
   });
+
+  function submit() {
+    render(<SignInPage />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "dispatch@ch-logistics.example" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "any password" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+  }
+
+  // T-106: with no database, Auth.js reports `Configuration`, not
+  // `CredentialsSignin` — that must not read as a wrong password.
+  it.each(["Configuration", "CallbackRouteError", "AccessDenied"])(
+    "says the server could not be reached, not incorrect credentials, on a %s error",
+    async (error) => {
+      signIn.mockResolvedValue({ error });
+      submit();
+
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toBe("Sign-in is unavailable — the server could not be reached.");
+      expect(alert.textContent).not.toMatch(/incorrect/i);
+      expect(push).not.toHaveBeenCalled();
+      expect((screen.getByRole("button", { name: /sign in/i }) as HTMLButtonElement).disabled).toBe(false);
+    },
+  );
+
+  it("says the server could not be reached when signIn itself throws", async () => {
+    signIn.mockRejectedValue(new TypeError("Failed to fetch"));
+    submit();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Sign-in is unavailable — the server could not be reached.");
+    expect(push).not.toHaveBeenCalled();
+  });
 });
