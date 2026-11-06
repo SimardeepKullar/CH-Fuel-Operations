@@ -69,8 +69,31 @@ interface FuelLineCells {
 }
 
 /** Splits the site-name-and-city words of a `#`-less site name at the first
- * tab after the site number, in the raw line. Null when there is no tab to
- * split on — the row is then unparseable rather than guessed at. */
+ * tab after the site number, in the raw line, or — when extraction dropped
+ * that tab — at the case boundary (`splitAtCase`). Null when neither marks
+ * it: the row is then unparseable rather than guessed at. */
+function splitSiteAndCity(rawLine: string, siteRef: string, words: readonly string[]): { siteName: string[]; city: string[] } | null {
+  return splitAtTab(rawLine, siteRef, words) ?? splitAtCase(words);
+}
+
+/**
+ * pdf.js occasionally extracts the site-name/city gap as a plain space, so
+ * the tab that normally ends the site name is missing. On real invoice
+ * 990856 one row reads "58073 BVD NIAGARA Niagara on the Lake", while every
+ * other row for that site has the tab. BVD prints the site name in capitals
+ * and the city in mixed case, so the site name ends right before the first
+ * word holding a lower-case letter. The split is accepted only when there is
+ * at least one all-capital word before that word. An all-capital city
+ * ("MISSISSAUGA") with no tab still fails.
+ */
+function splitAtCase(words: readonly string[]): { siteName: string[]; city: string[] } | null {
+  const cityStart = words.findIndex((w) => /[a-z]/.test(w));
+  if (cityStart < 1) {
+    return null;
+  }
+  return { siteName: words.slice(0, cityStart), city: words.slice(cityStart) };
+}
+
 function splitAtTab(rawLine: string, siteRef: string, words: readonly string[]): { siteName: string[]; city: string[] } | null {
   const segments = rawLine.split("\t").map((seg) => tokenize(seg));
   // The segment holding the site number, then the site name's words after
@@ -139,7 +162,7 @@ function readFuelLine(tokens: readonly string[], rawLine: string): FuelLineCells
     siteNameWords = middle.slice(start, hashIndex + 1);
     cityWords = middle.slice(hashIndex + 1);
   } else {
-    const split = splitAtTab(rawLine, siteRef, middle);
+    const split = splitSiteAndCity(rawLine, siteRef, middle);
     if (!split) {
       return null;
     }
@@ -403,9 +426,17 @@ function isColumnHeader(tokens: readonly string[], table: TableHeader["table"]):
     return false;
   }
   const { words } = header;
+  const expected = words.join(" ");
   const printed = tokens.slice(0, words.length).join(" ");
-  const tail = tokens.slice(words.length).join(" ");
-  if (printed !== words.join(" ") || (tail !== "" && !(header.table === "fuel" && MERGED_CARD_HEADING.test(tail)))) {
+  // When a table's heading closes one page, its header prints there and again
+  // at the top of the next, and pdf.js can extract both copies as one line
+  // (express table, real invoice 1003335). Each repeat must match exactly.
+  let rest = words.length;
+  while (rest + words.length <= tokens.length && tokens.slice(rest, rest + words.length).join(" ") === expected) {
+    rest += words.length;
+  }
+  const tail = tokens.slice(rest).join(" ");
+  if (printed !== expected || (tail !== "" && !(header.table === "fuel" && MERGED_CARD_HEADING.test(tail)))) {
     throw new InvoicePdfFormatError(
       `the ${header.table} table's column header changed: expected "${words.join(" ")}", found "${tokens.join(" ")}"`,
     );
@@ -448,6 +479,20 @@ export async function parseInvoicePdf(
     await parser.destroy();
   }
 
+  return parseInvoiceText(text, productCodes);
+}
+
+/**
+ * The text-to-records half of `parseInvoicePdf`, taking the text layer as
+ * pdf-parse extracts it. Exported so that tests can feed it the exact
+ * extracted lines behind an extraction quirk (a dropped tab, a doubled
+ * header). A generated PDF reproduces those only by accident of glyph
+ * placement.
+ */
+export function parseInvoiceText(
+  text: string,
+  productCodes: ReadonlyMap<string, InvoiceProductType>,
+): ParsedInvoice {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
