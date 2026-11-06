@@ -4,7 +4,7 @@ import { isUuid } from "../../actuals/ids.js";
 import { fxRateProblem, type InvoiceFx } from "../../actuals/units.js";
 import type { InvoiceCurrency } from "../../db/types.js";
 import { detectInvoiceFormat } from "../../invoice/detectFormat.js";
-import { importInvoice, type ImportInvoiceMeta, type ImportInvoiceResult } from "../../invoice/importInvoice.js";
+import { importInvoice, isInvoiceFormatError, type ImportInvoiceMeta, type ImportInvoiceResult } from "../../invoice/importInvoice.js";
 import { parseInvoicePdf } from "../../invoice/parseInvoicePdf.js";
 import { problemResponse } from "../problem.js";
 import { isoDateSchema } from "../query.js";
@@ -102,10 +102,26 @@ export async function handleImportInvoice(pool: Pool, request: Request, url: URL
   }
 
   const meta: ImportInvoiceMeta = { sourceFilename: file.name };
-  const result =
-    format === "pdf"
-      ? await importInvoice(pool, buffer, meta, { parse: parseInvoicePdf })
-      : await importInvoice(pool, buffer, meta);
+  let result: ImportInvoiceResult;
+  try {
+    result =
+      format === "pdf"
+        ? await importInvoice(pool, buffer, meta, { parse: parseInvoicePdf })
+        : await importInvoice(pool, buffer, meta);
+  } catch (err) {
+    // A file the parser cannot read is the upload's fault, and its message
+    // says which line and why. Returning it as a 500 left the dispatcher
+    // with only "Request failed".
+    if (isInvoiceFormatError(err)) {
+      return problemResponse({
+        title: "Unprocessable Content",
+        status: 422,
+        detail: `"${file.name}" could not be read as a BVD invoice: ${err.message}`,
+        instance: url.pathname,
+      });
+    }
+    throw err;
+  }
 
   return importResultResponse(pool, result, url);
 }
