@@ -58,6 +58,24 @@ describe("handleImportInvoice", () => {
     expect(response.headers.get("content-type")).toBe("application/problem+json");
   });
 
+  it("422s a PDF the parser cannot read, naming the reason, instead of a bare 500", async () => {
+    const pdf = readFileSync(path.join(dirname, "../../../test/fixtures/invoices/edge-changed-header.pdf"));
+    const formData = new FormData();
+    formData.append("file", new Blob([pdf]), "edge-changed-header.pdf");
+    const request = new Request("http://localhost/api/v1/invoices/import", { method: "POST", body: formData });
+    // Only the duplicate-file lookup runs before the parser throws; nothing is written.
+    const queries: string[] = [];
+    const pool = { query: async (sql: string) => (queries.push(sql), { rows: [] }) } as unknown as Pool;
+
+    const response = await handleImportInvoice(pool, request, new URL(request.url));
+
+    expect(response.status).toBe(422);
+    expect(response.headers.get("content-type")).toBe("application/problem+json");
+    const body = (await response.json()) as { detail: string };
+    expect(body.detail).toMatch(/^"edge-changed-header\.pdf" could not be read as a BVD invoice: .*column header changed/);
+    expect(queries.map((q) => q.trim().split(/\s+/)[0])).toEqual(["SELECT"]);
+  });
+
   it("400s a request with no \"file\" field", async () => {
     const formData = new FormData();
     const request = new Request("http://localhost/api/v1/invoices/import", {

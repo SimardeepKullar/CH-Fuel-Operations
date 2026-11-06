@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { parseInvoiceCsv } from "./parseInvoiceCsv.js";
-import { InvoicePdfFormatError, parseInvoicePdf } from "./parseInvoicePdf.js";
+import { InvoicePdfFormatError, parseInvoicePdf, parseInvoiceText } from "./parseInvoicePdf.js";
 import { groupByAuthCode } from "./groupByAuthCode.js";
 import { reconcile } from "./reconcile.js";
 import { DEFAULT_INVOICE_PRODUCT_CODES } from "./productCode.js";
@@ -451,5 +451,95 @@ describe.skipIf(!existsSync(REAL_BVD_CODES_PDF))("parseInvoicePdf — real invoi
     const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
     expect(outcome.grandTotal).toEqual({ expectedCents: 5338824, parsedCents: 5338824, deltaCents: 0 });
     expect(outcome.balanced).toBe(true);
+  });
+});
+
+/** The text layer exactly as `parseInvoicePdf` sees it. */
+async function extractedText(pdf: Buffer): Promise<string> {
+  const { PDFParse } = await import("pdf-parse");
+  const parser = new PDFParse({ data: pdf });
+  try {
+    return (await parser.getText()).text;
+  } finally {
+    await parser.destroy();
+  }
+}
+
+/** Replaces the one line containing `marker`, failing loudly if the fixture
+ * no longer has exactly one — a silent no-op would pass every test below. */
+function editLine(text: string, marker: string, edit: (line: string) => string): string {
+  const lines = text.split("\n");
+  const hits = lines.flatMap((l, k) => (l.includes(marker) ? [k] : []));
+  expect(hits, `lines containing ${JSON.stringify(marker)}`).toHaveLength(1);
+  lines[hits[0]!] = edit(lines[hits[0]!]!);
+  return lines.join("\n");
+}
+
+const EXPRESS_HEADER_LINE = "DATE EXP. CODE AUTH CODE TRACTOR TRAILER DRIVER NAME/ID CDL TRIP # AMOUNT CASHED FEE TOTAL CUR Payee NOTES";
+
+// Extraction quirks seen on real invoices, applied to the synthetic fixtures'
+// own extracted text. A generated PDF reproduces these only by accident of
+// glyph placement, so the text is edited instead.
+describe("parseInvoiceText — extraction quirks (T-110)", () => {
+  it("splits a site name from its city at the case boundary when the tab between them was dropped (990856)", async () => {
+    const original = await extractedText(readFileSync(CA_PDF));
+    const text = editLine(original, "58073 BVD NIAGARA", (l) => l.replace("BVD NIAGARA \tNiagara", "BVD NIAGARA Niagara"));
+    expect(text).not.toBe(original);
+
+    const result = parseInvoiceText(text, DEFAULT_INVOICE_PRODUCT_CODES);
+    const niagara = result.lines.find((l) => l.siteNumber === "58073")!;
+    expect([niagara.stationNameRaw, niagara.stationCity, niagara.stationState]).toEqual(["BVD NIAGARA", "Niagara on the Lake", "ON"]);
+    expect(result).toEqual(parseInvoiceText(original, DEFAULT_INVOICE_PRODUCT_CODES));
+  });
+
+  it("still refuses a dropped tab when the city is in capitals too, rather than guessing the split", async () => {
+    const text = editLine(await extractedText(readFileSync(CA_PDF)), "58803 BVD MISSISSAUGA", (l) =>
+      l.replace("SHAWSON \tMISSISSAUGA", "SHAWSON MISSISSAUGA"),
+    );
+    expect(() => parseInvoiceText(text, DEFAULT_INVOICE_PRODUCT_CODES)).toThrow(/unparseable fuel line/);
+  });
+
+  it("reads a column header extracted twice on one line across a page break (1003335)", async () => {
+    const original = await extractedText(readFileSync(REDACTED_PDF));
+    const text = editLine(original, EXPRESS_HEADER_LINE, (l) => `${l}\t${l}`);
+
+    const result = parseInvoiceText(text, DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.expressRows.length).toBeGreaterThan(0);
+    expect(result).toEqual(parseInvoiceText(original, DEFAULT_INVOICE_PRODUCT_CODES));
+  });
+
+  it("still refuses a header whose repeated copy differs from the expected header", async () => {
+    const text = editLine(await extractedText(readFileSync(REDACTED_PDF)), EXPRESS_HEADER_LINE, (l) =>
+      `${l}\t${l.replace("FEE TOTAL", "TOTAL FEE")}`,
+    );
+    expect(() => parseInvoiceText(text, DEFAULT_INVOICE_PRODUCT_CODES)).toThrow(/express table's column header changed/);
+  });
+});
+
+// The two real invoices that first showed those quirks, gitignored. Counts
+// and totals only — no driver name or card number in this file (T-58).
+const REAL_990856 = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_990856.pdf", import.meta.url));
+const REAL_1003335 = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_1003335.pdf", import.meta.url));
+
+describe.skipIf(!existsSync(REAL_990856))("parseInvoicePdf — real CA invoice 990856, a dropped site/city tab (local fixture only)", () => {
+  it("parses every line, splits the tab-less Niagara row like its siblings, and reconciles", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_990856), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.invoiceNumber).toBe("990856");
+    expect(result.header.currency).toBe("CAD");
+    expect(result.rejections).toEqual([]);
+    const niagara = new Set(result.lines.filter((l) => l.siteNumber === "58073").map((l) => `${l.stationNameRaw}|${l.stationCity}`));
+    expect([...niagara]).toEqual(["BVD NIAGARA|Niagara on the Lake"]);
+    expect(reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals).balanced).toBe(true);
+  });
+});
+
+describe.skipIf(!existsSync(REAL_1003335))("parseInvoicePdf — real US invoice 1003335, a doubled express header (local fixture only)", () => {
+  it("parses every line and express row, and reconciles", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_1003335), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.invoiceNumber).toBe("1003335");
+    expect(result.header.currency).toBe("USD");
+    expect(result.rejections).toEqual([]);
+    expect(result.expressRows.length).toBeGreaterThan(0);
+    expect(reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals).balanced).toBe(true);
   });
 });

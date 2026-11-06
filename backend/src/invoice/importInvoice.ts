@@ -9,7 +9,8 @@ import { resolveExpressDriver, type ExpressDriverResolution } from "../resolve/r
 import { resolveStation } from "../resolve/resolveStation.js";
 import { resolveTruckForStop } from "../resolve/resolveTruck.js";
 import { groupByAuthCode, type FuelStopGroup } from "./groupByAuthCode.js";
-import { parseInvoiceCsv, type ParsedInvoice } from "./parseInvoiceCsv.js";
+import { InvoiceFormatError, parseInvoiceCsv, type ParsedInvoice } from "./parseInvoiceCsv.js";
+import { InvoicePdfFormatError } from "./parseInvoicePdf.js";
 import type { ExpressRow } from "./parseExpressRows.js";
 import { DEFAULT_INVOICE_PRODUCT_CODES, type InvoiceProductType } from "./productCode.js";
 import { reconcile } from "./reconcile.js";
@@ -64,6 +65,16 @@ export type ImportInvoiceResult =
       existingInvoiceId: string;
       message: string;
     };
+
+/**
+ * Whether `importInvoice` threw because the file itself could not be read as
+ * a BVD invoice (either parser's format error). That is the uploader's file,
+ * not a server fault, so callers report it with its message. Every format
+ * error is thrown before anything is written.
+ */
+export function isInvoiceFormatError(err: unknown): err is Error {
+  return err instanceof InvoiceFormatError || err instanceof InvoicePdfFormatError;
+}
 
 interface ExistingInvoiceRow {
   id: string;
