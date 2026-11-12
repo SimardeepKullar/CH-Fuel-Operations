@@ -330,6 +330,34 @@ function readExpressLine(tokens: readonly string[], rawLine: string): string[] |
   ];
 }
 
+/**
+ * The fuel section's roll-up lines, by shape: "SUBTOTAL …" after each stop
+ * and card, "Sub Total …", "Card # …" and "<card> Fuel Total …" closing a
+ * card, and per-product rows ("DF …", "S …") between them. Measured across
+ * every real invoice on hand (T-128).
+ */
+function isFuelRollUp(tokens: readonly string[]): boolean {
+  const [first = "", second = "", third = ""] = tokens;
+  return (
+    first === "SUBTOTAL" ||
+    (first === "Sub" && second === "Total") ||
+    (first === "Card" && second === "#") ||
+    (second === "Fuel" && third === "Total") ||
+    (PRODUCT_CODE_LABELS.has(first) && tokens.length > 1 && tokens.slice(1).every((t) => NUMERIC.test(t) || CURRENCY_CODE.test(t)))
+  );
+}
+
+/** A Manual Transactions row: date, time, amount, fee, total, CUR, then the
+ * free-text description (T-128). The three money cells and the currency
+ * code pin the shape; the description is every word after. */
+function readManualLine(tokens: readonly string[]): string[] | null {
+  const [date = "", time = "", amount = "", fee = "", total = "", currency = ""] = tokens;
+  if (!DATE.test(date) || !TIME.test(time) || ![amount, fee, total].every((t) => NUMERIC.test(t)) || !CURRENCY_CODE.test(currency)) {
+    return null;
+  }
+  return [`${date} ${time}`, stripGrouping(amount), stripGrouping(fee), stripGrouping(total), currency, tokens.slice(6).join(" ")];
+}
+
 /** Header table: the invoice number followed by four date/time pairs
  * (invoice, period start, period end, due), which extraction splits across
  * their own lines. */
@@ -385,6 +413,10 @@ const EXPRESS_HEADER_RECORD = [
   "CDL", "TRIP #", "AMOUNT CASHED", "FEE", "TOTAL", "CUR", "PAYEE", "NOTES",
 ];
 
+/** The Manual Transactions table's header (T-128), as real invoice 854048
+ * prints it. */
+const MANUAL_HEADER_RECORD = ["DATE", "AMOUNT", "FEE", "TOTAL AMOUNT", "CUR", "DESCRIPTION"];
+
 const TOTALS_HEADER_RECORD = [
   "PRODUCT", "QTY", "PRE TAX AMT", "HST", "GST", "PST", "QST", "DISC RATE",
   "DISC AMT", "FINAL AMOUNT", "CUR",
@@ -399,7 +431,7 @@ const PRODUCT_CODE_LABELS = new Set(["TA", "TF", "DF", "S", "C", "AD", "O", "L"]
  * header prints "Payee" in mixed case.
  */
 interface TableHeader {
-  table: "fuel" | "express" | "totals";
+  table: "fuel" | "manual" | "express" | "totals";
   words: readonly string[];
 }
 
@@ -408,6 +440,7 @@ const ALTERNATE_HEADERS: readonly TableHeader[] = [{ table: "express", words: BV
 
 const PRINTED_HEADERS: readonly TableHeader[] = [
   { table: "fuel", words: FUEL_HEADER_RECORD.join(" ").split(" ") },
+  { table: "manual", words: MANUAL_HEADER_RECORD.join(" ").split(" ") },
   { table: "express", words: EXPRESS_HEADER_RECORD.map((c) => (c === "PAYEE" ? "Payee" : c)).join(" ").split(" ") },
   { table: "totals", words: TOTALS_HEADER_RECORD.join(" ").split(" ") },
 ];
@@ -515,7 +548,7 @@ export function parseInvoiceText(
   }
   records.push(["Fuel Card Transactions"]);
 
-  let section: "fuel" | "express" | "totals" = "fuel";
+  let section: TableHeader["table"] = "fuel";
   let seenCard = false;
   /** Whether the current table's column header has been read and checked
    * since its heading. Extraction order around a page break is not the
@@ -532,6 +565,12 @@ export function parseInvoiceText(
     const tokens = tokenize(line);
     if (tokens.length === 0) continue;
 
+    if (line === "Manual Transactions") {
+      records.push(["Manual Transactions"], MANUAL_HEADER_RECORD);
+      section = "manual";
+      headerChecked = false;
+      continue;
+    }
     if (line === "Express Codes" || line === "BVD Codes") {
       records.push(["Express Codes"], EXPRESS_HEADER_RECORD);
       section = "express";
@@ -567,7 +606,13 @@ export function parseInvoiceText(
         continue;
       }
       if (!FUEL_AUTH.test(tokens[0] ?? "")) {
-        continue; // SUBTOTAL / Card # / Fuel Total / Sub Total roll-ups
+        // Only the roll-ups BVD prints are skipped. Anything else — the
+        // Manual Transactions table was once read this way (T-128) — fails
+        // the file rather than vanishing.
+        if (!isFuelRollUp(tokens)) {
+          throw new InvoicePdfFormatError(`unexpected line in the fuel section: ${JSON.stringify(line)}`);
+        }
+        continue;
       }
       requireHeader();
       const cells = readFuelLine(tokens, line);
@@ -579,6 +624,20 @@ export function parseInvoiceText(
         cells.siteRef, cells.siteName, cells.city, cells.state, cells.prod,
         ...cells.numerics, cells.currency,
       ]);
+      continue;
+    }
+
+    if (section === "manual") {
+      if (!DATE.test(tokens[0] ?? "")) {
+        if (tokens[0] === "SUBTOTAL") continue;
+        throw new InvoicePdfFormatError(`unexpected line in the manual transactions section: ${JSON.stringify(line)}`);
+      }
+      requireHeader();
+      const record = readManualLine(tokens);
+      if (!record) {
+        throw new InvoicePdfFormatError(`unparseable manual transaction line: ${JSON.stringify(line)}`);
+      }
+      records.push(record);
       continue;
     }
 

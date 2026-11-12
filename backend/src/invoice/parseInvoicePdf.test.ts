@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { parseInvoiceCsv } from "./parseInvoiceCsv.js";
@@ -132,7 +132,9 @@ describe("parseInvoicePdf — edge-case fixtures (T-50)", () => {
     const { EDGE_CASES, FUEL_COLUMNS, renderInvoicePdf } = await import("../../test/fixtures/invoices/generateSamplePdf.js");
     const renamed = { ...EDGE_CASES["edge-changed-header"], fuelColumns: ["Authorization", ...FUEL_COLUMNS.slice(1)] };
     await expect(parseInvoicePdf(await renderInvoicePdf(renamed), DEFAULT_INVOICE_PRODUCT_CODES)).rejects.toThrow(
-      /a fuel row came before the fuel table's column header/,
+      // The strict fuel section (T-128) catches the renamed header line
+      // itself, one line before the first row would have tripped it.
+      /unexpected line in the fuel section: "Authorization/,
     );
   });
 
@@ -607,5 +609,72 @@ describe.skipIf(!existsSync(REAL_945798))("parseInvoicePdf — real CA invoice 9
     const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
     expect(outcome.balanced).toBe(true);
     expect(outcome.grandTotal.parsedCents).toBe(5638294);
+  });
+});
+
+describe("parseInvoicePdf — Manual Transactions (T-128)", () => {
+  it("edge-manual-credit: reads the credit row and reconciles it to the printed Manual and grand totals", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-manual-credit"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    expect(result.manualRows).toEqual([
+      {
+        lineNumber: expect.any(Number),
+        occurredAt: "2026-01-06T00:00:00",
+        amount: "-150.00",
+        fee: "0.00",
+        total: "-150.00",
+        currency: "USD",
+        description: "CREDIT FOR A SAMPLE ADVANCE",
+      },
+    ]);
+    expect(result.printedTotals.products.find((p) => p.productCode === "Manual Transactions")?.amount).toBe("-150.00");
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals, result.manualRows);
+    expect(outcome.balanced).toBe(true);
+    expect(outcome.grandTotal.deltaCents).toBe(0);
+  });
+
+  it("an invoice with no Manual Transactions section reads no manual rows", async () => {
+    const result = await parseInvoicePdf(redacted(), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.manualRows).toEqual([]);
+  });
+
+  it("refuses a changed Manual Transactions column header", async () => {
+    const text = editLine(await extractedText(edgePdf("edge-manual-credit")), "DATE AMOUNT FEE", (l) => l.replace("TOTAL AMOUNT", "TOTAL"));
+    expect(() => parseInvoiceText(text, DEFAULT_INVOICE_PRODUCT_CODES)).toThrow(/manual table's column header changed/);
+  });
+
+  it("fails on a line in the fuel section it does not recognise, rather than skipping it", async () => {
+    // Renaming the heading leaves its table inside the fuel section — what an
+    // unknown section looked like before this ticket, when it was skipped.
+    const text = editLine(await extractedText(edgePdf("edge-manual-credit")), "Manual Transactions", () => "Manual Adjustments");
+    expect(() => parseInvoiceText(text, DEFAULT_INVOICE_PRODUCT_CODES)).toThrow(/unexpected line in the fuel section: "Manual Adjustments"/);
+  });
+});
+
+const REAL_854048 = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_854048.pdf", import.meta.url));
+
+describe.skipIf(!existsSync(REAL_854048))("parseInvoicePdf — real US invoice 854048, a Manual Transactions credit (local fixture only)", () => {
+  it("reads the -11,400.00 credit and reconciles to the printed $18,314.84", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_854048), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.invoiceNumber).toBe("854048");
+    expect(result.rejections).toEqual([]);
+    expect(result.manualRows.map((r) => [r.amount, r.fee, r.total, r.currency])).toEqual([["-11400.00", "0.00", "-11400.00", "USD"]]);
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals, result.manualRows);
+    expect(outcome.balanced).toBe(true);
+    expect(outcome.grandTotal.parsedCents).toBe(1831484);
+  });
+});
+
+const REAL_INVOICE_DIR = fileURLToPath(new URL("../../../data/bvd-invoices/", import.meta.url));
+
+describe.skipIf(!existsSync(REAL_INVOICE_DIR))("parseInvoicePdf — every real invoice under a strict fuel section (local fixtures only)", () => {
+  it("parses every real PDF without an unexpected fuel-section line, and each one balances", async () => {
+    const files = readdirSync(REAL_INVOICE_DIR).filter((f) => f.endsWith(".pdf"));
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const result = await parseInvoicePdf(readFileSync(`${REAL_INVOICE_DIR}${file}`), DEFAULT_INVOICE_PRODUCT_CODES);
+      const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals, result.manualRows);
+      expect([file, outcome.balanced]).toEqual([file, true]);
+    }
   });
 });
