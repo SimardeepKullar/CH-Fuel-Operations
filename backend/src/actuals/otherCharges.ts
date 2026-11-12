@@ -53,7 +53,7 @@ export interface ExpressChargeItem {
 export interface ExpressChargeTotals {
   count: number;
   amount: number;
-  /** Separate from `amount` (A8.6: "surface the $3.00 fee total separately"). */
+  /** Separate from `amount` (A8.6: "surface the fee total separately"). */
   fee: number;
   /** `amount + fee`, summed in SQL — the figure that ties to the invoice's printed express total. */
   total: number;

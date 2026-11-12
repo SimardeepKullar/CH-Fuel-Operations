@@ -7,7 +7,7 @@ import { ExpressRowFormatError, parseExpressRows, type RawExpressRow } from "./p
  * DRIVER NAME/ID, CDL, TRIP #, AMOUNT CASHED, FEE, TOTAL, CUR, Payee, NOTES.
  *
  * Shapes the DoD cares about: a normal row, a blank-driver row (tractor
- * present, driver not — the real blank case), and the flat $3.00 fee.
+ * present, driver not — the real blank case), and the usual $3.00 fee.
  */
 const PDF_ROWS: RawExpressRow[] = [
   {
@@ -60,15 +60,25 @@ describe("parseExpressRows — pdf layout", () => {
     expect(row).toMatchObject({ trailerRaw: null, cdlRaw: null, tripNumberRaw: null });
   });
 
-  it("asserts the flat $3.00 fee on every row", () => {
-    expect(parseExpressRows(PDF_ROWS, "pdf").every((r) => r.fee === "3.00")).toBe(true);
+  it("reads the fee as printed: $6 on a tow, beside the usual $3 (T-126)", () => {
+    const tow: RawExpressRow[] = [
+      { lineNumber: 20, record: ["2026-01-12 09:30:54", "9000010", "E1000010", "104", "", "SAMPLE DRIVER", "", "", "2400", "6", "2406", "US", "tow", ""] },
+    ];
+    expect(parseExpressRows(tow, "pdf")[0]).toMatchObject({ amount: "2400.00", fee: "6.00", total: "2406.00" });
   });
 
-  it("fails loudly on a fee that is not $3.00, rather than passing it through", () => {
-    const badFee: RawExpressRow[] = [
-      { lineNumber: 999, record: ["2026-01-05 07:43:16", "1", "E1", "101", "", "", "", "", "100", "3.50", "103.50", "US", "lumper", ""] },
+  it("fails loudly when amount + fee is not the printed total, to the cent", () => {
+    const misread: RawExpressRow[] = [
+      { lineNumber: 999, record: ["2026-01-05 07:43:16", "1", "E1", "101", "", "", "", "", "100", "3.50", "103.00", "US", "lumper", ""] },
     ];
-    expect(() => parseExpressRows(badFee, "pdf")).toThrow(ExpressRowFormatError);
+    expect(() => parseExpressRows(misread, "pdf")).toThrow(/line 999: amount 100.00 \+ fee 3.50 != total 103.00/);
+  });
+
+  it("fails loudly on a negative fee", () => {
+    const negative: RawExpressRow[] = [
+      { lineNumber: 998, record: ["2026-01-05 07:43:16", "1", "E1", "101", "", "", "", "", "100", "-3", "97", "US", "lumper", ""] },
+    ];
+    expect(() => parseExpressRows(negative, "pdf")).toThrow(ExpressRowFormatError);
   });
 
   it("sums the sample's express amounts as expected", () => {

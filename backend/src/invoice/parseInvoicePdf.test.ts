@@ -259,7 +259,7 @@ describe.skipIf(!hasRealFixture)("parseInvoicePdf — real invoice 999210 (local
     expect(outcome.grandTotal.parsedCents).toBe(5092971);
   });
 
-  it("parses all 6 real express rows with their tractor and driver, flat $3.00 fee intact", async () => {
+  it("parses all 6 real express rows with their tractor and driver, each with the $3.00 fee BVD printed", async () => {
     const result = await parseInvoicePdf(readFileSync(REAL_PDF), DEFAULT_INVOICE_PRODUCT_CODES);
     expect(result.expressRows).toHaveLength(6);
     expect(result.expressRows.every((r) => r.fee === "3.00")).toBe(true);
@@ -541,5 +541,35 @@ describe.skipIf(!existsSync(REAL_1003335))("parseInvoicePdf — real US invoice 
     expect(result.rejections).toEqual([]);
     expect(result.expressRows.length).toBeGreaterThan(0);
     expect(reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals).balanced).toBe(true);
+  });
+});
+
+const REAL_949661 = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_949661.pdf", import.meta.url));
+const REAL_941875 = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_941875.pdf", import.meta.url));
+
+describe.skipIf(!existsSync(REAL_949661))("parseInvoicePdf — real US invoice 949661, a $6.00 express fee on a tow (local fixture only)", () => {
+  it("reads the $6.00 fee as printed beside the $3.00 ones, and reconciles", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_949661), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.invoiceNumber).toBe("949661");
+    expect(result.rejections).toEqual([]);
+    expect(result.expressRows.map((r) => r.fee).sort()).toEqual(["3.00", "3.00", "3.00", "3.00", "6.00"]);
+    expect(result.expressRows.find((r) => r.fee === "6.00")).toMatchObject({ amount: "2025.00", total: "2031.00" });
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(true);
+    expect(outcome.grandTotal.parsedCents).toBe(4008535);
+  });
+});
+
+describe.skipIf(!existsSync(REAL_941875))("parseInvoicePdf — real CA invoice 941875, a $6.00 express fee on a tow (local fixture only)", () => {
+  it("reads the $6.00 fee as printed, and reconciles", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_941875), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.invoiceNumber).toBe("941875");
+    expect(result.header.currency).toBe("CAD");
+    expect(result.rejections).toEqual([]);
+    expect(result.expressRows).toHaveLength(1);
+    expect(result.expressRows[0]).toMatchObject({ amount: "2655.50", fee: "6.00", total: "2661.50" });
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(true);
+    expect(outcome.grandTotal.parsedCents).toBe(6133368);
   });
 });
