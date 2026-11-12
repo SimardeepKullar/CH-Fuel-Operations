@@ -178,10 +178,14 @@ function readFuelLine(tokens: readonly string[], rawLine: string): FuelLineCells
   // The tractor cell can print blank (real CA invoice 1026203). A unit always
   // carries a digit and a driver name never does, so a digit-free token ahead
   // of the timestamp is the driver and the unit is blank, not the name.
-  const unit = /\d/.test(tokens[i] ?? "") ? tokens[i--]! : "";
+  // Index 0 is the auth code, which carries digits too, so it is never the unit.
+  const unit = i >= 1 && /\d/.test(tokens[i] ?? "") ? tokens[i--]! : "";
   const authCode = tokens[0] ?? "";
+  // The driver cell can print blank too (real CA invoice 945798, T-127). With
+  // a unit present the line is still unambiguous. With neither, nothing marks
+  // which cell is missing, so the line stays unparseable rather than guessed.
   const driverName = tokens.slice(1, i + 1).join(" ");
-  if (driverName === "") {
+  if (driverName === "" && unit === "") {
     return null;
   }
 

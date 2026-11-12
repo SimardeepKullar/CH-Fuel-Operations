@@ -1034,6 +1034,11 @@ select.input { width: 100%; }
 }
 .rr-disagree-value { font: 600 0.75rem var(--font-body); color: var(--color-accent-800); }
 .rr-disagree-raw { font: 400 0.625rem var(--font-mono); color: #946012; }
+/* The invoice printed nothing (T-127): the guess, then a full-strength red
+   label — stronger than .rr-unmatched's faded red, because nothing on the
+   invoice backs the value shown. */
+.rr-blank-wrap { align-items: center; gap: 0.375rem; }
+.rr-blank { font: 700 0.625rem var(--font-mono); letter-spacing: 0.04em; color: var(--color-error); }
 
 /* — A10 anomaly flags: two severities only — */
 .anomaly-flag {

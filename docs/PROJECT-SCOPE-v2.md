@@ -234,6 +234,7 @@ Consistent treatment across table, detail and overview. **Two severity levels at
 | Entered unit ≠ driver's assigned truck | `0` entered on card 9000005, JORDAN's assigned truck 072 | amber |
 | No truck on file for the driver on the stop's date (T-78) | a CA driver with no truck in the roster | amber |
 | Unit not entered — the driver typed no unit at the pump (T-95) | a fuel line printed with a driver and no tractor (CA invoice 1026203) | amber |
+| Driver name not entered (`driver_not_entered`, T-127) — the line printed a unit and no driver; the driver shown is the card's, beside a red **NO NAME** tag | a fuel line on CA invoice 945798 whose card and unit belong to different drivers | red |
 | Two fills too close in time or distance to be plausible | same site, 78 minutes apart | amber |
 | Billed price materially above BVD's published price for that site and date | — (needs the price-file audit, A6.5) | red |
 | DEF ratio well outside normal | 8.8% of diesel gallons against a ~3% norm | amber |

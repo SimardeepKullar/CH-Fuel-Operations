@@ -180,6 +180,15 @@ describe("parseInvoicePdf — edge-case fixtures (T-50)", () => {
     expect(result.lines.filter((l) => l.unitRaw === "101").length).toBeGreaterThan(0);
   });
 
+  it("edge-fuel-blank-driver: a fuel line printed with a tractor and no driver reads a blank driver (T-127)", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-fuel-blank-driver"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    const blank = result.lines.find((l) => l.authCode === "B500002-TA");
+    expect(blank).toMatchObject({ driverNameRaw: "", unitRaw: "101" });
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(true);
+  });
+
   it("edge-thousands: strips the thousands separators the PDF prints, on lines, totals and express rows", async () => {
     const result = await parseInvoicePdf(edgePdf("edge-thousands"), DEFAULT_INVOICE_PRODUCT_CODES);
     expect(result.rejections).toEqual([]);
@@ -571,5 +580,32 @@ describe.skipIf(!existsSync(REAL_941875))("parseInvoicePdf — real CA invoice 9
     const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
     expect(outcome.balanced).toBe(true);
     expect(outcome.grandTotal.parsedCents).toBe(6133368);
+  });
+});
+
+describe("parseInvoiceText — a fuel line with no driver name (T-127)", () => {
+  it("still refuses a line that prints neither a driver nor a unit, rather than guessing which cell is missing", async () => {
+    const original = await extractedText(edgePdf("edge-fuel-blank-driver"));
+    const text = editLine(original, "B500002-TA", (l) => l.replace(/(B500002-TA\s+)101\s+/, "$1"));
+    expect(text).not.toBe(original);
+    expect(() => parseInvoiceText(text, DEFAULT_INVOICE_PRODUCT_CODES)).toThrow(/unparseable fuel line/);
+  });
+});
+
+// Real CA invoice 945798 (gitignored): one fuel line prints a unit and no
+// driver. Counts and totals only — no driver name or card number here (T-58).
+const REAL_945798 = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_945798.pdf", import.meta.url));
+
+describe.skipIf(!existsSync(REAL_945798))("parseInvoicePdf — real CA invoice 945798, a fuel line with no driver (local fixture only)", () => {
+  it("reads the blank-driver line with its unit, and reconciles", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_945798), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.invoiceNumber).toBe("945798");
+    expect(result.header.currency).toBe("CAD");
+    expect(result.rejections).toEqual([]);
+    const blank = result.lines.filter((l) => l.driverNameRaw === "");
+    expect(blank.map((l) => [l.authCode, l.unitRaw])).toEqual([["A161767301-TA", "072"]]);
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals);
+    expect(outcome.balanced).toBe(true);
+    expect(outcome.grandTotal.parsedCents).toBe(5638294);
   });
 });
