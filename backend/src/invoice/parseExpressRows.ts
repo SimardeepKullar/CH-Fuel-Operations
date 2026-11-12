@@ -1,6 +1,6 @@
 import type { InvoiceCurrency } from "../db/types.js";
 import { currencyFromCode } from "./currency.js";
-import { DecimalFormatError, toDecimalString } from "./decimal.js";
+import { DecimalFormatError, toCents, toDecimalString } from "./decimal.js";
 
 export class ExpressRowFormatError extends Error {
   constructor(message: string) {
@@ -91,7 +91,6 @@ export interface RawExpressRow {
   lineNumber: number;
 }
 
-const EXPECTED_FEE = "3.00";
 const TIMESTAMP_PATTERN = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/;
 
 function normaliseTimestamp(raw: string, lineNumber: number): string {
@@ -126,10 +125,10 @@ function decimalField(raw: string | undefined, lineNumber: number, label: string
  * Parses an invoice's Express Codes section from either export's layout
  * (see `ExpressLayout`). Pure — no database, no HTTP, no clock, no I/O.
  *
- * Every row carries a flat $3.00 fee (§A5) — asserted explicitly here, never
- * assumed. A row whose fee differs throws rather than passing through: that
- * means the invoice's own flat-fee invariant has changed, not that this one
- * row is merely malformed.
+ * The fee is read as printed (§A5): $3.00 on most rows, but BVD charges
+ * $6.00 on large advances such as tows (T-126), at a cutoff nobody has
+ * seen stated. What every row must satisfy is amount + fee = total, exactly,
+ * in cents. A row that does not was misread, and throws.
  */
 export function parseExpressRows(
   rows: readonly RawExpressRow[],
@@ -148,9 +147,12 @@ export function parseExpressRows(
       throw new ExpressRowFormatError(`line ${lineNumber}: unknown currency code: "${rawCurrency}"`);
     }
 
-    if (fee !== EXPECTED_FEE) {
+    if (toCents(fee) < 0) {
+      throw new ExpressRowFormatError(`line ${lineNumber}: negative express fee ${fee}`);
+    }
+    if (toCents(amount) + toCents(fee) !== toCents(total)) {
       throw new ExpressRowFormatError(
-        `line ${lineNumber}: express fee ${fee} != flat fee ${EXPECTED_FEE}`,
+        `line ${lineNumber}: amount ${amount} + fee ${fee} != total ${total}`,
       );
     }
 
