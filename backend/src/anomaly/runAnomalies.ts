@@ -15,6 +15,7 @@ import {
 import { subGallon, type SubGallonConfig, type SubGallonStop } from "./rules/subGallon.js";
 import { tooClose, type TooCloseConfig, type TooCloseStop } from "./rules/tooClose.js";
 import { unitNotEntered, type UnitNotEnteredConfig, type UnitNotEnteredStop } from "./rules/unitNotEntered.js";
+import { driverNotEntered, type DriverNotEnteredConfig, type DriverNotEnteredStop } from "./rules/driverNotEntered.js";
 import { unitMismatch, type UnitMismatchConfig, type UnitMismatchStop } from "./rules/unitMismatch.js";
 import type { AnomalyFinding } from "./types.js";
 
@@ -25,6 +26,7 @@ const RULE_NAMES = [
   "unit_mismatch",
   "no_truck_on_file",
   "unit_not_entered",
+  "driver_not_entered",
   "too_close",
   "charges_no_fuel",
   "price_above_published",
@@ -258,6 +260,11 @@ async function rebuildFindings(db: Db, invoiceId: string): Promise<RunAnomaliesR
   const unitNotEnteredStops: UnitNotEnteredStop[] = stops.map((s) => ({ id: s.id, unitRaw: s.unit_raw }));
   for (const finding of unitNotEntered(unitNotEnteredStops, thresholds.get("unit_not_entered") as UnitNotEnteredConfig)) {
     findings.push({ rule: "unit_not_entered", finding });
+  }
+
+  const driverNotEnteredStops: DriverNotEnteredStop[] = stops.map((s) => ({ id: s.id, driverNameRaw: s.driver_name_raw }));
+  for (const finding of driverNotEntered(driverNotEnteredStops, thresholds.get("driver_not_entered") as DriverNotEnteredConfig)) {
+    findings.push({ rule: "driver_not_entered", finding });
   }
 
   const notOnRosterStops: NotOnRosterStop[] = stops.map((s) => ({

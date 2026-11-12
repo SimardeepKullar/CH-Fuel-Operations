@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runMigrations } from "../../src/db/migrate.js";
 import { importInvoice } from "../../src/invoice/importInvoice.js";
 import { runAnomalies } from "../../src/anomaly/runAnomalies.js";
+import { parseInvoicePdf } from "../../src/invoice/parseInvoicePdf.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.join(dirname, "../../../migrations/synthetic");
@@ -231,6 +232,19 @@ describe.skipIf(!hasDatabase)("runAnomalies (integration)", () => {
 
     await scopedPool.query("ALTER TABLE anomalies DROP CONSTRAINT t78_no_no_truck");
     expect(await findings()).toEqual(before);
+  });
+
+  it("flags a fuel stop whose line printed no driver name, red, and only that one (T-127)", async () => {
+    const pdf = readFileSync(path.join(fixturesDir, "edge-fuel-blank-driver.pdf"));
+    const result = await importInvoice(scopedPool, pdf, { sourceFilename: "edge-fuel-blank-driver.pdf" }, { parse: parseInvoicePdf });
+    expect(result.status).toBe("imported");
+
+    const { rows } = await scopedPool.query<{ base_auth_code: string; severity: string; detail: unknown }>(
+      `SELECT fs.base_auth_code, a.severity, a.detail FROM anomalies a
+       JOIN fuel_stops fs ON fs.id = a.subject_id
+       WHERE a.rule = 'driver_not_entered'`,
+    );
+    expect(rows).toEqual([{ base_auth_code: "B500002", severity: "red", detail: { reason: "no_driver_name" } }]);
   });
 
   it("a quarantined invoice produces zero anomalies", async () => {
