@@ -36,6 +36,14 @@ interface RawResolvedProps {
    * truck is a schedule expectation — T-40E.
    */
   primary?: "resolved" | "raw";
+  /**
+   * What to say, in red, when the invoice printed nothing for this value
+   * (T-127). The Driver column passes "NO NAME": a fuel line can print a unit
+   * and no driver, and the driver then shown is the card's, a guess. The
+   * resolved value still shows first, so the guess stays visible but marked.
+   * Unset (the unit column), a blank raw renders as before.
+   */
+  blankLabel?: string;
 }
 
 /**
@@ -55,7 +63,20 @@ export default function RawResolved({
   showRawWhenAgreeing = false,
   rawOnly = false,
   primary = "resolved",
+  blankLabel,
 }: RawResolvedProps) {
+  if (blankLabel !== undefined && value.raw.trim() === "") {
+    const guess = rawOnly ? null : value.resolved;
+    return (
+      <span className="rr rr-blank-wrap" data-state="blank">
+        {guess !== null && <span className="rr-value">{guess}</span>}
+        <span className="rr-blank" title="The invoice printed nothing here: check this">
+          {blankLabel}
+        </span>
+      </span>
+    );
+  }
+
   const state = rawOnly ? "unmatched" : stateOf(value);
 
   if (state === "unmatched") {

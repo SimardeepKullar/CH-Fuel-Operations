@@ -120,7 +120,7 @@ function buildColumns(
     columnHelper.display({
       id: "driver",
       header: "Driver",
-      cell: ({ row }) => <RawResolved value={row.original.driver} />,
+      cell: ({ row }) => <RawResolved value={row.original.driver} blankLabel="NO NAME" />,
     }),
     columnHelper.display({
       id: "unit",

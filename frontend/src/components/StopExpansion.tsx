@@ -181,7 +181,7 @@ export default function StopExpansion({ stop, stacked = false, invoiceNumber = n
           <dd>{stop.truck.resolved ?? "Unresolved"}</dd>
           <dt>Raw driver text</dt>
           <dd>
-            <RawResolved value={stop.driver} rawOnly />
+            <RawResolved value={stop.driver} rawOnly blankLabel="NO NAME" />
           </dd>
           <dt>Raw unit text</dt>
           <dd>

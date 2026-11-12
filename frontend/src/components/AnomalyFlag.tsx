@@ -12,6 +12,7 @@ const RULE_LABELS: Record<string, string> = {
   not_on_roster: "Not on roster",
   no_truck_on_file: "No truck",
   unit_not_entered: "Unit not entered",
+  driver_not_entered: "Driver name not entered",
   def_in_canada: "DEF in Canada",
 };
 
@@ -29,6 +30,7 @@ const RULE_DESCRIPTIONS: Record<string, string> = {
   not_on_roster: "This card has no driver on the fleet roster",
   no_truck_on_file: "No truck on file for this driver on this date",
   unit_not_entered: "The driver typed no unit number at the pump",
+  driver_not_entered: "The invoice printed no driver name; the driver shown is the card's",
   def_in_canada: "DEF was bought on a Canadian invoice",
 };
 

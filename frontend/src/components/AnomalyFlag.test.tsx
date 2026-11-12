@@ -56,6 +56,13 @@ describe("AnomalyFlag", () => {
     expect(FILTERABLE_FLAGS).toContainEqual({ value: "def_in_canada", label: "DEF in Canada" });
   });
 
+  it("renders driver_not_entered as 'Driver name not entered' (red) and offers it as a filterable flag (T-127)", () => {
+    render(<AnomalyFlag flag={{ rule: "driver_not_entered", severity: "red" }} />);
+    expect(screen.getByText("Driver name not entered").getAttribute("data-severity")).toBe("red");
+    expect(FILTERABLE_FLAGS).toContainEqual({ value: "driver_not_entered", label: "Driver name not entered" });
+    expect(flagDescription("driver_not_entered")).toBe("The invoice printed no driver name; the driver shown is the card's");
+  });
+
   it("humanizes an unmapped rule slug rather than rendering nothing", () => {
     render(<AnomalyFlag flag={{ rule: "some_new_rule", severity: "amber" }} />);
     expect(screen.getByText("some new rule")).toBeTruthy();

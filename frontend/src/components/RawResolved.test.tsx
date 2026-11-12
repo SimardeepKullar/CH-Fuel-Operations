@@ -34,6 +34,35 @@ describe("RawResolved", () => {
     expect(el.className).toContain("rr-unmatched");
   });
 
+  it("blank raw with a blankLabel: the resolved value, then the label as a red tag (T-127)", () => {
+    render(<RawResolved value={{ resolved: "DRIVER ONE", raw: "", agrees: false }} blankLabel="NO NAME" />);
+    const wrapper = document.querySelector('[data-state="blank"]');
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.querySelector(".rr-value")?.textContent).toBe("DRIVER ONE");
+    expect(wrapper!.querySelector(".rr-blank")?.textContent).toBe("NO NAME");
+    expect(wrapper!.textContent).not.toContain("≠");
+  });
+
+  it("blank raw with nothing resolved: the label alone, still red", () => {
+    render(<RawResolved value={{ resolved: null, raw: "  ", agrees: null }} blankLabel="NO NAME" />);
+    const wrapper = document.querySelector('[data-state="blank"]');
+    expect(wrapper!.querySelector(".rr-value")).toBeNull();
+    expect(wrapper!.querySelector(".rr-blank")?.textContent).toBe("NO NAME");
+  });
+
+  it("blank raw with rawOnly: the label alone, in place of empty raw text", () => {
+    render(<RawResolved value={{ resolved: "DRIVER ONE", raw: "", agrees: false }} blankLabel="NO NAME" rawOnly />);
+    const wrapper = document.querySelector('[data-state="blank"]');
+    expect(wrapper!.querySelector(".rr-value")).toBeNull();
+    expect(wrapper!.querySelector(".rr-blank")?.textContent).toBe("NO NAME");
+  });
+
+  it("without a blankLabel, a blank raw keeps its old rendering (the unit column)", () => {
+    render(<RawResolved value={{ resolved: "072", raw: "", agrees: false }} />);
+    expect(document.querySelector('[data-state="disagreeing"]')).not.toBeNull();
+    expect(document.querySelector(".rr-blank")).toBeNull();
+  });
+
   it("rawOnly forces the raw treatment even when a resolved value exists", () => {
     render(<RawResolved value={{ resolved: "072", raw: "072", agrees: true }} rawOnly />);
     const el = screen.getByText("072");

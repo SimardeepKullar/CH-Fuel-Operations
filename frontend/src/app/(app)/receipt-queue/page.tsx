@@ -365,7 +365,7 @@ export default function ReceiptQueuePage() {
                         </span>
                       </td>
                       <td>
-                        <RawResolved value={r.driver} />
+                        <RawResolved value={r.driver} blankLabel="NO NAME" />
                       </td>
                       <td>
                         <RawResolved value={r.truck} primary="raw" showRawWhenAgreeing />
