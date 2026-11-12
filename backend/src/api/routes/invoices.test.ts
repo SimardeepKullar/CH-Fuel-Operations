@@ -76,6 +76,23 @@ describe("handleImportInvoice", () => {
     expect(queries.map((q) => q.trim().split(/\s+/)[0])).toEqual(["SELECT"]);
   });
 
+  it("422s an express or manual row that fails its own amount + fee = total check, instead of a bare 500 (T-128)", async () => {
+    const { EDGE_CASES, renderInvoicePdf } = await import("../../../test/fixtures/invoices/generateSamplePdf.js");
+    const spec = EDGE_CASES["edge-manual-credit"];
+    // Misprint the express total by a cent: the row no longer adds up.
+    const misread = { ...spec, expressRows: spec.expressRows.map((r) => [...r.slice(0, 10), "53.01", ...r.slice(11)]) };
+    const formData = new FormData();
+    formData.append("file", new Blob([await renderInvoicePdf(misread)]), "misread.pdf");
+    const request = new Request("http://localhost/api/v1/invoices/import", { method: "POST", body: formData });
+    const pool = { query: async () => ({ rows: [] }) } as unknown as Pool;
+
+    const response = await handleImportInvoice(pool, request, new URL(request.url));
+
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as { detail: string };
+    expect(body.detail).toMatch(/could not be read as a BVD invoice: .*amount 50\.00 \+ fee 3\.00 != total 53\.01/);
+  });
+
   it("400s a request with no \"file\" field", async () => {
     const formData = new FormData();
     const request = new Request("http://localhost/api/v1/invoices/import", {

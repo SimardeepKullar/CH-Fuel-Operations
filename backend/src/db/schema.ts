@@ -245,6 +245,20 @@ export const SCHEMA: readonly TableDescriptor[] = [
     ],
   },
   {
+    // T-128: an invoice's Manual Transactions rows, as printed.
+    name: "manual_transactions",
+    columns: [
+      bigserialPk("manual_transactions"),
+      col("invoice_id", "uuid"),
+      col("occurred_at", "timestamptz"),
+      col("amount", "numeric"),
+      col("fee", "numeric"),
+      col("total", "numeric"),
+      t("description", true),
+    ],
+    checks: ["CHECK (((amount + fee) = total))"],
+  },
+  {
     name: "plan_actual_matches",
     columns: [
       bigserialPk("plan_actual_matches"),

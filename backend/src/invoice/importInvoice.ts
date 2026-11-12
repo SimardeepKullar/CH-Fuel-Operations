@@ -9,9 +9,10 @@ import { resolveExpressDriver, type ExpressDriverResolution } from "../resolve/r
 import { resolveStation } from "../resolve/resolveStation.js";
 import { resolveTruckForStop } from "../resolve/resolveTruck.js";
 import { groupByAuthCode, type FuelStopGroup } from "./groupByAuthCode.js";
+import { ExpressRowFormatError, type ExpressRow } from "./parseExpressRows.js";
+import { ManualRowFormatError, type ManualRow } from "./parseManualRows.js";
 import { InvoiceFormatError, parseInvoiceCsv, type ParsedInvoice } from "./parseInvoiceCsv.js";
 import { InvoicePdfFormatError } from "./parseInvoicePdf.js";
-import type { ExpressRow } from "./parseExpressRows.js";
 import { DEFAULT_INVOICE_PRODUCT_CODES, type InvoiceProductType } from "./productCode.js";
 import { reconcile } from "./reconcile.js";
 import { buildImportReport, type ImportReport } from "./report.js";
@@ -68,12 +69,18 @@ export type ImportInvoiceResult =
 
 /**
  * Whether `importInvoice` threw because the file itself could not be read as
- * a BVD invoice (either parser's format error). That is the uploader's file,
+ * a BVD invoice: either parser's format error, or an express or manual row
+ * that fails its own amount + fee = total check (T-128). That is the uploader's file,
  * not a server fault, so callers report it with its message. Every format
  * error is thrown before anything is written.
  */
 export function isInvoiceFormatError(err: unknown): err is Error {
-  return err instanceof InvoiceFormatError || err instanceof InvoicePdfFormatError;
+  return (
+    err instanceof InvoiceFormatError ||
+    err instanceof InvoicePdfFormatError ||
+    err instanceof ExpressRowFormatError ||
+    err instanceof ManualRowFormatError
+  );
 }
 
 interface ExistingInvoiceRow {
@@ -426,6 +433,15 @@ async function insertExpressCharge(
   );
 }
 
+/** One Manual Transactions row, as printed (T-128). */
+async function insertManualTransaction(client: PoolClient, invoiceId: string, row: ManualRow): Promise<void> {
+  await client.query(
+    `INSERT INTO manual_transactions (invoice_id, occurred_at, amount, fee, total, description)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [invoiceId, asUtcTimestamp(row.occurredAt), row.amount, row.fee, row.total, row.description],
+  );
+}
+
 async function insertInvoiceRejections(
   client: PoolClient,
   invoiceId: string,
@@ -507,7 +523,7 @@ export async function importInvoice(
 
   const groups = groupByAuthCode(parsed.lines);
   const actual = actualRangeOf(parsed.lines, parsed.expressRows);
-  const reconcileResult = reconcile(groups, parsed.expressRows, parsed.printedTotals);
+  const reconcileResult = reconcile(groups, parsed.expressRows, parsed.printedTotals, parsed.manualRows);
   const { cardIds, misses: cardMisses } = await resolveCardMisses(pool, groups);
   const { truckIds, misses: truckUnitMisses } = await resolveTruckUnitMisses(pool, parsed.expressRows);
   const expressBlankUnits = parsed.expressRows
@@ -593,6 +609,9 @@ export async function importInvoice(
         const truckId = row.unitRaw === null ? null : (truckIds.get(row.unitRaw) ?? null);
         const driverResolution = expressDriverResolutions[i]!;
         await insertExpressCharge(client, invoiceId, row, truckId, driverResolution);
+      }
+      for (const row of parsed.manualRows) {
+        await insertManualTransaction(client, invoiceId, row);
       }
       await runAnomalies(client, invoiceId);
     } else {

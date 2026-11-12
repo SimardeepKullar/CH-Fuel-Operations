@@ -1,13 +1,16 @@
 import { fromCents, toCents, toTenThousandths } from "./decimal.js";
 import type { FuelStopGroup } from "./groupByAuthCode.js";
 import type { ExpressRow } from "./parseExpressRows.js";
+import type { ManualRow } from "./parseManualRows.js";
 import type { PrintedProductTotal, PrintedTotals, ValidatedInvoiceLine } from "./parseInvoiceCsv.js";
 
 /** The printed row a raw product code reconciles against. Cash lines (`C`)
  * settle against BVD's "Manual Transactions" line, not a `C`-labelled row —
  * no invoice seen so far prints one. */
+const MANUAL_PRINTED_LABEL = "Manual Transactions";
+
 const PRINTED_ROW_LABEL: Record<string, string> = {
-  C: "Manual Transactions",
+  C: MANUAL_PRINTED_LABEL,
 };
 
 /** The synthetic "product code" express rows reconcile against — not a raw
@@ -182,8 +185,14 @@ export function reconcile(
   groups: readonly FuelStopGroup[],
   expressRows: readonly ExpressRow[],
   printedTotals: PrintedTotals,
+  manualRows: readonly ManualRow[] = [],
 ): ReconcileResult {
   const lines = groups.flatMap((g) => g.lines);
+  // A Manual Transactions section's rows (T-128) settle against the same
+  // printed "Manual" total that cash lines do, so the two are summed into
+  // one comparison rather than each checked against the whole figure.
+  const manualCents = manualRows.reduce((sum, r) => sum + toCents(r.total), 0);
+  let manualCompared = false;
 
   const codeToLines = new Map<string, typeof lines>();
   for (const line of lines) {
@@ -202,7 +211,10 @@ export function reconcile(
     const label = PRINTED_ROW_LABEL[code] ?? code;
     const lineNumbers = codeLines.map((l) => l.lineNumber);
 
-    const parsedAmountCents = codeLines.reduce((sum, l) => sum + toCents(l.amount), 0);
+    const isManual = label === MANUAL_PRINTED_LABEL;
+    manualCompared ||= isManual;
+    const parsedAmountCents =
+      codeLines.reduce((sum, l) => sum + toCents(l.amount), 0) + (isManual ? manualCents : 0);
     const expectedAmountCents = printedAmountCents(printedTotals, label);
     if (parsedAmountCents !== expectedAmountCents) {
       amountImbalances.push({
@@ -210,7 +222,7 @@ export function reconcile(
         expectedCents: expectedAmountCents,
         parsedCents: parsedAmountCents,
         deltaCents: parsedAmountCents - expectedAmountCents,
-        contributingLineNumbers: lineNumbers,
+        contributingLineNumbers: isManual ? [...lineNumbers, ...manualRows.map((r) => r.lineNumber)] : lineNumbers,
       });
     }
 
@@ -229,6 +241,22 @@ export function reconcile(
     }
   }
 
+  // With no cash lines, manual rows are compared on their own. A printed
+  // Manual total of zero with no rows passes; any other disagreement is an
+  // imbalance, never skipped.
+  if (!manualCompared) {
+    const expectedManualCents = printedAmountCents(printedTotals, MANUAL_PRINTED_LABEL);
+    if (manualCents !== expectedManualCents) {
+      amountImbalances.push({
+        productCode: MANUAL_PRINTED_LABEL,
+        expectedCents: expectedManualCents,
+        parsedCents: manualCents,
+        deltaCents: manualCents - expectedManualCents,
+        contributingLineNumbers: manualRows.map((r) => r.lineNumber),
+      });
+    }
+  }
+
   const parsedExpressCents = expressRows.reduce((sum, r) => sum + toCents(r.total), 0);
   const expectedExpressCents = printedAmountCents(printedTotals, EXPRESS_PRINTED_LABEL);
   if (parsedExpressCents !== expectedExpressCents) {
@@ -242,7 +270,7 @@ export function reconcile(
   }
 
   const parsedGrandTotalCents =
-    lines.reduce((sum, l) => sum + toCents(l.amount), 0) + parsedExpressCents;
+    lines.reduce((sum, l) => sum + toCents(l.amount), 0) + manualCents + parsedExpressCents;
   const expectedGrandTotalCents = toCents(printedTotals.grandTotal);
   const grandTotal = {
     expectedCents: expectedGrandTotalCents,

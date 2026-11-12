@@ -8,6 +8,7 @@ import { reconcile, withinRoundingBound } from "./reconcile.js";
 import type { ValidatedInvoiceLine } from "./parseInvoiceCsv.js";
 import type { FuelStopGroup } from "./groupByAuthCode.js";
 import type { ExpressRow } from "./parseExpressRows.js";
+import type { ManualRow } from "./parseManualRows.js";
 import type { PrintedProductTotal, PrintedTotals } from "./parseInvoiceCsv.js";
 
 function mkLine(overrides: Partial<ValidatedInvoiceLine>): ValidatedInvoiceLine {
@@ -311,6 +312,46 @@ describe("reconcile — line and totals checks (T-61)", () => {
     const totals = caTotals(lines);
     const wrong = { ...totals, products: [{ ...totals.products[0]!, hst: "82.22" }] };
     expect(reconcile([mkGroup(lines)], [], wrong).totalsImbalances.map((t) => t.check)).toContain("TAX_SUM");
+  });
+});
+
+describe("reconcile — Manual Transactions (T-128)", () => {
+  const credit = (total: string, lineNumber = 40): ManualRow => ({
+    lineNumber, occurredAt: "2026-01-06T00:00:00", amount: total, fee: "0.00", total, currency: "USD", description: "CREDIT",
+  });
+  const withManual = (amount: string, grandTotal: string): PrintedTotals => {
+    const totals = baseTotals({}, grandTotal);
+    return { ...totals, products: [...totals.products, printedRow("Manual Transactions", null, amount)] };
+  };
+
+  it("nets a credit out of the grand total, and ties it to the printed Manual row", () => {
+    const result = reconcile(baseGroups(), [], withManual("-100.00", "178.67"), [credit("-100.00")]);
+    expect(result.balanced).toBe(true);
+    expect(result.grandTotal).toEqual({ expectedCents: 17867, parsedCents: 17867, deltaCents: 0 });
+  });
+
+  it("a manual row that disagrees with the printed Manual total is an imbalance on that row", () => {
+    const result = reconcile(baseGroups(), [], withManual("-100.00", "178.67"), [credit("-99.00", 41)]);
+    expect(result.balanced).toBe(false);
+    expect(result.amountImbalances).toEqual([
+      { productCode: "Manual Transactions", expectedCents: -10000, parsedCents: -9900, deltaCents: 100, contributingLineNumbers: [41] },
+    ]);
+  });
+
+  it("a printed Manual total with no manual rows read is an imbalance, not a silent pass", () => {
+    const result = reconcile(baseGroups(), [], withManual("-100.00", "178.67"));
+    expect(result.balanced).toBe(false);
+    expect(result.amountImbalances.map((i) => i.productCode)).toEqual(["Manual Transactions"]);
+  });
+
+  it("cash (C) lines and manual rows settle against the one printed Manual total together", () => {
+    const groups = [
+      ...baseGroups(),
+      mkGroup([mkLine({ lineNumber: 3, authCode: "C900-C", baseAuthCode: "C900", rawProductCode: "C", qty: "0.00", amount: "50.00" })]),
+    ];
+    const result = reconcile(groups, [], withManual("-50.00", "228.67"), [credit("-100.00")]);
+    expect(result.amountImbalances).toEqual([]);
+    expect(result.grandTotal.deltaCents).toBe(0);
   });
 });
 

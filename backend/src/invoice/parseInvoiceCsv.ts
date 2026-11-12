@@ -11,6 +11,7 @@ import {
   type RawExpressRow,
 } from "./parseExpressRows.js";
 import { addIsoDays } from "../ingest/gapReport.js";
+import { parseManualRows, type ManualRow, type RawManualRow } from "./parseManualRows.js";
 
 /** Why a whole invoice was refused, where the reason is a named rule rather
  * than a malformed shape (T-61). */
@@ -156,7 +157,13 @@ export interface ParsedInvoice {
   lines: ValidatedInvoiceLine[];
   rejections: InvoiceLineRejection[];
   expressRows: ExpressRow[];
+  /** The Manual Transactions section's rows (T-128); empty when the invoice
+   * prints no such section, which is most of them. */
+  manualRows: ManualRow[];
 }
+
+/** The Manual Transactions header, as real invoice 854048 prints it (T-128). */
+const MANUAL_HEADER = ["DATE", "AMOUNT", "FEE", "TOTAL AMOUNT", "CUR", "DESCRIPTION"] as const;
 
 const FUEL_HEADER = [
   "AUTH CODE", "DRIVER NAME", "UNIT #", "DATE", "SITE #", "SITE NAME",
@@ -478,6 +485,8 @@ export function parseInvoiceRecords(
     | "before"
     | "fuel-awaiting-header"
     | "fuel-data"
+    | "manual-awaiting-header"
+    | "manual-data"
     | "express-awaiting-header"
     | "express-data"
     | "totals-awaiting-header"
@@ -491,6 +500,7 @@ export function parseInvoiceRecords(
   const lines: ValidatedInvoiceLine[] = [];
   const rejections: InvoiceLineRejection[] = [];
   const rawExpressRows: RawExpressRow[] = [];
+  const rawManualRows: RawManualRow[] = [];
   const totalsRows: string[][] = [];
   const totalsLineNumbers: number[] = [];
 
@@ -523,8 +533,18 @@ export function parseInvoiceRecords(
       mode = "fuel-awaiting-header";
       continue;
     }
-    if (mode === "fuel-data" && first === "Express Codes") {
+    // Manual Transactions sits between the last card and Express Codes, and
+    // only on an invoice that has one (T-128).
+    if (mode === "fuel-data" && first === "Manual Transactions") {
+      mode = "manual-awaiting-header";
+      continue;
+    }
+    if ((mode === "fuel-data" || mode === "manual-data") && first === "Express Codes") {
       mode = "express-awaiting-header";
+      continue;
+    }
+    if (mode === "manual-data" && first === "Grand Totals") {
+      mode = "totals-awaiting-header";
       continue;
     }
     // An invoice with zero express charges for the whole file omits the
@@ -568,6 +588,20 @@ export function parseInvoiceRecords(
       continue;
     }
 
+    if (mode === "manual-awaiting-header") {
+      if (!matchesHeader(record, MANUAL_HEADER)) {
+        throw new InvoiceFormatError(
+          `line ${lineNumber}: unexpected manual transactions header shape: ${JSON.stringify(record)}`,
+        );
+      }
+      mode = "manual-data";
+      continue;
+    }
+    if (mode === "manual-data") {
+      rawManualRows.push({ record, lineNumber });
+      continue;
+    }
+
     if (mode === "express-awaiting-header") {
       if (matchesHeader(record, EXPRESS_HEADER_PDF)) {
         expressLayout = "pdf";
@@ -605,15 +639,17 @@ export function parseInvoiceRecords(
   }
 
   const expressRows = parseExpressRows(rawExpressRows, expressLayout);
+  const manualRows = parseManualRows(rawManualRows);
   const { printedTotals, currencies } = buildPrintedTotals(totalsRows, totalsLineNumbers);
   const currency = invoiceCurrency([
     ...lines.map((l) => l.currency),
     ...expressRows.map((r) => r.currency),
+    ...manualRows.map((r) => r.currency),
     ...currencies,
   ]);
   const header: InvoiceHeader = { ...headerFields, currency };
 
-  return { header, printedTotals, lines, rejections, expressRows };
+  return { header, printedTotals, lines, rejections, expressRows, manualRows };
 }
 
 /** This system bills one supplier to one customer (CLAUDE.md), and the CSV

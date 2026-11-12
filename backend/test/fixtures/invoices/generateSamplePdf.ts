@@ -59,6 +59,9 @@ const BVD_CODES_COLUMNS = [
   "CDL", "TRIP #", "AMOUNT CASHED", "FEE", "TOTAL", "CUR", "Payee", "NOTES",
 ];
 
+/** The Manual Transactions table, as real invoice 854048 prints it. */
+const MANUAL_COLUMNS = ["DATE", "AMOUNT", "FEE", "TOTAL AMOUNT", "CUR", "DESCRIPTION"];
+
 const TOTALS_COLUMNS = [
   "PRODUCT", "QTY", "PRE TAX AMT", "HST", "GST", "PST", "QST", "DISC RATE",
   "DISC AMT", "FINAL AMOUNT", "CUR",
@@ -76,6 +79,9 @@ interface InvoiceSpec {
   /** Rows under each card: printed fuel lines with a SUBTOTAL after each stop. */
   cards: Array<{ card: string; rows: string[][]; rollUps: string[][] }>;
   expressRows: string[][];
+  /** Manual Transactions rows: date-time, amount, fee, total, CUR,
+   * description (T-128). Empty: the section is not printed. */
+  manualRows: string[][];
   /** The express section's own SUBTOTAL: amount, fee, total. */
   expressSubtotal: string[] | null;
   totalsRows: string[][];
@@ -202,9 +208,12 @@ function buildInvoice(input: {
   cur: string;
   cards: ReadonlyArray<{ card: string; rows: readonly string[][] }>;
   expressRows: string[][];
+  manualRows?: string[][];
   layout?: InvoiceSpec["layout"];
   breakAfterAuth?: readonly string[];
 }): InvoiceSpec {
+  const manualRows = input.manualRows ?? [];
+  const manualCents = manualRows.reduce((sum, r) => sum + toUnits(r[3]!, 2), 0);
   const fuelRows = input.cards.flatMap((c) => c.rows);
   const byProd = (p: string) => sumOf(fuelRows.filter((r) => r[8] === p).map(rowFigures));
   const ta = byProd("TA");
@@ -213,12 +222,13 @@ function buildInvoice(input: {
   const scale = byProd("S");
   const expressCents = input.expressRows.reduce((sum, r) => sum + toUnits(r[10]!, 2), 0);
   const priced = sumOf([ta, tf, df]);
-  const grand = { ...priced, final: priced.final + scale.final + expressCents };
+  const grand = { ...priced, final: priced.final + scale.final + manualCents + expressCents };
   const cur = input.cur;
   return {
     header: input.header,
     cards: input.cards.map(({ card, rows }) => cardBlock(card, rows, cur)),
     expressRows: input.expressRows,
+    manualRows,
     expressSubtotal:
       input.expressRows.length === 0
         ? null
@@ -233,7 +243,7 @@ function buildInvoice(input: {
       ["TF", ...nineFigures(tf), cur],
       ["DF", ...nineFigures(df), cur],
       ["S", money(scale.final), cur],
-      ["Manual", "0.00", cur],
+      ["Manual", money(manualCents), cur],
       ["Express", money(expressCents), cur],
       ["Grand Total", ...nineFigures(grand), cur],
     ],
@@ -445,8 +455,12 @@ const EDGE_EXPRESS: string[][] = [
   ["2026-01-05 08:00:00", "9000001", "E1000001", "101", "", "DRIVER ONE", "", "", "50.00", "3", "53.00", "US", "lumper fees", ""],
 ];
 
-function edge(cards: ReadonlyArray<{ card: string; rows: readonly string[][] }>, expressRows: string[][] = EDGE_EXPRESS): InvoiceSpec {
-  return buildInvoice({ header: EDGE_HEADER, cur: "US", cards, expressRows });
+function edge(
+  cards: ReadonlyArray<{ card: string; rows: readonly string[][] }>,
+  expressRows: string[][] = EDGE_EXPRESS,
+  manualRows: string[][] = [],
+): InvoiceSpec {
+  return buildInvoice({ header: EDGE_HEADER, cur: "US", cards, expressRows, manualRows });
 }
 
 export const EDGE_CASES = {
@@ -518,6 +532,13 @@ export const EDGE_CASES = {
       usRow("B500002-TA", "", "101", "2026-01-06 11:00:00", "1", "TA", "100.00", "5.5000", "5.1234"),
     ],
   }]),
+  /** A Manual Transactions credit, as on real invoice 854048 (T-128): BVD
+   * credits back an advance, and the grand total nets it out. */
+  "edge-manual-credit": edge(
+    [{ card: "1000001", rows: US_ROWS["1000001"] }],
+    EDGE_EXPRESS,
+    [["2026-01-06 00:00:00", "-150", "0", "-150", "US", "CREDIT FOR A SAMPLE ADVANCE"]],
+  ),
   /** One fuel line under a product code no mapping knows: quarantined as
    * UNMAPPED_PRODUCT, never default-mapped. */
   "edge-unmapped-product": edge([{
@@ -576,6 +597,16 @@ function entriesOf(spec: InvoiceSpec): Entry[] {
       });
     }
     for (const r of rollUps) add(r, { card });
+  }
+
+  if (spec.manualRows.length > 0) {
+    add(["Manual Transactions"], { gapBefore: 6 });
+    add(MANUAL_COLUMNS);
+    for (const r of spec.manualRows) add(r);
+    // Printed as BVD prints it: whole numbers where the figures are whole.
+    const sum = (k: number) => spec.manualRows.reduce((t, r) => t + toUnits(r[k]!, 2), 0);
+    const plain = (cents: number) => (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2));
+    add(["SUBTOTAL", plain(sum(1)), plain(sum(2)), plain(sum(3))]);
   }
 
   if (spec.expressRows.length > 0) {

@@ -60,6 +60,9 @@ export interface OtherChargesRollup {
   scale: number;
   express: number;
   expressFee: number;
+  /** The invoice's Manual Transactions, summed as printed (T-128). Negative
+   * for a credit, which BVD nets out of the bill, so `total` ties to it. */
+  manual: number;
   currency: InvoiceCurrency;
 }
 
@@ -275,6 +278,14 @@ async function loadExpressAgg(pool: Pool, invoiceId: string): Promise<ExpressAgg
   return rows[0]!;
 }
 
+async function loadManualTotal(pool: Pool, invoiceId: string): Promise<string | null> {
+  const { rows } = await pool.query<{ total: string | null }>(
+    "SELECT SUM(total) AS total FROM manual_transactions WHERE invoice_id = $1",
+    [invoiceId],
+  );
+  return rows[0]!.total;
+}
+
 async function loadReceiptCompliance(pool: Pool, invoiceId: string): Promise<ReceiptAggRow> {
   const { rows } = await pool.query<ReceiptAggRow>(
     `SELECT
@@ -317,10 +328,11 @@ function productRollup(row: InvoiceTotalRow | undefined, currency: InvoiceCurren
 
 async function loadKpis(pool: Pool, week: string, invoice: WeekInvoice, conv: QtyConverter): Promise<OverviewKpis> {
   const { currency } = invoice;
-  const [totals, dieselAgg, expressAgg, receipts, anomaliesFlagged] = await Promise.all([
+  const [totals, dieselAgg, expressAgg, manualTotal, receipts, anomaliesFlagged] = await Promise.all([
     loadInvoiceTotals(pool, invoice.id),
     loadDieselAgg(pool, invoice.id),
     loadExpressAgg(pool, invoice.id),
+    loadManualTotal(pool, invoice.id),
     loadReceiptCompliance(pool, invoice.id),
     loadAnomalyCount(pool, invoice.id),
   ]);
@@ -370,10 +382,11 @@ async function loadKpis(pool: Pool, week: string, invoice: WeekInvoice, conv: Qt
       currency,
     },
     otherCharges: {
-      total: Math.round((scaleAmount + expressAmount) * 100) / 100,
+      total: fromCents(toCents(scaleAmount) + toCents(expressAmount) + toCents(manualTotal ?? 0)),
       scale: scaleAmount,
       express: expressAmount,
       expressFee,
+      manual: manualTotal === null ? 0 : Number(manualTotal),
       currency,
     },
     receiptCompliance: { confirmed: Number(receipts.confirmed), total: Number(receipts.total) },
