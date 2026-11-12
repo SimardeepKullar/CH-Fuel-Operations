@@ -43,6 +43,7 @@ describe.skipIf(!hasDatabase)("0003_actuals_schema.sql (integration)", () => {
       "0004_actuals_config_seed.sql",
       "0005_fleet_roster_seed.sql",
       "0006_driver_not_entered.sql",
+      "0007_manual_transactions.sql",
     ]);
   });
 
