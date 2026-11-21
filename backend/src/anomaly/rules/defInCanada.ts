@@ -18,8 +18,9 @@ export interface DefInCanadaStop {
   lines: readonly DefInCanadaLine[];
 }
 
-/** The product code BVD prints for diesel exhaust fluid. */
-const DEF_PRODUCT_CODE = "DF";
+/** The product codes BVD prints for diesel exhaust fluid: DF, and DE for
+ * packaged DEF (T-129). */
+const DEF_PRODUCT_CODES: ReadonlySet<string> = new Set(["DF", "DE"]);
 
 /** Sums non-negative decimal strings exactly, as integers of the finest scale present. */
 function sumDecimals(values: readonly string[]): string {
@@ -33,7 +34,7 @@ function sumDecimals(values: readonly string[]): string {
 }
 
 /**
- * Flags a stop on a CAD invoice with at least one DEF (`DF`) line, once per
+ * Flags a stop on a CAD invoice with at least one DEF (`DF` or `DE`) line, once per
  * stop however many DEF lines it has (T-90). Informational (amber): it blocks
  * nothing and changes no totals. `detail` carries the DEF quantity and amount
  * as printed — litres and CAD — with no `Usd` key. A US stop with DEF is not
@@ -48,7 +49,7 @@ export function defInCanada(
   void _config;
   const findings: AnomalyFinding[] = [];
   for (const stop of stops) {
-    const def = stop.lines.filter((l) => l.productCode === DEF_PRODUCT_CODE && l.currency === "CAD");
+    const def = stop.lines.filter((l) => DEF_PRODUCT_CODES.has(l.productCode) && l.currency === "CAD");
     if (def.length === 0) {
       continue;
     }

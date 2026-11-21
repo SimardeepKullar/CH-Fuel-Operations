@@ -225,6 +225,8 @@ describe.skipIf(!hasDatabase)("runBackfillInvoicesCli (integration)", () => {
         "SELECT file_sha256 FROM invoices WHERE invoice_number = '999210'",
       );
       expect(rows).toEqual([{ file_sha256: pdfSha }]);
-    });
+      // It imports the whole real corpus, which grows with every invoice
+      // dropped in (15 PDFs at T-129), so the default 5 s is not enough.
+    }, 60_000);
   });
 });

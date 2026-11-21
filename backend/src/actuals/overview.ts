@@ -314,6 +314,27 @@ function taxCents(row: InvoiceTotalRow | undefined): number {
   return row ? toCents(row.hst) + toCents(row.gst) + toCents(row.pst) + toCents(row.qst) : 0;
 }
 
+/** Sums printed totals rows into one, exactly in integer hundredths, or
+ * `undefined` when none of them is printed. A row printing no quantity
+ * (DE's, like Scale's) adds money and no quantity. */
+function sumTotalRows(rows: ReadonlyArray<InvoiceTotalRow | undefined>): InvoiceTotalRow | undefined {
+  const present = rows.filter((r): r is InvoiceTotalRow => r !== undefined);
+  if (present.length === 0) return undefined;
+  if (present.length === 1) return present[0];
+  const sum = (pick: (r: InvoiceTotalRow) => string | null): string =>
+    (present.reduce((total, r) => total + toCents(pick(r) ?? 0), 0) / 100).toFixed(2);
+  return {
+    product_code: present.map((r) => r.product_code).join("+"),
+    qty: sum((r) => r.qty),
+    amount: sum((r) => r.amount),
+    discount: present.every((r) => r.discount === null) ? null : sum((r) => r.discount),
+    hst: sum((r) => r.hst),
+    gst: sum((r) => r.gst),
+    pst: sum((r) => r.pst),
+    qst: sum((r) => r.qst),
+  };
+}
+
 function productRollup(row: InvoiceTotalRow | undefined, currency: InvoiceCurrency, conv: QtyConverter): ProductRollup {
   const amount = row ? toCents(row.amount) : 0;
   const tax = taxCents(row);
@@ -338,7 +359,8 @@ async function loadKpis(pool: Pool, week: string, invoice: WeekInvoice, conv: Qt
   ]);
 
   const ta = totals.get("TA");
-  const df = totals.get("DF");
+  // BVD prints DEF under two codes (T-129): DF, and DE for packaged DEF.
+  const df = sumTotalRows([totals.get("DF"), totals.get("DE")]);
   const scale = totals.get("S");
 
   const taQty = dieselAgg.ta_gallons === null ? 0 : Number(dieselAgg.ta_gallons);

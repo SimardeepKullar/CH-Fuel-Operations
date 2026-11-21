@@ -16,7 +16,11 @@ export type InvoiceProductType =
 
 /**
  * The known codes (§A5/§11.1's tripwire, reused): TA tractor diesel, DF DEF,
- * S scale, TF trailer, AD additive, O oil, L lubricant, C cash.
+ * DE DEF, S scale, TF trailer, AD additive, O oil, L lubricant, C cash.
+ *
+ * `DE` is DEF too (T-129, confirmed by the operator). Real invoice 1038999
+ * prints it as Scale prints: an amount with QTY 0.00 and no price. BVD's own
+ * legend does not list it. The raw code stays `DE` wherever it is stored.
  *
  * This is a tripwire, not a lookup — its job is to fail an unmapped raw code
  * at parse time, never to enrich or default-map one. Passed as a parameter
@@ -29,6 +33,7 @@ export const DEFAULT_INVOICE_PRODUCT_CODES: ReadonlyMap<
 > = new Map([
   ["TA", "highway_diesel"],
   ["DF", "def"],
+  ["DE", "def"],
   ["S", "scale"],
   ["TF", "trailer"],
   ["AD", "additive"],

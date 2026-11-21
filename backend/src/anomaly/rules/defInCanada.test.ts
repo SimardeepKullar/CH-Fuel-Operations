@@ -28,6 +28,18 @@ describe("defInCanada", () => {
     ]);
   });
 
+  it("flags a CAD stop with a DE line, BVD's other DEF code (T-129)", () => {
+    const de: DefInCanadaLine = { productCode: "DE", qty: "0.00", amount: "24.99", currency: "CAD", qtyUnit: "L" };
+    expect(defInCanada([{ id: "s1", lines: [diesel(), de] }], {})).toEqual([
+      {
+        subjectType: "fuel_stop",
+        subjectId: "s1",
+        severity: "amber",
+        detail: { qty: "0.00", qtyUnit: "L", amount: "24.99", currency: "CAD" },
+      },
+    ]);
+  });
+
   it("does not flag a CAD stop without a DF line", () => {
     expect(defInCanada([{ id: "s1", lines: [diesel()] }], {})).toEqual([]);
   });
