@@ -422,7 +422,7 @@ const TOTALS_HEADER_RECORD = [
   "DISC AMT", "FINAL AMOUNT", "CUR",
 ];
 
-const PRODUCT_CODE_LABELS = new Set(["TA", "TF", "DF", "S", "C", "AD", "O", "L"]);
+const PRODUCT_CODE_LABELS = new Set(["TA", "TF", "DF", "DE", "S", "C", "AD", "O", "L"]);
 
 /**
  * Each table's column header as the PDF prints it. Rows are read by position,

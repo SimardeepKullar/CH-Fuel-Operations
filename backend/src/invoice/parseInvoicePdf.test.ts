@@ -665,6 +665,35 @@ describe.skipIf(!existsSync(REAL_854048))("parseInvoicePdf — real US invoice 8
   });
 });
 
+describe("parseInvoicePdf — product code DE, packaged DEF (T-129)", () => {
+  it("edge-de-def: reads the DE line as DEF, keeps its raw code, and reconciles to the printed DE and grand totals", async () => {
+    const result = await parseInvoicePdf(edgePdf("edge-de-def"), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.rejections).toEqual([]);
+    const de = result.lines.filter((l) => l.rawProductCode === "DE");
+    expect(de.map((l) => [l.authCode, l.productType, l.qty, l.billedPerUnit, l.amount])).toEqual([
+      ["B600001-DE", "def", "0.00", "0.0000", "24.99"],
+    ]);
+    expect(result.printedTotals.products.find((p) => p.productCode === "DE")).toMatchObject({ amount: "24.99", qty: null, preTaxAmount: null });
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals, result.manualRows);
+    expect(outcome.balanced).toBe(true);
+    expect(outcome.grandTotal.deltaCents).toBe(0);
+  });
+});
+
+const REAL_1038999 = fileURLToPath(new URL("../../../data/bvd-invoices/BVD_invoice_1038999.pdf", import.meta.url));
+
+describe.skipIf(!existsSync(REAL_1038999))("parseInvoicePdf — real US invoice 1038999, a DE line (local fixture only)", () => {
+  it("reads the $24.99 DE line as DEF and reconciles to the printed $46,108.66", async () => {
+    const result = await parseInvoicePdf(readFileSync(REAL_1038999), DEFAULT_INVOICE_PRODUCT_CODES);
+    expect(result.header.invoiceNumber).toBe("1038999");
+    expect(result.rejections).toEqual([]);
+    expect(result.lines.filter((l) => l.rawProductCode === "DE").map((l) => [l.productType, l.amount])).toEqual([["def", "24.99"]]);
+    const outcome = reconcile(groupByAuthCode(result.lines), result.expressRows, result.printedTotals, result.manualRows);
+    expect(outcome.balanced).toBe(true);
+    expect(outcome.grandTotal.parsedCents).toBe(4610866);
+  });
+});
+
 const REAL_INVOICE_DIR = fileURLToPath(new URL("../../../data/bvd-invoices/", import.meta.url));
 
 describe.skipIf(!existsSync(REAL_INVOICE_DIR))("parseInvoicePdf — every real invoice under a strict fuel section (local fixtures only)", () => {

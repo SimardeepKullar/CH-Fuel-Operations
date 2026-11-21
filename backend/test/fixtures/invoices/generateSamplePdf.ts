@@ -193,6 +193,11 @@ function cardBlock(card: string, fuelRows: readonly string[][], cur: string): { 
   if (fuelRows.some((r) => r[8] === "S")) {
     rollUps.push(["S", money(scale.final), money(scale.pre), money(scale.final), cur]);
   }
+  // Packaged DEF (T-129) prints as Scale does: an amount, no quantity or price.
+  const de = byProd("DE");
+  if (fuelRows.some((r) => r[8] === "DE")) {
+    rollUps.push(["DE", money(de.final), money(de.pre), money(de.final), cur]);
+  }
   rollUps.push(["Sub Total", money(all.pre), money(all.hst), money(all.gst), money(all.pst), money(all.qst), money(all.disc), money(all.final), cur]);
   return { card, rows, rollUps };
 }
@@ -220,9 +225,10 @@ function buildInvoice(input: {
   const tf = byProd("TF");
   const df = byProd("DF");
   const scale = byProd("S");
+  const de = byProd("DE");
   const expressCents = input.expressRows.reduce((sum, r) => sum + toUnits(r[10]!, 2), 0);
   const priced = sumOf([ta, tf, df]);
-  const grand = { ...priced, final: priced.final + scale.final + manualCents + expressCents };
+  const grand = { ...priced, final: priced.final + scale.final + de.final + manualCents + expressCents };
   const cur = input.cur;
   return {
     header: input.header,
@@ -243,6 +249,8 @@ function buildInvoice(input: {
       ["TF", ...nineFigures(tf), cur],
       ["DF", ...nineFigures(df), cur],
       ["S", money(scale.final), cur],
+      // Printed only when the invoice has a DE line, as on real invoice 1038999.
+      ...(fuelRows.some((r) => r[8] === "DE") ? [["DE", money(de.final), cur]] : []),
       ["Manual", money(manualCents), cur],
       ["Express", money(expressCents), cur],
       ["Grand Total", ...nineFigures(grand), cur],
@@ -539,6 +547,16 @@ export const EDGE_CASES = {
     EDGE_EXPRESS,
     [["2026-01-06 00:00:00", "-150", "0", "-150", "US", "CREDIT FOR A SAMPLE ADVANCE"]],
   ),
+  /** A packaged-DEF line under BVD's `DE` code, as on real invoice 1038999
+   * (T-129): an amount with no quantity or price, its own roll-up on the card
+   * and its own final-amount-only row in Grand Totals. */
+  "edge-de-def": edge([{
+    card: "1000001",
+    rows: [
+      ...US_ROWS["1000001"],
+      ["B600001-DE", "DRIVER ONE", "101", "2026-01-06 10:05:00", "90001", "SAMPLE #1", "Sampleton", "TX", "DE", "0.00", "0.0000", "0.0000", "24.99", "0.00", "0.00", "0.00", "0.00", "0.0000", "0.00", "24.99", "US"],
+    ],
+  }]),
   /** One fuel line under a product code no mapping knows: quarantined as
    * UNMAPPED_PRODUCT, never default-mapped. */
   "edge-unmapped-product": edge([{
