@@ -122,6 +122,9 @@
 .ov-cb-tile .ov-tile-cover { z-index: 1; }
 /* Needs review in a region card (T-131): each row is its own link, so the tile itself does not light up. */
 .ov-region .ov-tile.ov-review { gap: 0.5rem; }
+.ov-region .ov-review .ov-cb-count { font-size: 1.5rem; }
+.ov-region .ov-review .ov-cb-review-text { font-size: 0.75rem; }
+.ov-region .ov-review .ov-view { font-size: 1rem; }
 .ov-tile.ov-review:hover { background: #fff; }
 .ov-combined-none { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 0.625rem; padding: 1.5rem 1.75rem; }
 .ov-combined-none-title { font: 700 1.375rem var(--font-heading); letter-spacing: 0.03em; }

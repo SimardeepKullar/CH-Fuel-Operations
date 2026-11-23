@@ -25,7 +25,7 @@ function TileBox({ tile, big, hero }: { tile: Tile; big?: boolean; hero?: boolea
         <div className="ov-tile-top">
           <span className="ov-tile-label">{tile.label}</span>
         </div>
-        <ReviewRows review={tile.review} />
+        <ReviewRows review={tile.review} compact />
       </div>
     );
   }

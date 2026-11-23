@@ -118,7 +118,8 @@ describe("OverviewPage (T-71)", () => {
     expect(links[0]!.getAttribute("href")).toBe(`/transactions?scope=range&from=${from}&to=${to}&currency=all&anomalyOnly=true`);
     expect(links[1]!.getAttribute("href")).toBe(`/transactions?scope=range&from=${from}&to=${to}&currency=USD&anomalyOnly=true`);
     expect(links[2]!.getAttribute("href")).toContain("currency=CAD");
-    expect(links[1]!.closest("[data-testid=ov-tile]")!.textContent).toContain("View →");
+    expect(links[1]!.closest("[data-testid=ov-tile]")!.getAttribute("data-label")).toBe("Needs review");
+    expect(links[1]!.closest(".ov-cb-review-row")!.textContent).toContain("→");
   });
 
   it("the US card's units toggle swaps to CAD and litres", async () => {
