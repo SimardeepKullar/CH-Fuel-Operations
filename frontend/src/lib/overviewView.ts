@@ -232,8 +232,8 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
             tile("Diesel", "CA", usd(conv.diesel), "", `${qty(conv.litres)} L`),
             tile("DEF", "CA", usd(conv.def), "", `${qty(conv.defLitres)} L`),
             trailerTile("CA", conv.trailer, conv.trailerLitres, "L", several),
-            tile("Discount captured", "CA", usd(conv.disc), "", conv.litres > 0 ? `$${(conv.disc / conv.litres).toFixed(3)} / L average` : ""),
             tile("Other charges", "CA", usd(conv.other), "", OTHER_SUB),
+            tile("Discount captured", "CA", usd(conv.disc), "", conv.litres > 0 ? `$${(conv.disc / conv.litres).toFixed(3)} / L average` : ""),
             review,
           ],
         };
@@ -254,8 +254,8 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
       tile("Diesel", "US", usd(agg.diesel), "", `${qty(agg.gal)} gal`),
       tile("DEF", "US", usd(agg.def), "", `${qty(agg.defGal)} gal`),
       trailerTile("US", agg.trailer, agg.trailerGal, "gal", several),
-      tile("Discount captured", "US", usd(agg.disc), "", agg.discPerGal === null ? "" : `$${agg.discPerGal.toFixed(3)} / gal average`),
       tile("Other charges", "US", usd(agg.other), "", OTHER_SUB),
+      tile("Discount captured", "US", usd(agg.disc), "", agg.discPerGal === null ? "" : `$${agg.discPerGal.toFixed(3)} / gal average`),
       review,
     ],
   };
@@ -282,8 +282,8 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
       tile("Diesel", "CA", usd(agg.dieselWithTax), "", `${qty(agg.litres)} L`, { note: hst(agg.dieselHst) }),
       tile("DEF", "CA", usd(agg.defWithTax), "", `${qty(agg.defLitres)} L`, { note: hst(agg.defHst) }),
       trailerTile("CA", agg.trailerWithTax, agg.trailerLitres, "L", several, hst(agg.trailerHst)),
-      tile("Discount captured", "CA", usd(agg.disc), "", agg.discPerLitre === null ? "Before tax" : `Before tax · $${agg.discPerLitre.toFixed(3)} / L`),
       tile("Other charges", "CA", usd(agg.other), "", OTHER_SUB),
+      tile("Discount captured", "CA", usd(agg.disc), "", agg.discPerLitre === null ? "Before tax" : `Before tax · $${agg.discPerLitre.toFixed(3)} / L`),
       reviewTile(agg.anomalies, agg.receiptsConfirmed, agg.receiptsExpected, anomaliesHref),
     ],
   };

@@ -40,7 +40,7 @@ describe("1a all time", () => {
     expect(ca.big[1]!.unit).toBe("/ L");
     expect(ca.small[0]!.sub).toMatch(/ L$/);
     expect(ca.small.map((t) => t.label)).toEqual(v.us.small.map((t) => t.label));
-    expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Trailer Fuel", "Discount captured", "Other charges", "Needs review"]);
+    expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Trailer Fuel", "Other charges", "Discount captured", "Needs review"]);
     expect(v.us.small[5]!.review!.anomalies.link).toEqual({ text: "View →", href: "/transactions?side=us" });
   });
   it("has the CA tiles with HST notes", () => {
@@ -67,7 +67,7 @@ describe("1b single week", () => {
     expect(v.readout).toMatch(/^Billing week · /);
     expect(v.rateMeta).toBe("Exchange rate 1.42 CAD per USD");
     expect(v.us.big[1]!.sub).toMatch(/^[+−]\d\.\d% vs wk of Oct 27 · Discount \$\d\.\d{4} \/ gal off retail$/);
-    expect(v.us.small[4]!.sub).toBe("Scale, express and fees");
+    expect(v.us.small[3]!.sub).toBe("Scale, express and fees");
     expect(v.us.small[2]).toMatchObject({ label: "Trailer Fuel", value: "$0.00", sub: "None this week", color: "#9aa3b5" });
     expect(v.combined.rateLabel).toBe("CAD per USD");
   });
