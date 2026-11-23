@@ -7,10 +7,16 @@ import { loadSide, loadWeekFx, type OverviewSide } from "./overview.js";
 export interface OverviewWeekUs {
   /** The printed invoice number. */
   invoice: string;
+  /** The invoice's printed grand total: diesel + DEF + trailer + other, to the cent (T-131). */
+  total: number;
   gal: number;
   diesel: number;
   def: number;
   defGal: number;
+  /** Trailer fuel (`TF`), apart from tractor diesel. */
+  trailer: number;
+  trailerGal: number;
+  /** Scale, express, manual and every product that is not diesel, DEF or trailer fuel. */
   other: number;
   disc: number;
   /** Fuel stops on the invoice. */
@@ -22,13 +28,20 @@ export interface OverviewWeekUs {
 
 export interface OverviewWeekCa {
   invoice: string;
+  /** The invoice's printed grand total, with tax (T-131). */
+  total: number;
+  /** Every tax the invoice prints (HST + GST + PST + QST), all products. */
+  tax: number;
   litres: number;
   dieselWithTax: number;
   dieselPreTax: number;
   defWithTax: number;
   defPreTax: number;
   defLitres: number;
-  /** Scale and express charges, which print a final amount alone (no HST column). */
+  trailerWithTax: number;
+  trailerPreTax: number;
+  trailerLitres: number;
+  /** Scale, express, manual and every product that is not diesel, DEF or trailer fuel, with tax. */
   other: number;
   disc: number;
   stops: number;
@@ -81,10 +94,13 @@ function usWeek(side: OverviewSide, invoice: string): OverviewWeekUs {
   const { kpis } = side;
   return {
     invoice,
+    total: kpis.total.amount,
     gal: kpis.diesel.qty,
     diesel: kpis.diesel.amount,
     def: kpis.def.amount,
     defGal: kpis.def.qty,
+    trailer: kpis.trailer.amount,
+    trailerGal: kpis.trailer.qty,
     other: kpis.otherCharges.total,
     disc: kpis.discount.total,
     stops: kpis.receiptCompliance.total,
@@ -98,12 +114,17 @@ function caWeek(side: OverviewSide, invoice: string): OverviewWeekCa {
   const { kpis } = side;
   return {
     invoice,
+    total: kpis.total.amount,
+    tax: kpis.tax.tax,
     litres: kpis.diesel.qty,
     dieselWithTax: kpis.diesel.amount,
     dieselPreTax: kpis.diesel.preTax,
     defWithTax: kpis.def.amount,
     defPreTax: kpis.def.preTax,
     defLitres: kpis.def.qty,
+    trailerWithTax: kpis.trailer.amount,
+    trailerPreTax: kpis.trailer.preTax,
+    trailerLitres: kpis.trailer.qty,
     other: kpis.otherCharges.total,
     disc: kpis.discount.total,
     stops: kpis.receiptCompliance.total,
