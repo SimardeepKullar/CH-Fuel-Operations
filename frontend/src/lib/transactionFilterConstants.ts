@@ -30,11 +30,15 @@ const PRODUCT_BADGE_VARIANTS: Record<InvoiceProductType, string> = {
 /** The product filter's options — BVD's fixed, known invoice codes
  * (`productCode.ts`'s tripwire map), not derived from loaded rows: a
  * product with no stops this period should still be choosable, unlike
- * card/state (T-40's `useTransactionFilterOptions`). */
-export const PRODUCT_OPTIONS: FilterOption[] = [...DEFAULT_INVOICE_PRODUCT_CODES.entries()].map(([code, type]) => ({
-  value: code,
-  label: PRODUCT_LABELS[type],
-}));
+ * card/state (T-40's `useTransactionFilterOptions`). One option per
+ * product, not per code (T-130): DEF is `DF` and `DE`, offered once as `DF`,
+ * and the API's filter matches every code of that product. */
+export const PRODUCT_OPTIONS: FilterOption[] = [...DEFAULT_INVOICE_PRODUCT_CODES.entries()]
+  .filter(([, type], i, all) => all.findIndex(([, t]) => t === type) === i)
+  .map(([code, type]) => ({
+    value: code,
+    label: PRODUCT_LABELS[type],
+  }));
 
 export const RECEIPT_STATUS_OPTIONS: FilterOption[] = [
   { value: "pending", label: "Pending" },

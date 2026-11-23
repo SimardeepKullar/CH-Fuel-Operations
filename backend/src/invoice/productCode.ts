@@ -41,3 +41,17 @@ export const DEFAULT_INVOICE_PRODUCT_CODES: ReadonlyMap<
   ["L", "lubricant"],
   ["C", "cash"],
 ]);
+
+/**
+ * Every known raw code that shares `code`'s product — `["DF", "DE"]` for
+ * either DEF code (T-130) — so a product filter picks the product, not one
+ * spelling of it. An unknown code matches only itself, never a guessed type.
+ */
+export function codesForProductOf(
+  code: string,
+  codes: ReadonlyMap<string, InvoiceProductType> = DEFAULT_INVOICE_PRODUCT_CODES,
+): string[] {
+  const type = codes.get(code);
+  if (type === undefined) return [code];
+  return [...codes].filter(([, t]) => t === type).map(([c]) => c);
+}

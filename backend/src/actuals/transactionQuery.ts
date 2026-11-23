@@ -1,4 +1,5 @@
 import type { InvoiceCurrency, ReceiptStatus } from "../db/types.js";
+import { codesForProductOf } from "../invoice/productCode.js";
 
 /**
  * A8.3's filters. Every field is optional and they compose with `AND` —
@@ -29,7 +30,8 @@ export interface TransactionFilters {
   cardId?: string;
   /** `stations.state_usps`. */
   state?: string;
-  /** A raw BVD product code (`TA`, `DF`, `S`, ...) — matches any line on the stop. */
+  /** A raw BVD product code (`TA`, `DF`, `S`, ...) — matches any line on the stop
+   * of the same product, so `DF` also matches `DE` (T-130). */
   product?: string;
   receiptStatus?: ReceiptStatus;
   /**
@@ -118,8 +120,8 @@ export function buildTransactionFilterClause(
   }
   if (filters.product !== undefined) {
     add(
-      "EXISTS (SELECT 1 FROM fuel_stop_lines fsl WHERE fsl.fuel_stop_id = fs.id AND fsl.product_code = ?)",
-      filters.product,
+      "EXISTS (SELECT 1 FROM fuel_stop_lines fsl WHERE fsl.fuel_stop_id = fs.id AND fsl.product_code = ANY(?::text[]))",
+      codesForProductOf(filters.product),
     );
   }
   if (filters.receiptStatus !== undefined) {

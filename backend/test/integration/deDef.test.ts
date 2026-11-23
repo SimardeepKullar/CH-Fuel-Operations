@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getOverview } from "../../src/actuals/overview.js";
+import { loadRollupSums } from "../../src/actuals/rollup.js";
+import { listTransactions } from "../../src/actuals/transactions.js";
 import { runMigrations } from "../../src/db/migrate.js";
 import { importInvoice } from "../../src/invoice/importInvoice.js";
 import { parseInvoicePdf } from "../../src/invoice/parseInvoicePdf.js";
@@ -55,5 +57,30 @@ describe.skipIf(!hasDatabase)("Product code DE (integration, T-129)", () => {
     // DF 22.50 + DE 24.99, in integer cents; DE adds money but no quantity.
     expect(Math.round(def.amount * 100)).toBe(2250 + 2499);
     expect(def.qty).toBe(5);
+  });
+
+  it("the one DEF filter, sent as DF or DE, finds the DE-only stop beside the DF ones (T-130)", async () => {
+    const result = await importInvoice(scopedPool, fixture("edge-de-def.pdf"), { sourceFilename: "edge-de-def.pdf" }, { parse: parseInvoicePdf });
+    if (result.status !== "imported") throw new Error("fixture did not import");
+
+    const codesOf = async (product: string) => {
+      const list = await listTransactions(
+        scopedPool,
+        { product },
+        { field: "occurred_at", direction: "asc" },
+        { page: 1, pageSize: 200 },
+        { includeLines: true },
+      );
+      return list.rows.map((r) => (r.lines ?? []).map((l) => l.productCode).filter((c) => c === "DF" || c === "DE").sort().join("+"));
+    };
+    const viaDf = await codesOf("DF");
+    expect(viaDf).toContain("DE");
+    expect(viaDf.some((c) => c.includes("DF"))).toBe(true);
+    expect(await codesOf("DE")).toEqual(viaDf);
+
+    // The per-driver/truck DEF quantity counts both codes too; DE adds no quantity.
+    const sums = await loadRollupSums(scopedPool, result.invoiceId, "driver");
+    const defQty = [...sums.values()].reduce((n, s) => n + s.defQty, 0);
+    expect(defQty).toBe(5);
   });
 });
