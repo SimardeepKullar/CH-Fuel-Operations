@@ -82,9 +82,9 @@ describe("buildTransactionFilterClause", () => {
   it("product alone is an EXISTS against fuel_stop_lines, not a join", () => {
     const clause = buildTransactionFilterClause({ product: "DF" });
     expect(clause.whereSql).toBe(
-      "WHERE EXISTS (SELECT 1 FROM fuel_stop_lines fsl WHERE fsl.fuel_stop_id = fs.id AND fsl.product_code = $1)",
+      "WHERE EXISTS (SELECT 1 FROM fuel_stop_lines fsl WHERE fsl.fuel_stop_id = fs.id AND fsl.product_code = ANY($1::text[]))",
     );
-    expect(clause.params).toEqual(["DF"]);
+    expect(clause.params).toEqual([["DF", "DE"]]);
   });
 
   it("receiptStatus alone", () => {
@@ -158,7 +158,7 @@ describe("buildTransactionFilterClause", () => {
       "truck-1",
       "card-1",
       "TX",
-      "TA",
+      ["TA"],
       "missing",
     ]);
     // Every placeholder number matches the params array position exactly.

@@ -142,7 +142,7 @@ export async function loadRollupSums(pool: Pool, invoiceId: string, key: RollupK
        SELECT fs.id, fs.${column} AS group_id, fs.total, fs.receipt_status,
               COALESCE(SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_qty,
               COALESCE(SUM(fsl.qty * fsl.billed_per_unit) FILTER (WHERE fsl.product_code = 'TA'), 0) AS ta_weighted_num,
-              COALESCE(SUM(fsl.qty) FILTER (WHERE fsl.product_code = 'DF'), 0) AS df_qty
+              COALESCE(SUM(fsl.qty) FILTER (WHERE fsl.product_code IN ('DF', 'DE')), 0) AS df_qty
        FROM fuel_stops fs
        LEFT JOIN fuel_stop_lines fsl ON fsl.fuel_stop_id = fs.id
        WHERE fs.invoice_id = $1
