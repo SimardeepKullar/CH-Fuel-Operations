@@ -48,9 +48,13 @@ export interface UsAggregate {
   diesel: number;
   def: number;
   defGal: number;
+  /** Trailer fuel (TF), apart from tractor diesel (T-131). */
+  trailer: number;
+  trailerGal: number;
   other: number;
   disc: number;
   stops: number;
+  /** Σ the invoices' printed grand totals — diesel + DEF + trailer + other (T-131). */
   total: number;
   /** Σ diesel $ / Σ gal. */
   avgPrice: number | null;
@@ -71,10 +75,12 @@ export interface UsConverted {
   total: number;
   diesel: number;
   def: number;
+  trailer: number;
   other: number;
   disc: number;
   litres: number;
   defLitres: number;
+  trailerLitres: number;
   /** Σ diesel CAD / Σ litres over the covered weeks. */
   pricePerLitre: number | null;
 }
@@ -87,15 +93,19 @@ export interface CaAggregate {
   defWithTax: number;
   defPreTax: number;
   defLitres: number;
-  /** Scale and express charges. */
+  trailerWithTax: number;
+  trailerLitres: number;
+  /** Scale, express, manual and every product that is not diesel, DEF or trailer fuel. */
   other: number;
   disc: number;
   stops: number;
-  /** Diesel + DEF with tax, plus other charges: the invoice grand total. */
+  /** Σ the invoices' printed grand totals, with tax (T-131): never a sum of tiles. */
   total: number;
+  /** Σ every tax the invoices print, all products (T-131). */
   hst: number;
   dieselHst: number;
   defHst: number;
+  trailerHst: number;
   avgPrice: number | null;
   avgPricePreTax: number | null;
   weeklyLow: number | null;
@@ -115,17 +125,20 @@ export interface CombinedAggregate {
   caTotal: number;
   diesel: number;
   def: number;
-  /** Scale and express charges, US converted at each week's rate plus CA. */
+  trailer: number;
+  /** Everything but diesel, DEF and trailer fuel, US converted at each week's rate plus CA. */
   other: number;
   disc: number;
-  /** The CA invoice's HST as printed; the US invoice carries none. */
+  /** The CA invoice's tax as printed; the US invoice carries none. */
   hst: number;
   dieselHst: number;
   defHst: number;
+  trailerHst: number;
   /** Covered weeks with a CA invoice — 0 means there is no HST to report, not CA$0.00. */
   caWeeks: number;
   litres: number;
   defLitres: number;
+  trailerLitres: number;
   /** Σ diesel CAD / Σ litres. */
   pricePerLitre: number | null;
   /** Before HST: US diesel at each week's rate (it has no HST) plus CA pre-tax diesel, / Σ litres. */
@@ -172,10 +185,12 @@ function aggregateUs(weeks: readonly WeekFigures[]): UsAggregate | null {
     diesel,
     def,
     defGal: us((u) => u.defGal),
+    trailer: us((u) => u.trailer),
+    trailerGal: us((u) => u.trailerGal),
     other,
     disc,
     stops: us((u) => u.stops),
-    total: diesel + def + other,
+    total: us((u) => u.total),
     avgPrice: ratio(diesel, gal),
     weeklyLow: weekly.length > 0 ? Math.min(...weekly) : null,
     weeklyHigh: weekly.length > 0 ? Math.max(...weekly) : null,
@@ -188,13 +203,15 @@ function aggregateUs(weeks: readonly WeekFigures[]): UsAggregate | null {
         ? null
         : {
             coveredWeeks: covered.length,
-            total: conv((u) => u.diesel + u.def + u.other),
+            total: conv((u) => u.total),
             diesel: dieselCad,
             def: conv((u) => u.def),
+            trailer: conv((u) => u.trailer),
             other: conv((u) => u.other),
             disc: conv((u) => u.disc),
             litres,
             defLitres: sum(covered, (w) => w.us.defGal * LITRES_PER_GALLON),
+            trailerLitres: sum(covered, (w) => w.us.trailerGal * LITRES_PER_GALLON),
             pricePerLitre: ratio(dieselCad, litres),
           },
   };
@@ -209,6 +226,8 @@ function aggregateCa(weeks: readonly WeekFigures[]): CaAggregate | null {
   const dieselPreTax = ca((c) => c.dieselPreTax);
   const defWithTax = ca((c) => c.defWithTax);
   const defPreTax = ca((c) => c.defPreTax);
+  const trailerWithTax = ca((c) => c.trailerWithTax);
+  const trailerPreTax = ca((c) => c.trailerPreTax);
   const disc = ca((c) => c.disc);
   const weekly = withCa.map((w) => ratio(w.ca.dieselWithTax, w.ca.litres)).filter((p): p is number => p !== null);
   return {
@@ -216,16 +235,19 @@ function aggregateCa(weeks: readonly WeekFigures[]): CaAggregate | null {
     litres,
     dieselWithTax,
     dieselPreTax,
-      defWithTax,
+    defWithTax,
     defPreTax,
     defLitres: ca((c) => c.defLitres),
+    trailerWithTax,
+    trailerLitres: ca((c) => c.trailerLitres),
     other: ca((c) => c.other),
     disc,
     stops: ca((c) => c.stops),
-    total: dieselWithTax + defWithTax + ca((c) => c.other),
-    hst: dieselWithTax - dieselPreTax + defWithTax - defPreTax,
+    total: ca((c) => c.total),
+    hst: ca((c) => c.tax),
     dieselHst: dieselWithTax - dieselPreTax,
     defHst: defWithTax - defPreTax,
+    trailerHst: trailerWithTax - trailerPreTax,
     avgPrice: ratio(dieselWithTax, litres),
     avgPricePreTax: ratio(dieselPreTax, litres),
     weeklyLow: weekly.length > 0 ? Math.min(...weekly) : null,
@@ -247,19 +269,22 @@ function aggregateCombined(covered: readonly WeekFigures[]): CombinedAggregate |
   const litres = sum(covered, (w) => (w.us === null ? 0 : w.us.gal * LITRES_PER_GALLON) + ca(w, (c) => c.litres));
   return {
     coveredWeeks: covered.length,
-    total: sum(covered, (w) => us(w, (u) => u.diesel + u.def + u.other) + ca(w, (c) => c.dieselWithTax + c.defWithTax + c.other)),
-    usTotal: sum(covered, (w) => us(w, (u) => u.diesel + u.def + u.other)),
-    caTotal: sum(covered, (w) => ca(w, (c) => c.dieselWithTax + c.defWithTax + c.other)),
+    total: sum(covered, (w) => us(w, (u) => u.total) + ca(w, (c) => c.total)),
+    usTotal: sum(covered, (w) => us(w, (u) => u.total)),
+    caTotal: sum(covered, (w) => ca(w, (c) => c.total)),
     diesel,
     def: sum(covered, (w) => us(w, (u) => u.def) + ca(w, (c) => c.defWithTax)),
+    trailer: sum(covered, (w) => us(w, (u) => u.trailer) + ca(w, (c) => c.trailerWithTax)),
     other: sum(covered, (w) => us(w, (u) => u.other) + ca(w, (c) => c.other)),
     disc: sum(covered, (w) => us(w, (u) => u.disc) + ca(w, (c) => c.disc)),
-    hst: sum(covered, (w) => ca(w, (c) => c.dieselWithTax - c.dieselPreTax + c.defWithTax - c.defPreTax)),
+    hst: sum(covered, (w) => ca(w, (c) => c.tax)),
     dieselHst: sum(covered, (w) => ca(w, (c) => c.dieselWithTax - c.dieselPreTax)),
     defHst: sum(covered, (w) => ca(w, (c) => c.defWithTax - c.defPreTax)),
+    trailerHst: sum(covered, (w) => ca(w, (c) => c.trailerWithTax - c.trailerPreTax)),
     caWeeks: covered.filter((w) => w.ca !== null).length,
     litres,
     defLitres: sum(covered, (w) => (w.us === null ? 0 : w.us.defGal * LITRES_PER_GALLON) + ca(w, (c) => c.defLitres)),
+    trailerLitres: sum(covered, (w) => (w.us === null ? 0 : w.us.trailerGal * LITRES_PER_GALLON) + ca(w, (c) => c.trailerLitres)),
     pricePerLitre: ratio(diesel, litres),
     pricePreTaxPerLitre: ratio(sum(covered, (w) => us(w, (u) => u.diesel) + ca(w, (c) => c.dieselPreTax)), litres),
   };

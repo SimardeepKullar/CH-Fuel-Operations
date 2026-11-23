@@ -175,7 +175,8 @@ describe("OverviewPage (T-71)", () => {
     expect(within(panel).getAllByTestId("ov-cb-hst")).toHaveLength(3);
     expect(within(panel).getByText("Average billed price, with HST")).toBeTruthy();
     expect(within(panel).getByText(/before HST$/)).toBeTruthy();
-    expect(within(panel).getByText("Discount captured")).toBeTruthy();
+    expect(within(panel).getByText(/^Discount CA\$/)).toBeTruthy();
+    expect(within(panel).getByText("Trailer Fuel")).toBeTruthy();
     unmount();
     mount("usonly", `scope=week&w=${overviewFixture("usonly")[10]!.weekEnd}`);
     const usOnly = await screen.findByTestId("combined-panel");

@@ -15,6 +15,8 @@ const NAVY = "#16205c";
 const CYAN = "#00a6e2";
 const AMBER = "#b7791f";
 const RED = "#c13b3b";
+/** A tile with nothing to show this scope (trailer fuel in most weeks). */
+const MUTED = "#9aa3b5";
 
 /** `Sep 3 – 9` within a month, `Aug 30 – Sep 5` across one. */
 export function rangeLabel(start: string, end: string): string {
@@ -25,7 +27,7 @@ const TWO = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
 const usd = (n: number): string => "$" + n.toLocaleString("en-US", TWO);
 const qty = (n: number): string => n.toLocaleString("en-US", TWO);
 const RECEIPTS_HREF = "/receipt-queue";
-const TOTAL_SUB = "Fuel + DEF + Other Charges";
+const TOTAL_SUB = "Diesel + DEF + Trailer Fuel + Other Charges";
 const OTHER_SUB = "Scale, express and fees";
 const price4 = (n: number): string => "$" + n.toFixed(4);
 
@@ -41,10 +43,42 @@ export interface Tile {
   color: string;
   /** A link in the sub line (the anomalies tile). */
   link: { text: string; href: string } | null;
+  /** The Needs review tile (T-131): anomalies and receipts as two linked rows, in place of a figure. */
+  review: ReviewRows | null;
 }
 
-function tile(label: string, cc: string, value: string, unit: string, sub: string, o: Partial<Pick<Tile, "note" | "color" | "link">> = {}): Tile {
-  return { label, cc, value, unit, sub, note: o.note ?? "", color: o.color ?? NAVY, link: o.link ?? null };
+/** Anomalies and receipt compliance, one tile in the region cards and the combined band. */
+export interface ReviewRows {
+  anomalies: { count: number; link: { text: string; href: string } };
+  /** `null` when no stop expected a receipt. */
+  receipts: { value: string; color: string; sub: string; link: { text: string; href: string } } | null;
+}
+
+function tile(label: string, cc: string, value: string, unit: string, sub: string, o: Partial<Pick<Tile, "note" | "color" | "link" | "review">> = {}): Tile {
+  return { label, cc, value, unit, sub, note: o.note ?? "", color: o.color ?? NAVY, link: o.link ?? null, review: o.review ?? null };
+}
+
+/** The receipts row of a Needs review tile, or `null` when no stop expected one. */
+function receiptsRow(confirmed: number, expected: number): ReviewRows["receipts"] {
+  const pct = receiptPercent(confirmed, expected);
+  if (pct === null) return null;
+  return { value: `${pct}%`, color: receiptColor(pct), sub: `${confirmed} of ${expected} confirmed`, link: { text: "View →", href: RECEIPTS_HREF } };
+}
+
+function reviewTile(anomalies: number, confirmed: number, expected: number, anomaliesHref: string): Tile {
+  return tile("Needs review", "", "", "", "", {
+    review: { anomalies: { count: anomalies, link: { text: "View →", href: anomaliesHref } }, receipts: receiptsRow(confirmed, expected) },
+  });
+}
+
+const isZero = (amount: number, quantity: number): boolean => Math.round(amount * 100) === 0 && Math.round(quantity * 100) === 0;
+const noneSub = (several: boolean): string => (several ? "None in range" : "None this week");
+
+/** Trailer fuel (TF): always shown so the grid never shifts, muted with "None" when the scope bought none (T-131). */
+function trailerTile(cc: string, amount: number, quantity: number, unit: "L" | "gal", several: boolean, note = ""): Tile {
+  return isZero(amount, quantity)
+    ? tile("Trailer Fuel", cc, usd(0), "", noneSub(several), { color: MUTED })
+    : tile("Trailer Fuel", cc, usd(amount), "", `${qty(quantity)} ${unit}`, { note });
 }
 
 const receiptColor = (pct: number | null): string => (pct === null ? NAVY : pct < 50 ? RED : pct < 85 ? AMBER : NAVY);
@@ -97,6 +131,8 @@ export interface CombinedTile {
   sub: string;
   /** Bottom-right corner note, `HST CA$…`; empty when the week has no Canadian invoice. */
   note: string;
+  /** Nothing to show this scope: drawn muted (trailer fuel in most weeks). */
+  muted?: boolean;
 }
 
 /** One side's share of the combined total, in CAD. */
@@ -108,11 +144,7 @@ export interface CombinedShare {
   color: string;
 }
 
-export interface CombinedAttention {
-  anomalies: { count: number; link: { text: string; href: string } };
-  /** `null` when no stop expected a receipt. */
-  receipts: { value: string; color: string; sub: string; link: { text: string; href: string } } | null;
-}
+export type CombinedAttention = ReviewRows;
 
 export interface CombinedView {
   show: boolean;
@@ -125,7 +157,7 @@ export interface CombinedView {
   total: CombinedTile | null;
   /** US (converted) and Canada, each a share of the total; `null` when either is absent. */
   shares: [CombinedShare, CombinedShare] | null;
-  /** Average billed price, diesel, DEF, other charges, discount captured; empty with no rate. */
+  /** Average billed price (discount in its corner), diesel, DEF, trailer fuel, other charges; empty with no rate. */
   kpis: CombinedTile[];
   /** Counts across both sides, so shown whether or not a rate exists. */
   attention: CombinedAttention;
@@ -183,12 +215,8 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
   const conv = agg.converted;
   const partial = conv !== null && conv.coveredWeeks < agg.weeks;
   const suffix = partial ? ` · ${conv.coveredWeeks} of ${agg.weeks} wks` : "";
-  const pct = receiptPercent(agg.receiptsConfirmed, agg.receiptsExpected);
   const several = agg.weeks > 1;
-  const shared = [
-    tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct), link: { text: "View →", href: RECEIPTS_HREF } }),
-    tile("Anomalies flagged", "", String(agg.anomalies), "", "Review in Transactions", { color: AMBER, link: { text: "View →", href: anomaliesHref } }),
-  ];
+  const review = reviewTile(agg.anomalies, agg.receiptsConfirmed, agg.receiptsExpected, anomaliesHref);
   const caUnits: RegionView | null =
     conv === null
       ? null
@@ -203,9 +231,10 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
           small: [
             tile("Diesel", "CA", usd(conv.diesel), "", `${qty(conv.litres)} L`),
             tile("DEF", "CA", usd(conv.def), "", `${qty(conv.defLitres)} L`),
-            tile("Other charges", "CA", usd(conv.other), "", OTHER_SUB),
+            trailerTile("CA", conv.trailer, conv.trailerLitres, "L", several),
             tile("Discount captured", "CA", usd(conv.disc), "", conv.litres > 0 ? `$${(conv.disc / conv.litres).toFixed(3)} / L average` : ""),
-            ...shared,
+            tile("Other charges", "CA", usd(conv.other), "", OTHER_SUB),
+            review,
           ],
         };
 
@@ -224,9 +253,10 @@ function usRegion(agg: UsAggregate | null, weeks: readonly WeekFigures[], span: 
     small: [
       tile("Diesel", "US", usd(agg.diesel), "", `${qty(agg.gal)} gal`),
       tile("DEF", "US", usd(agg.def), "", `${qty(agg.defGal)} gal`),
-      tile("Other charges", "US", usd(agg.other), "", OTHER_SUB),
+      trailerTile("US", agg.trailer, agg.trailerGal, "gal", several),
       tile("Discount captured", "US", usd(agg.disc), "", agg.discPerGal === null ? "" : `$${agg.discPerGal.toFixed(3)} / gal average`),
-      ...shared,
+      tile("Other charges", "US", usd(agg.other), "", OTHER_SUB),
+      review,
     ],
   };
 }
@@ -235,7 +265,6 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
   const base = { side: "ca" as const, code: "CA" as const, name: "Canada", accent: CYAN, absentMessage: `No Canadian invoice for ${span}` };
   if (agg === null) return { ...base, present: false, sub: "CAD · litres", big: [], small: [] };
   const inScope = weeks.filter((w) => w.ca !== null);
-  const pct = receiptPercent(agg.receiptsConfirmed, agg.receiptsExpected);
   const several = agg.weeks > 1;
   const hst = (n: number): string => `HST CA${usd(n)}`;
 
@@ -252,10 +281,10 @@ function caRegion(agg: CaAggregate | null, weeks: readonly WeekFigures[], span: 
     small: [
       tile("Diesel", "CA", usd(agg.dieselWithTax), "", `${qty(agg.litres)} L`, { note: hst(agg.dieselHst) }),
       tile("DEF", "CA", usd(agg.defWithTax), "", `${qty(agg.defLitres)} L`, { note: hst(agg.defHst) }),
-      tile("Other charges", "CA", usd(agg.other), "", OTHER_SUB),
+      trailerTile("CA", agg.trailerWithTax, agg.trailerLitres, "L", several, hst(agg.trailerHst)),
       tile("Discount captured", "CA", usd(agg.disc), "", agg.discPerLitre === null ? "Before tax" : `Before tax · $${agg.discPerLitre.toFixed(3)} / L`),
-      tile("Receipt compliance", "", pct === null ? "—" : `${pct}%`, "", `${agg.receiptsConfirmed} of ${agg.receiptsExpected} confirmed`, { color: receiptColor(pct), link: { text: "View →", href: RECEIPTS_HREF } }),
-      tile("Anomalies flagged", "", String(agg.anomalies), "", "Review in Transactions", { color: AMBER, link: { text: "View →", href: anomaliesHref } }),
+      tile("Other charges", "CA", usd(agg.other), "", OTHER_SUB),
+      reviewTile(agg.anomalies, agg.receiptsConfirmed, agg.receiptsExpected, anomaliesHref),
     ],
   };
 }
@@ -312,24 +341,19 @@ function combinedView(agg: ScopeAggregate, single: boolean, hasUs: boolean, hasC
               value: combined.pricePerLitre === null ? "—" : price4(combined.pricePerLitre),
               unit: "/ L",
               sub: combined.pricePreTaxPerLitre === null ? "" : `CA${price4(combined.pricePreTaxPerLitre)} / L before HST`,
-              note: "",
+              // Discount is subordinate to the billed price (A9.1), so it rides in its corner (T-131).
+              note: `Discount CA${usd(combined.disc)}`,
             },
             { label: "Diesel", cc: "CA", value: usd(combined.diesel), unit: "", sub: `${qty(combined.litres)} L`, note: hst(combined.dieselHst) },
             { label: "DEF", cc: "CA", value: usd(combined.def), unit: "", sub: `${qty(combined.defLitres)} L`, note: hst(combined.defHst) },
+            isZero(combined.trailer, combined.trailerLitres)
+              ? { label: "Trailer Fuel", cc: "CA", value: usd(0), unit: "", sub: noneSub(!single), note: "", muted: true }
+              : { label: "Trailer Fuel", cc: "CA", value: usd(combined.trailer), unit: "", sub: `${qty(combined.trailerLitres)} L`, note: hst(combined.trailerHst) },
             { label: "Other charges", cc: "CA", value: usd(combined.other), unit: "", sub: OTHER_SUB, note: "" },
-            { label: "Discount captured", cc: "CA", value: usd(combined.disc), unit: "", sub: "", note: "" },
           ],
     attention: {
       anomalies: { count: anomalies, link: { text: "View →", href: anomaliesHref } },
-      receipts:
-        expected === 0
-          ? null
-          : {
-              value: `${receiptPercent(confirmed, expected) ?? 0}%`,
-              color: receiptColor(receiptPercent(confirmed, expected)),
-              sub: `${confirmed} of ${expected} confirmed`,
-              link: { text: "View →", href: RECEIPTS_HREF },
-            },
+      receipts: receiptsRow(confirmed, expected),
     },
   };
 }

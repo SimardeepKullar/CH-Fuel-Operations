@@ -195,9 +195,9 @@ describe("trendSeries / trendChange", () => {
 });
 
 describe("trendPeriods — weekly and monthly billed price (T-89)", () => {
-  const usFig = (gal: number, diesel: number) => ({ invoice: "i", gal, diesel, def: 0, defGal: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0 });
+  const usFig = (gal: number, diesel: number) => ({ invoice: "i", gal, diesel, total: diesel, def: 0, defGal: 0, trailer: 0, trailerGal: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0 });
   const caFig = (litres: number, withTax: number, preTax: number) => ({
-    invoice: "i", litres, dieselWithTax: withTax, dieselPreTax: preTax, defWithTax: 0, defPreTax: 0, defLitres: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0,
+    invoice: "i", litres, dieselWithTax: withTax, dieselPreTax: preTax, defWithTax: 0, defPreTax: 0, total: withTax, tax: withTax - preTax, defLitres: 0, trailerWithTax: 0, trailerPreTax: 0, trailerLitres: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0,
   });
   const week = (weekEnd: string, start: string, us: ReturnType<typeof usFig> | null, ca: ReturnType<typeof caFig> | null): WeekFigures => ({
     weekEnd, start, end: weekEnd, fx: null, us, ca, drivers: [],
@@ -287,8 +287,8 @@ describe("aggregateWeeks â€” HST on the combined band (T-92)", () => {
     return {
       ...base,
       fx: 1.5,
-      us: { ...base.us!, gal: 1000, diesel: 5000, def: 0, defGal: 0, other: 0 },
-      ca: { ...base.ca!, litres: 2000, dieselWithTax: 1130, dieselPreTax: 1000, defWithTax: 113, defPreTax: 100, defLitres: 10, other: 0 },
+      us: { ...base.us!, gal: 1000, diesel: 5000, def: 0, defGal: 0, other: 0, total: 5000 },
+      ca: { ...base.ca!, litres: 2000, dieselWithTax: 1130, dieselPreTax: 1000, defWithTax: 113, defPreTax: 100, defLitres: 10, other: 0, total: 1243, tax: 143 },
     };
   }
 
@@ -316,3 +316,69 @@ describe("aggregateWeeks â€” HST on the combined band (T-92)", () => {
   });
 });
 
+
+describe("aggregateWeeks — trailer fuel and the printed total (T-131)", () => {
+  /** Invoice 1044723's figures: TA 72,258.18, TF 397.69, DF 326.82, S 52.00 = 73,034.69; tax 8,396.23. */
+  function week1044723(): WeekFigures {
+    const base = overviewFixture("all")[0]!;
+    return {
+      ...base,
+      fx: null,
+      us: null,
+      ca: {
+        ...base.ca!,
+        litres: 33819.72,
+        dieselWithTax: 72258.18,
+        dieselPreTax: 63945.3,
+        defWithTax: 326.82,
+        defPreTax: 289.22,
+        defLitres: 212.36,
+        trailerWithTax: 397.69,
+        trailerPreTax: 351.94,
+        trailerLitres: 184.3,
+        other: 52,
+        total: 73034.69,
+        tax: 8396.23,
+      },
+    };
+  }
+  const cents = (n: number): number => Math.round(n * 100);
+
+  it("total and HST are the invoice's, not the tiles' sum", () => {
+    const ca = aggregateWeeks([week1044723()]).ca!;
+    expect(cents(ca.total)).toBe(7303469);
+    expect(cents(ca.hst)).toBe(839623);
+  });
+
+  it("trailer fuel is its own figure, and the four tiles add to the total", () => {
+    const ca = aggregateWeeks([week1044723()]).ca!;
+    expect(cents(ca.trailerWithTax)).toBe(39769);
+    expect(ca.trailerLitres).toBe(184.3);
+    expect(cents(ca.trailerHst)).toBe(4575);
+    expect(cents(ca.dieselWithTax) + cents(ca.defWithTax) + cents(ca.trailerWithTax) + cents(ca.other)).toBe(cents(ca.total));
+  });
+
+  it("diesel price per litre stays tractor-only", () => {
+    const ca = aggregateWeeks([week1044723()]).ca!;
+    expect(ca.avgPrice).toBe(72258.18 / 33819.72);
+  });
+
+  it("the combined band carries trailer fuel and the printed total", () => {
+    const c = aggregateWeeks([week1044723()]).combined!;
+    expect(cents(c.total)).toBe(7303469);
+    expect(cents(c.trailer)).toBe(39769);
+    expect(cents(c.hst)).toBe(839623);
+    expect(cents(c.diesel) + cents(c.def) + cents(c.trailer) + cents(c.other)).toBe(cents(c.total));
+  });
+
+  it("US trailer fuel sums, and converts at the week's rate", () => {
+    const base = overviewFixture("all")[0]!;
+    const w: WeekFigures = { ...base, fx: 1.5, ca: null, us: { ...base.us!, diesel: 1000, def: 100, trailer: 200, trailerGal: 40, other: 50, total: 1350 } };
+    const us = aggregateWeeks([w]).us!;
+    expect(us.trailer).toBe(200);
+    expect(us.trailerGal).toBe(40);
+    expect(us.total).toBe(1350);
+    expect(us.converted!.trailer).toBe(300);
+    expect(us.converted!.total).toBe(2025);
+  });
+});

@@ -162,7 +162,7 @@ The shell must tolerate a larger navigation structure later (A18 Q4).
 Numbered to match the design brief. The design file `CH Fuel App.dc.html` already realises A8.3, A8.10, and both Plan screens; the rest are specified here and ticketed from T-40.
 
 ### A8.1 Overview
-Landing screen. Answers "how did last week go" in five seconds. KPI cards for the selected period using the A5 figures: total spend, diesel gal/$, **average billed price (headline)**, discount captured (subordinate), DEF, other charges, receipt compliance, anomalies flagged. Below: billed-price-per-gallon trend across recent periods, top-spend-by-driver bars, and a compact anomalies list linking into Transactions.
+Landing screen. Answers "how did last week go" in five seconds. KPI cards for the selected period using the A5 figures: total spend, diesel gal/$, **average billed price (headline)**, discount captured (subordinate), DEF, trailer fuel, other charges, and one needs-review card holding receipt compliance and anomalies flagged. Total spend and its tax are the invoice's printed grand total and tax, never a sum of cards; diesel, DEF, trailer fuel and other charges add up to it (T-131). Below: billed-price-per-gallon trend across recent periods, top-spend-by-driver bars, and a compact anomalies list linking into Transactions.
 
 ### A8.2 Import
 Drag-and-drop for either BVD export. **Prefer the emailed PDF** — it is the only one carrying express tractor/driver and the invoice's own header dates (D13); the portal CSV is accepted too. Three states designed carefully:

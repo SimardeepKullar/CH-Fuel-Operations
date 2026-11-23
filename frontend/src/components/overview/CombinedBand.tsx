@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import type { CombinedTile, CombinedView } from "../../lib/overviewView";
+import ReviewRows from "./ReviewRows";
 
 /** The currency code sits small beside the figure; the `$` stays with the number, in its size and colour. */
 function Figure({ tile, size }: { tile: CombinedTile; size: "xl" | "md" }) {
   return (
     <div className={`ov-cb-fig ov-cb-${size}`}>
       <span className="ov-cb-cc">{tile.cc}</span>
-      <span className="ov-cb-num">{tile.value}</span>
+      <span className="ov-cb-num" style={tile.muted ? { color: "#9aa3b5" } : undefined}>
+        {tile.value}
+      </span>
       {tile.unit !== "" && <span className="ov-cb-unit">{tile.unit}</span>}
     </div>
   );
@@ -87,7 +90,7 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
             <Figure tile={k} size="md" />
             {k.sub !== "" && <div className="ov-cb-note">{k.sub}</div>}
             {k.note !== "" && (
-              <div className="ov-cb-corner" data-testid="ov-cb-hst">
+              <div className="ov-cb-corner" data-testid={k.note.startsWith("HST") ? "ov-cb-hst" : "ov-cb-corner"}>
                 {k.note}
               </div>
             )}
@@ -95,24 +98,7 @@ export default function CombinedBand({ view, onEnterRates }: { view: CombinedVie
         ))}
         <div className="ov-cb-tile ov-cb-review" data-testid="combined-attention">
           <div className="ov-cb-label">Needs review</div>
-          <div className="ov-cb-review-row ov-linked">
-            <span className="ov-cb-count" style={{ color: "#A15C07" }}>
-              {attention.anomalies.count}
-            </span>
-            <span className="ov-cb-review-text">anomalies flagged</span>
-            <span className="ov-view">{attention.anomalies.link.text}</span>
-            <Link className="ov-tile-cover" href={attention.anomalies.link.href} aria-label="Anomalies flagged: review in Transactions" data-testid="anomalies-link" />
-          </div>
-          {attention.receipts !== null && (
-            <div className="ov-cb-review-row ov-linked">
-              <span className="ov-cb-count" style={{ color: attention.receipts.color }}>
-                {attention.receipts.value}
-              </span>
-              <span className="ov-cb-review-text">receipts · {attention.receipts.sub}</span>
-              <span className="ov-view">{attention.receipts.link.text}</span>
-              <Link className="ov-tile-cover" href={attention.receipts.link.href} aria-label="Receipt compliance: view the receipt queue" data-testid="receipts-link" />
-            </div>
-          )}
+          <ReviewRows review={attention} />
         </div>
       </div>
     </section>

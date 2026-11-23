@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { RegionView, Tile } from "../../lib/overviewView";
 import Corners from "../Corners";
+import ReviewRows from "./ReviewRows";
 
 function Money({ tile, big, hero }: { tile: Tile; big?: boolean; hero?: boolean }) {
   return (
@@ -18,6 +19,16 @@ function Money({ tile, big, hero }: { tile: Tile; big?: boolean; hero?: boolean 
 }
 
 function TileBox({ tile, big, hero }: { tile: Tile; big?: boolean; hero?: boolean }) {
+  if (tile.review !== null) {
+    return (
+      <div className="ov-tile ov-review" data-testid="ov-tile" data-label={tile.label}>
+        <div className="ov-tile-top">
+          <span className="ov-tile-label">{tile.label}</span>
+        </div>
+        <ReviewRows review={tile.review} />
+      </div>
+    );
+  }
   const cls = hero ? "ov-tile ov-tile-big ov-tile-hero" : big ? "ov-tile ov-tile-big" : "ov-tile";
   return (
     <div className={cls} data-testid="ov-tile" data-label={tile.label}>
@@ -34,7 +45,7 @@ function TileBox({ tile, big, hero }: { tile: Tile; big?: boolean; hero?: boolea
   );
 }
 
-/** One country's card: two big tiles and six small ones, or the absent-side empty state. */
+/** One country's card: two big tiles and six small ones (the last, Needs review), or the absent-side empty state. */
 export default function RegionCard({ region: native }: { region: RegionView }) {
   const [caUnits, setCaUnits] = useState(false);
   const alt = native.caUnits ?? null;
