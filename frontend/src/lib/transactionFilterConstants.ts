@@ -5,7 +5,7 @@ const PRODUCT_LABELS: Record<InvoiceProductType, string> = {
   highway_diesel: "Diesel",
   def: "DEF",
   scale: "Scale",
-  trailer: "Trailer",
+  trailer: "Trailer Fuel",
   additive: "Additive",
   oil: "Oil",
   lubricant: "Lubricant",
