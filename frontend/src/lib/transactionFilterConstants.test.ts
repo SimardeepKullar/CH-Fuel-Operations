@@ -16,3 +16,10 @@ describe("PRODUCT_OPTIONS (T-130)", () => {
     expect(productLabel("DE")).toBe("DEF");
   });
 });
+
+describe("Trailer Fuel label (T-132)", () => {
+  it("labels TF as Trailer Fuel in the filter and on a line", () => {
+    expect(PRODUCT_OPTIONS.find((o) => o.value === "TF")).toEqual({ value: "TF", label: "Trailer Fuel" });
+    expect(productLabel("TF")).toBe("Trailer Fuel");
+  });
+});
