@@ -557,6 +557,16 @@ export const EDGE_CASES = {
       ["B600001-DE", "DRIVER ONE", "101", "2026-01-06 10:05:00", "90001", "SAMPLE #1", "Sampleton", "TX", "DE", "0.00", "0.0000", "0.0000", "24.99", "0.00", "0.00", "0.00", "0.00", "0.0000", "0.00", "24.99", "US"],
     ],
   }]),
+  /** A trailer-fuel (`TF`) line beside the tractor diesel, as on real invoice
+   * 1044723 (T-131): its own roll-up on the card and its own Grand Totals row,
+   * which the Overview must count in no tile but Trailer Fuel. */
+  "edge-trailer-fuel": edge([{
+    card: "1000001",
+    rows: [
+      ...US_ROWS["1000001"],
+      usRow("B700001-TF", "DRIVER ONE", "101", "2026-01-06 10:20:00", "1", "TF", "48.60", "5.5000", "5.1234"),
+    ],
+  }]),
   /** One fuel line under a product code no mapping knows: quarantined as
    * UNMAPPED_PRODUCT, never default-mapped. */
   "edge-unmapped-product": edge([{

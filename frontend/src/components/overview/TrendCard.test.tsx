@@ -5,9 +5,9 @@ import type { WeekFigures } from "../../lib/overviewAggregate";
 import { buildTrends } from "../../lib/overviewCharts";
 import TrendCard from "./TrendCard";
 
-const us = (gal: number, diesel: number) => ({ invoice: "i", gal, diesel, def: 0, defGal: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0 });
+const us = (gal: number, diesel: number) => ({ invoice: "i", gal, diesel, total: diesel, def: 0, defGal: 0, trailer: 0, trailerGal: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0 });
 const ca = (litres: number, withTax: number, preTax: number) => ({
-  invoice: "i", litres, dieselWithTax: withTax, dieselPreTax: preTax, defWithTax: 0, defPreTax: 0, defLitres: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0,
+  invoice: "i", litres, dieselWithTax: withTax, dieselPreTax: preTax, defWithTax: 0, defPreTax: 0, total: withTax, tax: withTax - preTax, defLitres: 0, trailerWithTax: 0, trailerPreTax: 0, trailerLitres: 0, other: 0, disc: 0, stops: 1, receiptsExpected: 0, receiptsConfirmed: 0, anomalies: 0,
 });
 const week = (start: string, end: string, u: ReturnType<typeof us> | null, c: ReturnType<typeof ca> | null): WeekFigures => ({ weekEnd: end, start, end, fx: null, us: u, ca: c, drivers: [] });
 

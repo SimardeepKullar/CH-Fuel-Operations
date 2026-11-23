@@ -40,8 +40,8 @@ describe("1a all time", () => {
     expect(ca.big[1]!.unit).toBe("/ L");
     expect(ca.small[0]!.sub).toMatch(/ L$/);
     expect(ca.small.map((t) => t.label)).toEqual(v.us.small.map((t) => t.label));
-    expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Other charges", "Discount captured", "Receipt compliance", "Anomalies flagged"]);
-    expect(v.us.small[5]!.link).toEqual({ text: "View →", href: "/transactions?side=us" });
+    expect(v.us.small.map((t) => t.label)).toEqual(["Diesel", "DEF", "Trailer Fuel", "Other charges", "Discount captured", "Needs review"]);
+    expect(v.us.small[5]!.review!.anomalies.link).toEqual({ text: "View →", href: "/transactions?side=us" });
   });
   it("has the CA tiles with HST notes", () => {
     expect(v.ca.big[1]!.label).toBe("Billed price, with HST");
@@ -50,7 +50,7 @@ describe("1a all time", () => {
   });
   it("has the combined headline, split, price, discount and attention counts", () => {
     expect(v.combined.total!.label).toBe("Total Spend - Combined");
-    expect(v.combined.kpis.map((k) => k.label)).toEqual(["Average billed price, with HST", "Diesel", "DEF", "Other charges", "Discount captured"]);
+    expect(v.combined.kpis.map((k) => k.label)).toEqual(["Average billed price, with HST", "Diesel", "DEF", "Trailer Fuel", "Other charges"]);
     const [us, ca] = v.combined.shares!;
     expect(us.pct + ca.pct).toBe(100);
     expect(v.combined.attention.anomalies.count).toBe(v.agg.us!.anomalies + v.agg.ca!.anomalies);
@@ -67,7 +67,8 @@ describe("1b single week", () => {
     expect(v.readout).toMatch(/^Billing week · /);
     expect(v.rateMeta).toBe("Exchange rate 1.42 CAD per USD");
     expect(v.us.big[1]!.sub).toMatch(/^[+−]\d\.\d% vs wk of Oct 27 · Discount \$\d\.\d{4} \/ gal off retail$/);
-    expect(v.us.small[2]!.sub).toBe("Scale, express and fees");
+    expect(v.us.small[3]!.sub).toBe("Scale, express and fees");
+    expect(v.us.small[2]).toMatchObject({ label: "Trailer Fuel", value: "$0.00", sub: "None this week", color: "#9aa3b5" });
     expect(v.combined.rateLabel).toBe("CAD per USD");
   });
 });
@@ -78,7 +79,8 @@ describe("1c four-week range", () => {
     expect(v.readout).toMatch(/^Range · 4 weeks · /);
     expect(v.invoices.summaryLabel).toBe("Invoices in range");
     expect(v.invoices.count).toBe(8);
-    expect(v.us.small[5]!.link!.href).toBe("/transactions?side=us");
+    expect(v.us.small[5]!.review!.anomalies.link.href).toBe("/transactions?side=us");
+    expect(v.ca.small[2]!.sub).toBe("None in range");
   });
 });
 
@@ -89,7 +91,8 @@ describe("1d today's real data", () => {
     expect(v.us.sub).toBe("Invoice 999210 · Sep 3 – 9 · USD · gallons");
     expect(v.ca.sub).toBe("Invoice 999217 · Sep 3 – 9 · CAD incl. HST · litres");
     expect(v.us.big[1]!.value).toBe("$5.5479");
-    expect(v.us.small[4]).toMatchObject({ value: "0%", color: "#c13b3b", sub: "0 of 66 confirmed" });
+    expect(v.us.small[5]!.review!.receipts).toMatchObject({ value: "0%", color: "#c13b3b", sub: "0 of 66 confirmed" });
+    expect(v.us.small[5]!.review!.anomalies.count).toBe(13);
   });
   it("renders no NaN or Infinity in any label", () => {
     const text = JSON.stringify([v.us, v.ca, v.combined, v.invoices, v.readout, v.rateMeta]);
@@ -280,20 +283,68 @@ describe("T-92 HST on the combined band", () => {
     expect(price.sub).toMatch(/^CA\$\d\.\d{4} \/ L before HST$/);
   });
 
-  it("puts HST in the Diesel, DEF and Total spend corners and keeps Discount captured", () => {
+  it("puts HST in the Diesel, DEF and Total spend corners, and Discount in the price's (T-131)", () => {
     const v = view("all");
     const c = v.agg.combined!;
     expect(find(v, "Diesel").note).toBe(money(c.dieselHst));
     expect(find(v, "DEF").note).toBe(money(c.defHst));
     expect(v.combined.total!.note).toBe(money(c.hst));
-    expect(find(v, "Discount captured").value).toMatch(/^\$/);
+    expect(find(v, "Average billed price, with HST").note).toBe(`Discount ${money(c.disc).replace(/^HST /, "")}`);
   });
 
   it("shows no HST note at all on a US-only week", () => {
     const v = view("usonly");
     expect(v.combined.total!.note).toBe("");
-    expect(v.combined.kpis.every((k) => k.note === "")).toBe(true);
+    expect(v.combined.kpis.every((k) => !k.note.startsWith("HST"))).toBe(true);
     expect(JSON.stringify(v.combined)).not.toContain("HST CA");
   });
 });
 
+
+describe("T-131 invoice 1044723: the tiles add up to the invoice", () => {
+  const base = overviewFixture("all")[0]!;
+  const week = {
+    ...base,
+    fx: null,
+    us: null,
+    ca: {
+      ...base.ca!,
+      invoice: "1044723",
+      litres: 33819.72,
+      dieselWithTax: 72258.18,
+      dieselPreTax: 63945.3,
+      defWithTax: 326.82,
+      defPreTax: 289.22,
+      defLitres: 212.36,
+      trailerWithTax: 397.69,
+      trailerPreTax: 351.94,
+      trailerLitres: 184.3,
+      other: 52,
+      total: 73034.69,
+      tax: 8396.23,
+      receiptsExpected: 77,
+      receiptsConfirmed: 0,
+      anomalies: 45,
+    },
+  };
+  const v = buildOverviewView([week], { mode: "week", week: week.weekEnd }, href);
+  const ca = (label: string) => v.ca.small.find((t) => t.label === label)!;
+
+  it("Total spend and its HST are the invoice's printed figures", () => {
+    expect(v.ca.big[0]).toMatchObject({ value: "$73,034.69", note: "HST CA$8,396.23", sub: "Diesel + DEF + Trailer Fuel + Other Charges" });
+  });
+
+  it("trailer fuel has its own tile, with litres and HST", () => {
+    expect(ca("Trailer Fuel")).toMatchObject({ value: "$397.69", sub: "184.30 L", note: "HST CA$45.75", color: "#16205c" });
+    expect(ca("Diesel").value).toBe("$72,258.18");
+  });
+
+  it("Needs review holds the anomalies and receipts in one tile", () => {
+    expect(ca("Needs review").review).toMatchObject({ anomalies: { count: 45 }, receipts: { value: "0%", sub: "0 of 77 confirmed" } });
+  });
+
+  it("the combined band's total and Trailer Fuel tile match", () => {
+    expect(v.combined.total!.value).toBe("$73,034.69");
+    expect(v.combined.kpis.find((k) => k.label === "Trailer Fuel")).toMatchObject({ value: "$397.69", sub: "184.30 L", note: "HST CA$45.75" });
+  });
+});

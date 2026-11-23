@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { AnomalySeverity, InvoiceCurrency, InvoiceQtyUnit } from "../db/types.js";
+import { DEFAULT_INVOICE_PRODUCT_CODES, type InvoiceProductType } from "../invoice/productCode.js";
 import { normalizeAnomalyDetail } from "./anomalyDetail.js";
 import {
   convertNullable,
@@ -58,6 +59,9 @@ export interface DiscountRollup {
 export interface OtherChargesRollup {
   total: number;
   scale: number;
+  /** Every other product the invoice prints a total for — additive, oil,
+   * lubricant, cash — with tax (T-131). Not diesel, DEF or trailer fuel. */
+  products: number;
   express: number;
   expressFee: number;
   /** The invoice's Manual Transactions, summed as printed (T-128). Negative
@@ -80,6 +84,8 @@ export interface OverviewKpis {
   tax: OverviewTax;
   diesel: ProductRollup;
   def: ProductRollup;
+  /** Trailer fuel (`TF`), kept apart from tractor diesel so the billed price stays tractor-only (T-131). */
+  trailer: ProductRollup;
   /** Headline metric (A6.3/A9): quantity-weighted, never a mean of prices. `null` with no TA quantity this week.
    * As billed, so with tax on a CA invoice. */
   avgBilledPerUnit: number | null;
@@ -358,10 +364,21 @@ async function loadKpis(pool: Pool, week: string, invoice: WeekInvoice, conv: Qt
     loadAnomalyCount(pool, invoice.id),
   ]);
 
+  // Each printed totals row goes to exactly one tile by its product's type, so
+  // diesel + DEF + trailer + other charges is the grand total (T-131). BVD
+  // prints DEF under two codes (T-129): DF, and DE for packaged DEF.
+  const ofType = (type: InvoiceProductType): InvoiceTotalRow[] =>
+    [...totals.values()].filter((row) => DEFAULT_INVOICE_PRODUCT_CODES.get(row.product_code) === type);
   const ta = totals.get("TA");
-  // BVD prints DEF under two codes (T-129): DF, and DE for packaged DEF.
-  const df = sumTotalRows([totals.get("DF"), totals.get("DE")]);
+  const df = sumTotalRows(ofType("def"));
+  const tf = sumTotalRows(ofType("trailer"));
   const scale = totals.get("S");
+  const otherProductCents = [...totals.values()]
+    .filter((row) => {
+      const type = DEFAULT_INVOICE_PRODUCT_CODES.get(row.product_code);
+      return type !== "highway_diesel" && type !== "def" && type !== "trailer" && type !== "scale";
+    })
+    .reduce((sum, row) => sum + toCents(row.amount), 0);
 
   const taQty = dieselAgg.ta_gallons === null ? 0 : Number(dieselAgg.ta_gallons);
   const avgBilledStored = taQty > 0 ? Number(dieselAgg.weighted_num) / taQty : null;
@@ -396,6 +413,7 @@ async function loadKpis(pool: Pool, week: string, invoice: WeekInvoice, conv: Qt
     },
     diesel: productRollup(ta, currency, conv),
     def: productRollup(df, currency, conv),
+    trailer: productRollup(tf, currency, conv),
     avgBilledPerUnit: convertNullable(conv.perUnit, avgBilledStored),
     avgBilledPreTaxPerUnit: convertNullable(conv.perUnit, avgPreTaxStored),
     discount: {
@@ -404,8 +422,9 @@ async function loadKpis(pool: Pool, week: string, invoice: WeekInvoice, conv: Qt
       currency,
     },
     otherCharges: {
-      total: fromCents(toCents(scaleAmount) + toCents(expressAmount) + toCents(manualTotal ?? 0)),
+      total: fromCents(toCents(scaleAmount) + otherProductCents + toCents(expressAmount) + toCents(manualTotal ?? 0)),
       scale: scaleAmount,
+      products: fromCents(otherProductCents),
       express: expressAmount,
       expressFee,
       manual: manualTotal === null ? 0 : Number(manualTotal),
